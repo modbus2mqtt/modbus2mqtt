@@ -1,0 +1,20 @@
+name: "On pull request: Enable Auto-Merge"
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge (squash)
+    runs-on: ubuntu-latest
+    # Skip Release Please PRs (those should be merged manually)
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    steps:
+      - run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
