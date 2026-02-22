@@ -2,67 +2,97 @@ name: 'On pull request: Build and Test'
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - 'e2e/**'
-      - 'specification/**'
-      - 'specifications/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.nvmrc'
-      - '.github/workflows/build-and-test-on-pr.yml'
   workflow_dispatch:
 permissions:
   contents: write
+  pull-requests: read
 jobs:
+  check-changes:
+    name: Check for code changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'e2e/**'
+              - 'specification/**'
+              - 'specifications/**'
+              - 'scripts/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - '.nvmrc'
+              - '.github/workflows/build-and-test-on-pr.yml'
+
   build-and-test-on-pr:
     name: 'On pull request: Build and Test'
+    needs: check-changes
     runs-on: ubuntu-latest
     steps:
+      - name: Skip — no code changes
+        if: needs.check-changes.outputs.code != 'true'
+        run: echo "No relevant code changes detected. Skipping build and test."
+
       - name: Checkout repository
+        if: needs.check-changes.outputs.code == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Setup pnpm
+        if: needs.check-changes.outputs.code == 'true'
         uses: pnpm/action-setup@v4
       - name: Set up Node.js from .nvmrc
+        if: needs.check-changes.outputs.code == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Install system dependencies (nginx, mosquitto, jq)
+        if: needs.check-changes.outputs.code == 'true'
         run: sudo apt-get update && sudo apt-get install -y nginx mosquitto mosquitto-clients jq
       - name: Install Node dependencies
+        if: needs.check-changes.outputs.code == 'true'
         run: |
           pnpm install --frozen-lockfile
           pushd backend && pnpm install --frozen-lockfile && popd
           pushd frontend && pnpm install --frozen-lockfile && popd
       - name: Run pre-commit checks (fast, no full mode)
+        if: needs.check-changes.outputs.code == 'true'
         env:
           GITHUB_ACTIONS: '1'
           GITHUB_BASE_REF: origin/${{ github.base_ref }}
         run: |
           bash scripts/pre-commit.sh
       - name: Build all
+        if: needs.check-changes.outputs.code == 'true'
         run: pnpm run build
       - name: Run backend unit tests
+        if: needs.check-changes.outputs.code == 'true'
         run: |
           pushd backend && pnpm run test && popd
       - name: Run specification smoke test
+        if: needs.check-changes.outputs.code == 'true'
         run: |
           pushd specification && pnpm run test && popd
       - name: Verify specification validator CLI (guards modbus2mqtt.config)
+        if: needs.check-changes.outputs.code == 'true'
         run: node dist/specification/validate.js --help
       - name: Install Playwright browsers
+        if: needs.check-changes.outputs.code == 'true'
         run: npx playwright install --with-deps chromium
       - name: Start local E2E servers
+        if: needs.check-changes.outputs.code == 'true'
         run: pnpm run e2e:start
       - name: Run Playwright E2E tests
+        if: needs.check-changes.outputs.code == 'true'
         run: npx playwright test
       - name: Upload Playwright test results
-        if: ${{ always() }}
+        if: ${{ always() && needs.check-changes.outputs.code == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
@@ -71,7 +101,7 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
       - name: Upload server logs
-        if: ${{ always() }}
+        if: ${{ always() && needs.check-changes.outputs.code == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: e2e-logs

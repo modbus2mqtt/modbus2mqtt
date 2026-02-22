@@ -7,6 +7,11 @@ on:
         description: 'Version: patch|minor|major or explicit (e.g. 1.2.3). If omitted, read from package.json.'
         required: false
         type: string
+      skip_github_release:
+        description: 'Skip GitHub Release creation (used when Release Please already created it).'
+        required: false
+        type: boolean
+        default: false
     outputs:
       resolved_version:
         description: 'Resolved version used for tagging.'
@@ -48,13 +53,19 @@ jobs:
         id: setver
         run: |
           set -euo pipefail
-          if [ -n "${{ inputs.version }}" ]; then
+          input_version="${{ inputs.version }}"
+          if [ -z "$input_version" ]; then
+            # No version given — read from package.json
+            resolved="$(node -p "require('./package.json').version")"
+          elif echo "$input_version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            # Explicit semver (e.g. from Release Please) — use directly
+            resolved="$input_version"
+          else
+            # Bump keyword (patch|minor|major) — use npm version
             git config --global user.email "noreply@github.com"
             git config --global user.name "Workflow User"
-            resolved="$(npm version ${{ inputs.version }} | sed -e 's/^v//g')"
+            resolved="$(npm version "$input_version" | sed -e 's/^v//g')"
             git push --follow-tags
-          else
-            resolved="$(node -p "require('./package.json').version")"
           fi
           echo "resolved_version=$resolved" >> $GITHUB_OUTPUT
           echo "Using version: $resolved"
@@ -117,6 +128,7 @@ jobs:
             BUILD_REPOSITORY=${{ github.repository }}
 
       - name: Create GitHub Release
+        if: ${{ !inputs.skip_github_release }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.setver.outputs.resolved_version }}
