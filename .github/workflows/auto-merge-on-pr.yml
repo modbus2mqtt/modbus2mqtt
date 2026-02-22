@@ -15,6 +15,7 @@ jobs:
     # Skip Release Please PRs (those should be merged manually)
     if: ${{ github.actor != 'github-actions[bot]' }}
     steps:
+      - uses: actions/checkout@v5
       - run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
