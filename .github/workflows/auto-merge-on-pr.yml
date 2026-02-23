@@ -21,4 +21,4 @@ jobs:
       - uses: actions/checkout@v5
       - run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
