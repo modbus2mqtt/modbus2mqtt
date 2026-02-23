@@ -6,6 +6,8 @@ import {
   IdentifiedStates,
   HttpErrorsEnum,
   Converters,
+  FileLocation,
+  SpecificationFileUsage,
 } from '../../src/shared/specification/index.js'
 import { Config } from '../../src/server/config.js'
 import { ConfigPersistence } from '../../src/server/persistence/configPersistence.js'
@@ -421,6 +423,33 @@ describe('http POST', () => {
     conn.timeout = 100
     ConfigBus.updateBusProperties(Bus.getBus(0)!.properties!, conn)
     expect(Bus.getBus(0)!.properties.connectionData.timeout).toBe(100)
+  })
+
+  test('POST /specification: accepts payload > 100KB (base64 files)', async () => {
+    // Generate a base64 string > 100KB to exceed the old default body-parser limit
+    const largeBase64 = Buffer.alloc(150 * 1024).toString('base64')
+    const specWithFile: ImodbusSpecification = {
+      ...spec,
+      filename: 'largefiletest',
+      files: [
+        {
+          url: 'large-image.png',
+          fileLocation: FileLocation.Local,
+          usage: SpecificationFileUsage.img,
+          data: largeBase64,
+          mimeType: 'image/png',
+        },
+      ],
+    }
+    const url = apiUri.specfication + '?busid=0&slaveid=2&originalFilename=largefiletest'
+    await supertest(httpServer['app'])
+      .post(url)
+      .send(specWithFile)
+      .expect(HttpErrorsEnum.OkCreated)
+
+    // Cleanup
+    const jsonPath = join(ConfigSpecification.getLocalDir(), 'specifications', 'largefiletest.json')
+    if (fs.existsSync(jsonPath)) fs.unlinkSync(jsonPath)
   })
 
   // Upload endpoints removed: files are now managed as base64 in the specification object

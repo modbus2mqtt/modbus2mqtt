@@ -4,7 +4,6 @@ import { Application, NextFunction, Request } from 'express'
 import type { ParamsDictionary } from 'express-serve-static-core'
 import type { ParsedQs } from 'qs'
 import express from 'express'
-import bodyParser from 'body-parser'
 import { Config, MqttValidationResult } from './config.js'
 import { HttpErrorsEnum } from '../shared/specification/index.js'
 import { join, basename } from 'path'
@@ -318,9 +317,8 @@ export class HttpServerBase {
     this.initStatics()
 
     //this.app.use(cors);
-    this.app.use(bodyParser.json())
-    this.app.use(bodyParser.urlencoded({ extended: true }))
-    this.app.use(express.json())
+    this.app.use(express.json({ limit: '50mb' }))
+    this.app.use(express.urlencoded({ extended: true, limit: '50mb' }))
     this.app.use(function (_undefined: unknown, res: http.ServerResponse, next: NextFunction) {
       //            res.setHeader('charset', 'utf-8')
       debug('Authenticate')
