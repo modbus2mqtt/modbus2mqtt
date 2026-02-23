@@ -23,9 +23,6 @@ importers:
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
-      body-parser:
-        specifier: ^2.2.0
-        version: 2.2.2
       bootstrap:
         specifier: ^5.3.3
         version: 5.3.8(@popperjs/core@2.11.8)
@@ -102,9 +99,6 @@ importers:
       '@types/bcryptjs':
         specifier: ^2.4.6
         version: 2.4.6
-      '@types/body-parser':
-        specifier: ^1.19.5
-        version: 1.19.6
       '@types/debug':
         specifier: ^4.1.12
         version: 4.1.12
