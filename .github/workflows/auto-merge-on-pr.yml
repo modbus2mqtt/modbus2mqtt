@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   auto-merge:
-    name: Enable auto-merge (squash)
+    name: Enable auto-merge (rebase)
     runs-on: ubuntu-latest
     # Only for trusted contributors (not bots, not external)
     if: >-
@@ -19,6 +19,6 @@ jobs:
       || github.actor == 'volkmarnissen') }}
     steps:
       - uses: actions/checkout@v5
-      - run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash
+      - run: gh pr merge ${{ github.event.pull_request.number }} --auto --rebase
         env:
           GH_TOKEN: ${{ secrets.PAT }}
