@@ -80,6 +80,9 @@ export interface Iconfiguration {
   mqttkeyFile?: string
   mqttcertFile?: string
   httpport: number
+  httpsPort?: number
+  httpsCertFile?: string
+  httpsKeyFile?: string
   rootUrl?: string
   frontendDir?: string
   supervisor_host?: string

@@ -15,6 +15,7 @@ declare global {
   namespace NodeJS {
     interface ProcessEnv {
       HASSIO_TOKEN: string
+      MODBUS2MQTT_HTTPS_PORT?: string
     }
   }
 }
@@ -164,6 +165,24 @@ export class Config {
           ? Config.config.mqttusehassio
           : process.env.HASSIO_TOKEN != undefined && process.env.HASSIO_TOKEN.length > 0
       Config.config.supervisor_host = Config.config.supervisor_host ? Config.config.supervisor_host : 'supervisor'
+
+      // HTTPS configuration: env var takes precedence over YAML
+      const envHttpsPort = process.env.MODBUS2MQTT_HTTPS_PORT
+      if (envHttpsPort) {
+        const parsed = parseInt(envHttpsPort, 10)
+        if (!isNaN(parsed) && parsed > 0) {
+          Config.config.httpsPort = parsed
+        }
+      }
+      // Default certificate filenames when HTTPS is configured
+      if (Config.config.httpsPort) {
+        Config.config.httpsCertFile = Config.config.httpsCertFile ? Config.config.httpsCertFile : 'fullchain.pem'
+        Config.config.httpsKeyFile = Config.config.httpsKeyFile ? Config.config.httpsKeyFile : 'privkey.pem'
+      }
+      // Disable HTTPS in addon mode
+      if (Config.config.mqttusehassio) {
+        Config.config.httpsPort = undefined
+      }
     } else {
       log.log(LogLevelEnum.info, 'No config file found ')
       Config.config = structuredClone(Config.newConfig)
@@ -376,6 +395,7 @@ export class Config {
   static resetForE2E(): void {
     // Preserve server-identity properties
     const httpport = Config.config?.httpport
+    const httpsPort = Config.config?.httpsPort
     const supervisor_host = Config.config?.supervisor_host
     const mqttusehassio = Config.config?.mqttusehassio
     const fakeModbus = Config.config?.fakeModbus
@@ -388,6 +408,7 @@ export class Config {
 
     // Restore preserved properties
     if (httpport) Config.config.httpport = httpport
+    if (httpsPort) Config.config.httpsPort = httpsPort
     if (supervisor_host) Config.config.supervisor_host = supervisor_host
     if (mqttusehassio) Config.config.mqttusehassio = mqttusehassio
     if (fakeModbus) Config.config.fakeModbus = fakeModbus

@@ -5,6 +5,7 @@ services:
     container_name: modbus2mqtt
     ports:
       - 3000:3000
+      - 3443:3443
     restart: always
     volumes:
       - data:/home/volkmar/data
@@ -12,6 +13,7 @@ services:
       - ssl:/home/volkmar/ssl
     environment:
       - TZ=Europe/Berlin
+      - MODBUS2MQTT_HTTPS_PORT=3443
 volumes:
   data:
   config:

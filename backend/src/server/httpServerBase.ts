@@ -1,5 +1,6 @@
 import Debug from 'debug'
 import * as http from 'http'
+import * as https from 'https'
 import { Application, NextFunction, Request } from 'express'
 import type { ParamsDictionary } from 'express-serve-static-core'
 import type { ParsedQs } from 'qs'
@@ -14,6 +15,7 @@ import { LogLevelEnum, Logger } from '../specification/index.js'
 import { apiUri } from '../shared/server/index.js'
 import { AddressInfo } from 'net'
 import { MqttSubscriptions } from './mqttsubscriptions.js'
+import { ConfigPersistence } from './persistence/configPersistence.js'
 
 interface IAddonInfo {
   slug: string
@@ -34,6 +36,7 @@ export class HttpServerBase {
   protected app: Application
   languages = ['en']
   server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse>
+  httpsServer?: https.Server
   constructor(private angulardir: string = '.') {
     this.app = express()
   }
@@ -62,9 +65,47 @@ export class HttpServerBase {
     }
   }
   listen(listenFunction: () => void) {
-    this.server = this.app.listen(Config.getConfiguration().httpport, listenFunction)
+    const config = Config.getConfiguration()
+    const httpsPort = config.httpsPort
+
+    if (httpsPort) {
+      const persistence = new ConfigPersistence()
+      const certData = persistence.readCertificateFile(config.httpsCertFile)
+      const keyData = persistence.readCertificateFile(config.httpsKeyFile)
+
+      if (certData && keyData) {
+        // Start HTTPS server with the app
+        this.httpsServer = https.createServer({ cert: certData, key: keyData }, this.app)
+        this.httpsServer.listen(httpsPort, () => {
+          log.log(LogLevelEnum.info, `HTTPS listening on port ${httpsPort}`)
+          listenFunction()
+        })
+
+        // HTTP server only redirects to HTTPS
+        const redirectApp = express()
+        redirectApp.all(/.*/, (req: Request, res: express.Response) => {
+          const host = req.hostname
+          const httpsUrl = `https://${host}:${httpsPort}${req.originalUrl}`
+          res.redirect(301, httpsUrl)
+        })
+        this.server = redirectApp.listen(config.httpport, () => {
+          log.log(LogLevelEnum.info, `HTTP redirecting to HTTPS on port ${config.httpport}`)
+        })
+        return
+      } else {
+        log.log(
+          LogLevelEnum.warn,
+          `HTTPS configured on port ${httpsPort} but certificate files not found ` +
+            `(${config.httpsCertFile}, ${config.httpsKeyFile} in ${ConfigPersistence.sslDir}). Falling back to HTTP only.`
+        )
+      }
+    }
+
+    // Default: plain HTTP
+    this.server = this.app.listen(config.httpport, listenFunction)
   }
   close() {
+    if (this.httpsServer) this.httpsServer.close()
     if (this.server) this.server.close()
   }
   private static getAuthTokenFromHeader(req: Request): string | undefined {
