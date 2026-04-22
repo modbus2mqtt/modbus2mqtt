@@ -41,7 +41,7 @@ export async function runRegister(
   } else if (options.port != null) {
     baseUrl = `http://${LOCALHOST}:${options.port}`;
   } else {
-    baseUrl = `http://${LOCALHOST}:${PORTS.modbus2mqttE2e}`;
+    baseUrl = `http://${LOCALHOST}:${PORTS.modbus2mqttSpec}`;
   }
 
   await dismissAnnouncements(page);

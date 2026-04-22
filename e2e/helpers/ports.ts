@@ -2,7 +2,7 @@ export const PORTS = {
   nginxAddon: 3006,
   modbus2mqttAddon: 3004,
   modbusTcp: 3002,
-  modbus2mqttE2e: 3005,
+  modbus2mqttSpec: 3005,
   mosquittoAuth: 3001,
   mosquittoNoAuth: 3003,
   modbus2mqttNoAuth: 3007,

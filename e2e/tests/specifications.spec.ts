@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { PORTS, LOCALHOST } from '../helpers/ports';
-import { runRegister, runConfig, dismissAnnouncements } from '../helpers/app-helpers';
+import { runRegister, runConfig } from '../helpers/app-helpers';
 import { resetServer } from '../helpers/reset-helper';
 
 /** Minimal spec JSON that can be imported via POST /api/uploadspec */
@@ -36,31 +36,25 @@ const localSpec = {
 };
 
 test.describe('Specifications Page Tests', () => {
-  const baseUrl = `http://${LOCALHOST}:${PORTS.modbus2mqttE2e}`;
+  const baseUrl = `http://${LOCALHOST}:${PORTS.modbus2mqttSpec}`;
 
   test.beforeEach(async () => {
-    await resetServer(PORTS.modbus2mqttE2e);
+    await resetServer(PORTS.modbus2mqttSpec);
   });
 
   test('shows public specifications and imported local spec', async ({ page }) => {
     test.setTimeout(120_000);
 
-    // Register and configure MQTT
-    await runRegister(page, { authentication: true });
-    await runConfig(page, { authentication: true });
+    // Register and configure MQTT (no-auth backend — API calls need no bearer token)
+    await runRegister(page, { authentication: false, port: PORTS.modbus2mqttSpec });
+    await runConfig(page, { authentication: false });
 
-    // Get auth token from sessionStorage (set by login)
-    const authToken = await page.evaluate(() => sessionStorage.getItem('modbus2mqtt.authToken'));
-    expect(authToken).toBeTruthy();
-    const authHeaders = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${authToken}`,
-    };
+    const headers = { 'Content-Type': 'application/json' };
 
     // Import a local specification via API
     const uploadResponse = await page.request.post(`${baseUrl}/api/uploadspec`, {
       data: localSpec,
-      headers: authHeaders,
+      headers,
     });
     const uploadStatus = uploadResponse.status();
     const uploadBody = await uploadResponse.text();
@@ -70,7 +64,7 @@ test.describe('Specifications Page Tests', () => {
 
     // Verify GET /api/specifications returns summary format
     const apiResponse = await page.request.get(`${baseUrl}/api/specifications`, {
-      headers: authHeaders,
+      headers,
     });
     expect(apiResponse.ok()).toBeTruthy();
     const specs = await apiResponse.json();
