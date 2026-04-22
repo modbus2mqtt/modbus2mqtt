@@ -131,6 +131,7 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
     },
     { id: VariableTargetParameters.deviceSerialNumber, name: 'Serial Number' },
     { id: VariableTargetParameters.deviceSWversion, name: 'Software Version' },
+    { id: VariableTargetParameters.deviceHWversion, name: 'Hardware Version' },
     { id: VariableTargetParameters.entityMultiplier, name: 'Multiplier' },
     { id: VariableTargetParameters.entityOffset, name: 'Offset' },
     { id: VariableTargetParameters.entityUom, name: 'Unit of Measurement' },

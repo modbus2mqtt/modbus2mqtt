@@ -242,6 +242,7 @@ export class SpecificationComponent extends SessionStorage implements OnInit, On
             case VariableTargetParameters.deviceIdentifiers:
             case VariableTargetParameters.deviceSerialNumber:
             case VariableTargetParameters.deviceSWversion:
+            case VariableTargetParameters.deviceHWversion:
               return false
             default:
               if (this.currentSpecification)

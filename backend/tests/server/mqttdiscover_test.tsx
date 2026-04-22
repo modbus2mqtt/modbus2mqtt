@@ -493,3 +493,203 @@ test.skip('onMessage SendCommand with modbusValues', async () => {
 //       done()
 //     })
 // })
+
+// Issue #228: Variable Property values (serial_number, sw_version, hw_version) are
+// only available after the first Modbus poll. Initial discovery runs before polling,
+// so without the post-poll republish these device fields would stay empty forever.
+function buildDeviceVariableSpec(sn?: string, swv?: string, hwv?: string): ImodbusSpecification {
+  const serialEntity: ImodbusEntity = {
+    id: 10,
+    mqttname: 'sn',
+    variableConfiguration: { targetParameter: VariableTargetParameters.deviceSerialNumber },
+    converter: 'text',
+    modbusValue: [],
+    mqttValue: sn as any,
+    identified: 1,
+    converterParameters: { stringlength: 12 },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 10,
+  }
+  const swVersionEntity: ImodbusEntity = {
+    id: 11,
+    mqttname: 'swv',
+    variableConfiguration: { targetParameter: VariableTargetParameters.deviceSWversion },
+    converter: 'text',
+    modbusValue: [],
+    mqttValue: swv as any,
+    identified: 1,
+    converterParameters: { stringlength: 8 },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 11,
+  }
+  const hwVersionEntity: ImodbusEntity = {
+    id: 12,
+    mqttname: 'hwv',
+    variableConfiguration: { targetParameter: VariableTargetParameters.deviceHWversion },
+    converter: 'text',
+    modbusValue: [],
+    mqttValue: hwv as any,
+    identified: 1,
+    converterParameters: { stringlength: 8 },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 12,
+  }
+  const power: ImodbusEntity = {
+    id: 13,
+    mqttname: 'power',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: '42',
+    identified: 1,
+    converterParameters: { uom: 'W' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 13,
+  }
+  const s = {
+    filename: 'issue228',
+    manufacturer: 'Acme',
+    model: 'X1',
+    i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'Acme Device' }, { textId: 'e13', text: 'Power' }] }],
+    entities: [serialEntity, swVersionEntity, hwVersionEntity, power],
+  } as any as ImodbusSpecification
+  return s
+}
+
+test('issue #228: discovery device.serial_number/sw_version/hw_version empty when mqttValue undefined', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const s = buildDeviceVariableSpec(undefined, undefined, undefined)
+  const sl = new Slave(
+    0,
+    { slaveid: 42, specificationid: 'issue228', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
+  const payloads = disc['generateDiscoveryPayloads'](sl, s)
+  // only the numeric 'power' entity (no variableConfiguration) generates a payload
+  expect(payloads.length).toBe(1)
+  const payload = JSON.parse(payloads[0].payload as string)
+  expect(payload.device.serial_number).toBeUndefined()
+  expect(payload.device.sw_version).toBeUndefined()
+  expect(payload.device.hw_version).toBeUndefined()
+})
+
+test('issue #228: hw_version is written when deviceHWversion entity has mqttValue', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const s = buildDeviceVariableSpec('SN-001', '1.2.3', 'RevB')
+  const sl = new Slave(
+    0,
+    { slaveid: 43, specificationid: 'issue228', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
+  const payloads = disc['generateDiscoveryPayloads'](sl, s)
+  expect(payloads.length).toBe(1)
+  const payload = JSON.parse(payloads[0].payload as string)
+  expect(payload.device.serial_number).toBe('SN-001')
+  expect(payload.device.sw_version).toBe('1.2.3')
+  expect(payload.device.hw_version).toBe('RevB')
+})
+
+test('issue #228: republishDiscoveryIfChanged publishes delta after first poll', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const published: { topic: string; payload: string }[] = []
+  conn.getMqttClient = function (cb: (c: MqttClient) => void) {
+    cb({
+      publish: (topic: string, payload: Buffer | string) => {
+        published.push({ topic, payload: payload.toString() })
+      },
+    } as any as MqttClient)
+  }
+
+  // initial state: values not yet polled → empty device fields
+  const emptySpec = buildDeviceVariableSpec(undefined, undefined, undefined)
+  const islave: Islave = { slaveid: 44, specificationid: 'issue228', specification: emptySpec as any }
+  const sl = new Slave(0, islave, Config.getConfiguration().mqttbasetopic)
+
+  // prime the cache as if onUpdateSlave had just published empty payloads
+  const emptyPayloads = disc['generateDiscoveryPayloads'](sl, emptySpec)
+  for (const tp of emptyPayloads) {
+    disc['lastDiscoveryPayloads'].set(tp.topic, tp.payload.toString())
+  }
+
+  // now simulate "first poll completed": values appear on the live spec
+  islave.specification!.entities[0].mqttValue = 'SN-REAL' as any
+  islave.specification!.entities[1].mqttValue = '2.0.0' as any
+  islave.specification!.entities[2].mqttValue = 'RevC' as any
+
+  disc.republishDiscoveryIfChanged(sl)
+
+  expect(published.length).toBe(1)
+  const payload = JSON.parse(published[0].payload)
+  expect(payload.device.serial_number).toBe('SN-REAL')
+  expect(payload.device.sw_version).toBe('2.0.0')
+  expect(payload.device.hw_version).toBe('RevC')
+})
+
+test('issue #228: configuration_url is published when slave has configurationUrl', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const s = buildDeviceVariableSpec('SN', '1.0', 'A')
+  const sl = new Slave(
+    0,
+    {
+      slaveid: 46,
+      specificationid: 'issue228',
+      specification: s as any,
+      configurationUrl: 'https://192.168.1.100:8443',
+    } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
+  const payloads = disc['generateDiscoveryPayloads'](sl, s)
+  expect(payloads.length).toBe(1)
+  const payload = JSON.parse(payloads[0].payload as string)
+  expect(payload.device.configuration_url).toBe('https://192.168.1.100:8443')
+})
+
+test('issue #228: configuration_url is omitted when slave has no configurationUrl', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const s = buildDeviceVariableSpec('SN', '1.0', 'A')
+  const sl = new Slave(
+    0,
+    { slaveid: 47, specificationid: 'issue228', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
+  const payloads = disc['generateDiscoveryPayloads'](sl, s)
+  expect(payloads.length).toBe(1)
+  const payload = JSON.parse(payloads[0].payload as string)
+  expect(payload.device.configuration_url).toBeUndefined()
+})
+
+test('issue #228: republishDiscoveryIfChanged is a no-op when nothing changed', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  let publishCount = 0
+  conn.getMqttClient = function (cb: (c: MqttClient) => void) {
+    cb({
+      publish: () => {
+        publishCount++
+      },
+    } as any as MqttClient)
+  }
+
+  const s = buildDeviceVariableSpec('SN-1', '1.0', 'A')
+  const sl = new Slave(
+    0,
+    { slaveid: 45, specificationid: 'issue228', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
+  // prime the cache with the exact same payloads we will generate next
+  const initial = disc['generateDiscoveryPayloads'](sl, s)
+  for (const tp of initial) {
+    disc['lastDiscoveryPayloads'].set(tp.topic, tp.payload.toString())
+  }
+
+  disc.republishDiscoveryIfChanged(sl)
+  expect(publishCount).toBe(0)
+})

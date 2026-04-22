@@ -194,6 +194,21 @@
                         It is in the responsibility of the user to make sure, that there are no duplicates in MQTT topic names'
                     />
                   </mat-form-field>
+                  <h2>Configuration URL</h2>
+                  <mat-form-field class="width150pt">
+                    <mat-label>Configuration URL</mat-label>
+                    <input
+                      matInput
+                      matTooltipClass="tooltip-class"
+                      formControlName="configurationUrl"
+                      placeholder="http://192.168.1.100:8080"
+                      matTooltip='Optional:
+
+                        Web UI URL of the device, published as device.configuration_url in the Home Assistant MQTT discovery payload.
+
+                        Example: http://192.168.1.100:8080 or https://device.local'
+                    />
+                  </mat-form-field>
                   <h2>State Topic</h2>
 
                   @if (config.rootUrl != undefined) {

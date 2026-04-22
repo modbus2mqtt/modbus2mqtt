@@ -40,6 +40,8 @@ interface MqttDiscoveryDevice {
   identifiers?: string[]
   serial_number?: string
   sw_version?: string
+  hw_version?: string
+  configuration_url?: string
 }
 
 interface MqttDiscoveryPayload {
@@ -69,6 +71,7 @@ interface MqttDiscoveryPayload {
 export class MqttDiscover {
   private client?: MqttClient
   private isSubscribed: boolean
+  private lastDiscoveryPayloads: Map<string, string> = new Map()
   validate() {
     // currently no meaningful checks
   }
@@ -157,6 +160,8 @@ export class MqttDiscover {
 
               if (!obj.device.manufacturer && spec.manufacturer) obj.device.manufacturer = spec.manufacturer
               if (!obj.device.model && spec.model) obj.device.model = spec.model
+              const configUrl = slave.getConfigurationUrl()
+              if (configUrl) obj.device.configuration_url = configUrl
               obj.device.identifiers = ['m2m' + slave.getBusId() + 's' + slave.getSlaveId()]
               spec.entities.forEach((ent1) => {
                 if (ent1.variableConfiguration) {
@@ -171,6 +176,12 @@ export class MqttDiscover {
                       {
                         const sv = (ent1 as ImodbusEntity).mqttValue
                         if (sv !== undefined && sv !== null) obj.device.sw_version = String(sv)
+                      }
+                      break
+                    case VariableTargetParameters.deviceHWversion:
+                      {
+                        const hv = (ent1 as ImodbusEntity).mqttValue
+                        if (hv !== undefined && hv !== null) obj.device.hw_version = String(hv)
                       }
                       break
                     // case VariableTargetParameters.deviceIdentifiers:
@@ -358,6 +369,11 @@ export class MqttDiscover {
         log.log(LogLevelEnum.info, 'Publish Discovery: length:' + tAndPs.length)
         tAndPs.forEach((tAndP) => {
           mqttClient.publish(tAndP.topic, tAndP.payload, retain)
+          if (tAndP.payload instanceof Buffer && tAndP.payload.length === 0) {
+            this.lastDiscoveryPayloads.delete(tAndP.topic)
+          } else {
+            this.lastDiscoveryPayloads.set(tAndP.topic, tAndP.payload.toString())
+          }
           if (newSlave) this.subscriptions.resubscribe(mqttClient)
         })
       })
@@ -371,6 +387,34 @@ export class MqttDiscover {
           })
           .catch(reject)
       }, 500)
+    })
+  }
+
+  // Republishes discovery payloads for a slave when device-variable values
+  // (serial_number, sw_version, hw_version, entityUom) have become available
+  // after the first successful Modbus poll. No-op when nothing changed.
+  republishDiscoveryIfChanged(slave: Slave): void {
+    const spec = slave.getSpecification() as ImodbusSpecification | undefined
+    if (!spec || !spec.entities) return
+    if (slave.getNoDiscovery()) return
+
+    const payloads = this.generateDiscoveryPayloads(slave, spec)
+    const changed: ItopicAndPayloads[] = []
+    for (const tp of payloads) {
+      if (slave.getNoDiscoverEntities().includes(tp.entityid)) continue
+      const payloadStr = tp.payload.toString()
+      if (this.lastDiscoveryPayloads.get(tp.topic) !== payloadStr) {
+        changed.push(tp)
+        this.lastDiscoveryPayloads.set(tp.topic, payloadStr)
+      }
+    }
+    if (changed.length === 0) return
+
+    this.connector.getMqttClient((mqttClient) => {
+      log.log(LogLevelEnum.info, 'Republish Discovery (post-poll): length:' + changed.length)
+      changed.forEach((tp) => {
+        mqttClient.publish(tp.topic, tp.payload, retain)
+      })
     })
   }
 

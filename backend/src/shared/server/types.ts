@@ -164,6 +164,7 @@ export interface Islave {
   rootTopic?: string
   noDiscoverEntities?: number[]
   noDiscovery?: boolean
+  configurationUrl?: string
   modbusStatusForSlave?: ImodbusStatusForSlave
 }
 export interface IidentificationSpecification {

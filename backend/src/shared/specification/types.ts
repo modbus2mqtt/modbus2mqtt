@@ -104,6 +104,7 @@ export enum VariableTargetParameters {
   deviceIdentifiers = 1,
   deviceSerialNumber = 5,
   deviceSWversion = 6,
+  deviceHWversion = 7,
   entityUom = 2,
   entityMultiplier = 3,
   entityOffset = 4,

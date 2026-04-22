@@ -406,6 +406,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     fg.get('pollMode')!.setValue(slave.pollMode == undefined ? PollModes.intervall : slave.pollMode)
     fg.get('qos')!.setValue(slave.qos ? slave.qos : -1)
     fg.get('noDiscovery')!.setValue(slave.noDiscovery ? slave.noDiscovery : false)
+    fg.get('configurationUrl')!.setValue(slave.configurationUrl ? slave.configurationUrl : null)
     fg.get('discoverEntitiesList')!.setValue(this.buildDiscoverEntityList(slave))
     if (slave.noDiscovery) fg.get('discoverEntitiesList')!.disable()
     else fg.get('discoverEntitiesList')!.enable()
@@ -423,6 +424,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         rootTopic: [slave.rootTopic],
         showUrl: [false],
         noDiscovery: [false],
+        configurationUrl: [slave.configurationUrl],
         discoverEntitiesList: [[]],
       })
       this.slave2Form(slave, fg)
@@ -508,7 +510,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     ;(uiSlave.slave as any)[controlname] = val == null ? undefined : val
   }
 
-  private static controllers: string[] = ['name', 'rootTopic', 'pollInterval', 'pollMode', 'qos', 'noDiscovery']
+  private static controllers: string[] = ['name', 'rootTopic', 'pollInterval', 'pollMode', 'qos', 'noDiscovery', 'configurationUrl']
   private specCache = new Map<string, Ispecification>()
   private addSpecificationToUiSlave(uiSlave: IuiSlave, callback?: () => void) {
     const specId = uiSlave.slave.specificationid

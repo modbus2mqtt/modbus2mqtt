@@ -104,6 +104,9 @@ export class Slave {
   getName(): string | undefined {
     return this.slave.name
   }
+  getConfigurationUrl(): string | undefined {
+    return this.slave.configurationUrl
+  }
   getQos(): number | undefined {
     return this.slave.qos
   }

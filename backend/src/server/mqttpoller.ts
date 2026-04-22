@@ -4,7 +4,7 @@ import { LogLevelEnum, Logger } from '../specification/index.js'
 import { Bus } from './bus.js'
 import { Config } from './config.js'
 import { Modbus } from './modbus.js'
-import { ItopicAndPayloads } from './mqttdiscover.js'
+import { ItopicAndPayloads, MqttDiscover } from './mqttdiscover.js'
 import { MqttConnector } from './mqttconnector.js'
 
 const debug = Debug('mqttpoller')
@@ -82,6 +82,14 @@ export class MqttPoller {
                 next: (spec) => {
                   tAndP.push({ topic: bs.getStateTopic(), payload: bs.getStatePayload(spec.entities), entityid: 0 })
                   tAndP.push({ topic: bs.getAvailabilityTopic(), payload: 'online', entityid: 0 })
+                  // Device-variable entities (serial_number, sw_version, hw_version, UoM)
+                  // only have mqttValue after the Modbus read — republish discovery if it
+                  // changed so HA sees the real values instead of empty device fields.
+                  try {
+                    MqttDiscover.getInstance().republishDiscoveryIfChanged(bs)
+                  } catch (e) {
+                    debug('republishDiscoveryIfChanged failed: ' + (e instanceof Error ? e.message : String(e)))
+                  }
                   // Reset processing flag immediately for this device
                   const si = this.slavePollInfo.get(bs.getSlaveId())
                   if (si) this.slavePollInfo.set(bs.getSlaveId(), { count: si.count, processing: false })

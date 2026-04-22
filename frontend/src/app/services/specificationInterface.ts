@@ -25,5 +25,6 @@ export function isDeviceVariable(variableTarget: VariableTargetParameters): bool
     VariableTargetParameters.deviceIdentifiers,
     VariableTargetParameters.deviceSWversion,
     VariableTargetParameters.deviceSerialNumber,
+    VariableTargetParameters.deviceHWversion,
   ].includes(variableTarget)
 }
