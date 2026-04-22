@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.21.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.20.0...modbus2mqtt-v0.21.0) (2026-04-22)
+
+
+### Features
+
+* **auth:** implement structured error logging and OIDC failure handling ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+* auto-detect HTTPS certificates in /ssl directory ([6a2c86f](https://github.com/modbus2mqtt/modbus2mqtt/commit/6a2c86f85d287751a2541ac75424e228f0bcf5b0))
+* **discovery:** add hw_version + configuration_url and fix post-poll republish ([#228](https://github.com/modbus2mqtt/modbus2mqtt/issues/228)) ([#234](https://github.com/modbus2mqtt/modbus2mqtt/issues/234)) ([fbea618](https://github.com/modbus2mqtt/modbus2mqtt/commit/fbea618d15d91e16270624c8e2dbb7054e7e7281))
+* **git:** add scripts for branch management and PR creation ([ba3a3ce](https://github.com/modbus2mqtt/modbus2mqtt/commit/ba3a3ced16434a9b73daa6661cb57662cbf17f09))
+* https Support implemented ([4813e03](https://github.com/modbus2mqtt/modbus2mqtt/commit/4813e03c06f2abe32450aea89370e0f8c2c07b53))
+* integrate OIDC authentication with Zitadel ([2e261f9](https://github.com/modbus2mqtt/modbus2mqtt/commit/2e261f9d29ca4e283e703b165e33643e14b84adc))
+* **modbus2mqtt:** update Docker image references and documentation ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+
+
+### Bug Fixes
+
+* **announcements:** update breaking change message for OIDC transition ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+* **zitadel-script:** update default callback URLs for OIDC ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+
+
+### Miscellaneous
+
+* **package:** update repository links in package.json ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+* **workspace:** add build task for modbus2mqtt ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+
+
+### Documentation
+
+* **authentication:** add comprehensive authentication setup guide ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+* **getting-started:** correct GitHub issue links ([538d246](https://github.com/modbus2mqtt/modbus2mqtt/commit/538d246f11a0329f704c1ecd9979d0eb50c2628a))
+
 ## [0.20.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.19.0...modbus2mqtt-v0.20.0) (2026-02-25)
 
 
