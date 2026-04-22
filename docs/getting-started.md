@@ -211,5 +211,5 @@ Log out and back in for changes to take effect.
 ## Getting Help
 
 - Check the [FAQ](./faq.md)
-- Search [GitHub Issues](https://github.com/modbus2mqtt/server/issues)
-- Ask in [GitHub Discussions](https://github.com/modbus2mqtt/server/discussions)
+- Search [GitHub Issues](https://github.com/modbus2mqtt/modbus2mqtt/issues)
+- Ask in [GitHub Discussions](https://github.com/modbus2mqtt/modbus2mqtt/discussions)

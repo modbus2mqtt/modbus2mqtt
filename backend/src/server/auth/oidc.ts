@@ -23,6 +23,39 @@ export interface AuthSession {
   oidcNonce?: string
 }
 
+function serializeError(err: unknown): Record<string, unknown> {
+  if (!(err instanceof Error)) return { error: String(err) }
+  const e = err as Error & { code?: string; cause?: unknown }
+  const cause =
+    e.cause instanceof Error
+      ? { message: e.cause.message, code: (e.cause as { code?: string }).code, stack: e.cause.stack }
+      : e.cause
+  return {
+    name: e.name,
+    message: e.message,
+    code: e.code,
+    cause,
+    stack: e.stack,
+  }
+}
+
+function logOidcFailure(message: string, err: unknown, oidcConfig?: OidcConfig, reqContext?: Record<string, unknown>): void {
+  if (oidcConfig) {
+    log.log(
+      LogLevelEnum.info,
+      `[oidc] Active config (on failure) ${JSON.stringify({
+        issuer: oidcConfig.issuerUrl,
+        client_id: oidcConfig.clientId,
+        callback: oidcConfig.callbackUrl,
+      })}`
+    )
+  }
+  if (reqContext) {
+    log.log(LogLevelEnum.info, `[oidc] Request context (on failure) ${JSON.stringify(reqContext)}`)
+  }
+  log.log(LogLevelEnum.error, `${message} ${JSON.stringify(serializeError(err))}`)
+}
+
 export async function initOidc(): Promise<OidcConfig | null> {
   if (process.env.OIDC_ENABLED !== 'true') {
     log.log(LogLevelEnum.info, '[oidc] OIDC authentication: DISABLED (OIDC_ENABLED != true)')
@@ -49,7 +82,10 @@ export async function initOidc(): Promise<OidcConfig | null> {
     log.log(LogLevelEnum.info, `[oidc] OIDC authentication: ENABLED — issuer=${issuerUrl} client_id=${clientId} callback=${callbackUrl}`)
     return { config, issuerUrl, clientId, callbackUrl }
   } catch (err) {
-    log.log(LogLevelEnum.error, `[oidc] OIDC authentication: FAILED — could not reach issuer ${issuerUrl}: ${String(err)}`)
+    log.log(
+      LogLevelEnum.error,
+      `[oidc] OIDC authentication: FAILED — could not reach issuer ${issuerUrl} ${JSON.stringify(serializeError(err))}`
+    )
     return null
   }
 }
@@ -147,7 +183,7 @@ export function registerOidcRoutes(app: Application, oidcConfig: OidcConfig): vo
           }
         }
       } catch (err) {
-        log.log(LogLevelEnum.info, `[oidc] UserInfo fetch error: ${String(err)}`)
+        log.log(LogLevelEnum.warn, `[oidc] UserInfo fetch error ${JSON.stringify(serializeError(err))}`)
       }
 
       const nameCandidate =
@@ -173,14 +209,20 @@ export function registerOidcRoutes(app: Application, oidcConfig: OidcConfig): vo
       log.log(LogLevelEnum.info, `[oidc] User logged in: ${sess.userName || claims.sub}`)
       res.redirect('/')
     } catch (err) {
-      log.log(LogLevelEnum.error, `[oidc] Callback error: ${String(err)}`)
+      logOidcFailure('[oidc] Callback error', err, oidcConfig, {
+        protocol: req.protocol,
+        host: req.get('host'),
+        original_url: req.originalUrl,
+        has_state_param: req.query.state != null,
+        has_code_param: req.query.code != null,
+      })
       res.status(500).send('Authentication failed. Please try again.')
     }
   })
 
   app.post('/api/auth/logout', (req: Request, res: Response) => {
     req.session.destroy((err) => {
-      if (err) log.log(LogLevelEnum.error, `[oidc] Logout error: ${String(err)}`)
+      if (err) log.log(LogLevelEnum.error, `[oidc] Logout error ${JSON.stringify(serializeError(err))}`)
       const endSessionEndpoint = oidcConfig.config.serverMetadata().end_session_endpoint
       if (endSessionEndpoint) {
         const url = new URL(endSessionEndpoint)

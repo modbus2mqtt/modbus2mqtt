@@ -1,11 +1,86 @@
-.disabled {
-  pointer-events: none;
-  color: rgb(230, 62, 62);
-  cursor: default;
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  background: #f5f5f5;
+  color: #222;
+  padding: 0 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
-@media (max-width: 800pt) {
-  .middle {
-    align-self: flex-start;
-  }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-logo {
+  width: 24px;
+  height: 24px;
+}
+
+.app-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-btn {
+  background: #fff;
+  color: #555;
+  border: none;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.header-btn:hover {
+  background: #e0e0e0;
+  color: #222;
+}
+
+.header-btn.active {
+  background: #e0e0e0;
+  color: #222;
+  box-shadow: inset 0 -2px 0 #673ab7;
+}
+
+.header-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+}
+
+.auth-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #555;
+  margin-left: 0.5rem;
+}
+
+.auth-user mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.auth-username {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

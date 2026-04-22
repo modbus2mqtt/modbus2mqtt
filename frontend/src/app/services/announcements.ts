@@ -16,12 +16,15 @@ export interface Announcement {
  */
 export const ANNOUNCEMENTS: Announcement[] = [
   {
-    id: 'tcpbridge-port-2026-01',
-    title: 'Breaking Change: tcpBridge → tcpBridgePort',
+    id: 'oidc-login-2026-04',
+    title: 'Login has changed',
     messageHtml:
-      'The boolean <code>tcpBridge</code> option has been replaced by <code>tcpBridgePort</code> (a port number). ' +
-      'Please check your bus configuration and set the port explicitly (e.g. <code>502</code>).',
-    date: '2026-01-23',
-    severity: 'breaking',
+      '<ol>' +
+      '<li><strong>Home Assistant add-on:</strong> no changes — supervisor token and IP whitelist continue to handle access.</li>' +
+      '<li><strong>Standalone with authentication:</strong> the built-in user/password login has been replaced by <strong>OIDC</strong> (OpenID Connect). Configure an OIDC provider via the <code>OIDC_*</code> environment variables.</li>' +
+      '<li><strong>Standalone without authentication:</strong> if no <code>OIDC_*</code> variables are set, the server runs with open access (same behaviour as the old <code>noAuthentication</code> flag, which is no longer needed).</li>' +
+      '</ol>',
+    date: '2026-04-22',
+    severity: 'info',
   },
 ]

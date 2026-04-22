@@ -6,7 +6,7 @@
     { "path": "cypress" },
     { "path": "scripts" },
     { "path": "docs" },
-    { "path": "../oci-lxc-deployer-green" },
+    { "path": "../oci-lxc-deployer-yellow" },
   ],
   "settings": {
     "typescript.tsdk": "node_modules/typescript/lib",
@@ -51,12 +51,25 @@
       "streetsidesoftware.code-spell-checker",
     ],
   },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "build modbus2mqtt",
+        "type": "shell",
+        "command": "pnpm",
+        "args": ["run", "build"],
+        "options": { "cwd": "${workspaceFolder:modbus2mqtt}" },
+        "problemMatcher": [],
+      },
+    ],
+  },
   "launch": {
     "version": "0.2.0",
     "configurations": [
       {
         "name": "Run Modbus2mqtt Server (OIDC)",
-        "preLaunchTask": "npm: build",
+        "preLaunchTask": "build modbus2mqtt",
         "timeout": 10000,
         "program": "${workspaceFolder:modbus2mqtt}/dist/server/modbus2mqtt.js",
         "args": ["-s", "ssl", "-c", "../config-dir", "-d", "../data-dir"],

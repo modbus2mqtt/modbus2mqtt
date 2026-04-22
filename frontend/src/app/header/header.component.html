@@ -1,28 +1,50 @@
-<div class="flexrowsNoWrap header">
-  <div class="menuButton">
-    <button mat-icon-button matTooltip="Configuration" [matMenuTriggerFor]="configMenu" class="hover-display">
-      <mat-icon>menu</mat-icon>
+<header class="app-header">
+  <div class="header-left">
+    <img class="app-logo" src="assets/images/icon.png" alt="Modbus2MQTT logo" />
+    <span class="app-title">Modbus2MQTT</span>
+  </div>
+  <span class="header-actions">
+    <button
+      class="header-btn"
+      type="button"
+      aria-label="Configure MQTT/Github"
+      routerLink="/configure"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      matTooltip="Configure MQTT/Github"
+    >
+      <mat-icon aria-hidden="true">settings</mat-icon>
     </button>
-    <mat-menu #configMenu>
-      <a [routerLink]="'/configure'">
-        <button mat-button [disabled]="getActiveRoute() == '/configure'">Configure MQTT/Github ...</button></a
-      ><br />
-      <a [routerLink]="'/specifications'">
-        <button mat-button [disabled]="getActiveRoute() == '/specifications'">Contribute/Import/Export Spec.</button> </a
-      ><br />
-      <a [routerLink]="'/busses'" [class]="getActiveRoute() == '/busses' ? 'disabled' : ''">
-        <button mat-button [disabled]="getActiveRoute() == '/busses'">Show Busses ...</button> </a
-      ><br />
-      <a [routerLink]="'/register'" [class]="getActiveRoute() == '/register' ? 'disabled' : ''">
-        <button mat-button aria-label="Register User ..." [disabled]="getActiveRoute() == '/register'">Register User ...</button>
-      </a>
-    </mat-menu>
-  </div>
-  <div>
-    <img src="assets/images/icon.png" style="width: 1.5em; height: 1.5em" />
-  </div>
-
-  <div class="middle flex-auto">
-    <h1>Modbus2MQTT</h1>
-  </div>
-</div>
+    <button
+      class="header-btn"
+      type="button"
+      aria-label="Contribute/Import/Export Specifications"
+      routerLink="/specifications"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      matTooltip="Contribute/Import/Export Specifications"
+    >
+      <mat-icon aria-hidden="true">description</mat-icon>
+    </button>
+    <button
+      class="header-btn"
+      type="button"
+      aria-label="Show Busses"
+      routerLink="/busses"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      matTooltip="Show Busses"
+    >
+      <mat-icon aria-hidden="true">device_hub</mat-icon>
+    </button>
+    @if (auth.isOidcEnabled && auth.isAuthenticated) {
+      <span class="auth-user" matTooltip="Logged in as {{ auth.user?.name || auth.user?.email || 'User' }}">
+        <mat-icon>person</mat-icon>
+        <span class="auth-username">{{ auth.user?.name || auth.user?.email || 'User' }}</span>
+      </span>
+      <button class="header-btn" type="button" aria-label="Logout" (click)="auth.logout()" matTooltip="Logout">
+        <mat-icon aria-hidden="true">logout</mat-icon>
+      </button>
+    }
+  </span>
+</header>

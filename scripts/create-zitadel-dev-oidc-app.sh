@@ -32,8 +32,8 @@
 #   ZITADEL_URL       default: https://auth.ohnewarum.de
 #   PROJECT_NAME      default: modbus2mqtt
 #   OIDC_APP_NAME     default: modbus2mqtt-dev
-#   CALLBACK_URL      default: http://localhost:3000/api/auth/callback
-#   POST_LOGOUT_URL   default: http://localhost:3000/
+#   CALLBACK_URL      default: https://localhost:3443/api/auth/callback
+#   POST_LOGOUT_URL   default: https://localhost:3443/
 #   PAT_GLOB          default: /rpool/data/subvol-*-zitadel-bootstrap/admin-client.pat
 #   ADMIN_PAT         if set, SSH lookup is skipped
 #
@@ -52,8 +52,8 @@ PVE_HOST="${PVE_HOST:-pve1.cluster}"
 ZITADEL_URL="${ZITADEL_URL:-https://auth.ohnewarum.de}"
 PROJECT_NAME="${PROJECT_NAME:-modbus2mqtt}"
 OIDC_APP_NAME="${OIDC_APP_NAME:-modbus2mqtt-dev}"
-CALLBACK_URL="${CALLBACK_URL:-http://localhost:3000/api/auth/callback}"
-POST_LOGOUT_URL="${POST_LOGOUT_URL:-http://localhost:3000/}"
+CALLBACK_URL="${CALLBACK_URL:-https://localhost:3443/api/auth/callback}"
+POST_LOGOUT_URL="${POST_LOGOUT_URL:-https://localhost:3443/}"
 PAT_GLOB="${PAT_GLOB:-/rpool/data/subvol-*-zitadel-bootstrap/admin-client.pat}"
 
 PROJECT_ROLE="${PROJECT_ROLE:-admin}"

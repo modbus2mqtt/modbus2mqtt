@@ -1,266 +1,112 @@
-# Installation in Proxmox LXC Container
+# Installation on Proxmox
+
+modbus2mqtt on Proxmox is deployed as an LXC container from the official OCI image via [oci-lxc-deployer](https://github.com/modbus2mqtt/oci-lxc-deployer) — the deployer handles container creation, networking, volumes, optional HTTPS, and optional Zitadel-backed single sign-on.
 
 ## Prerequisites
 
-- Proxmox VE 7.0 or higher
-- Basic knowledge of Proxmox and LXC containers
+- Proxmox VE 7.0 or newer
+- Two companion LXCs already deployed and reachable on the same Proxmox host (each is its own deployer application — follow their READMEs):
+  1. **Zitadel** — identity provider that issues OIDC tokens. Only required if you plan to enable `addon-oidc`.
+  2. **oci-lxc-deployer** — the deployer itself (web UI + CLI).
 
-## Container Setup
+## Optional addons
 
-### 1. Create LXC Container with Alpine Linux
+modbus2mqtt supports two deployer addons. Pick them independently when you launch the installation:
 
-In Proxmox web interface:
+| Addon | What it does |
+|---|---|
+| `addon-ssl` | Generates/mounts TLS certificates at `/etc/ssl/addon/` inside the container and wires `MODBUS2MQTT_HTTPS_PORT` + `MODBUS2MQTT_SSL_DIR` into the LXC environment. modbus2mqtt auto-detects the certs on start and listens on `3443`; HTTP on `3000` becomes a 301 redirect to HTTPS. |
+| `addon-oidc` | Creates (or reuses) the Zitadel project `modbus2mqtt`, registers an OIDC web application with the correct redirect URI (HTTPS when `addon-ssl` is active, HTTP otherwise), ensures the `admin` project role exists, generates a session secret, and injects `OIDC_ENABLED`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_CALLBACK_URL`, `OIDC_SESSION_SECRET`, `OIDC_REQUIRED_ROLE=admin` into the container. |
 
-1. Click **Create CT**
-2. Configure the container:
-   - **General**
-     - Hostname: `modbus2mqtt`
-     - Password: Set a secure password
-   - **Template**
-     - Storage: Select your storage
-     - Template: `alpine-3.19-default` or latest Alpine version
-   - **Root Disk**
-     - Disk size: 4 GB (minimum, Alpine is lightweight)
-   - **CPU**
-     - Cores: 2
-   - **Memory**
-     - Memory: 512 MB (Alpine requires less memory)
-     - Swap: 512 MB
-   - **Network**
-     - IPv4: DHCP or static IP
+## Deploy modbus2mqtt
 
-3. Check **Start after created**
-4. Click **Finish**
+1. Open the deployer web UI and pick **Modbus2MQTT** from the application catalog.
+2. Fill in the parameters:
+   - **Hostname** — LXC hostname (default `modbus2mqtt`)
+   - **Volumes** — bind mounts, one `name=/path` per line. Default: `config=/config`, `data=/data`, `ssl=/ssl`
+   - **HTTP Port** / **HTTPS Port** — defaults `3000` / `3443`
+   - **Version** — OCI image tag, e.g. `latest` or a pinned version such as `v0.20.0`
+   - **Rootfs Storage** / **Volume Storage** — your Proxmox storage IDs
+3. Under **Addons**, tick the ones you want:
+   - `addon-ssl` for native HTTPS
+   - `addon-oidc` for Zitadel-backed single sign-on
+4. Click **Install**.
 
-### 2. Pass-through USB Device (for Modbus RTU)
+The deployer creates the LXC, pulls `ghcr.io/modbus2mqtt/modbus2mqtt:<tag>`, sets up the volumes, runs the addon pre-start hooks in the right order, and starts the container.
 
-Identify the USB device on the Proxmox host:
+## Pass through the Modbus RTU USB device (optional)
+
+If you use Modbus RTU via a serial adapter, pass the USB device into the LXC. On the Proxmox host:
 
 ```bash
 lsusb
 ls -l /dev/ttyUSB*
-```
 
-Edit the container configuration on the Proxmox host:
-
-```bash
+# Edit the LXC config
 nano /etc/pve/lxc/<CTID>.conf
-```
 
-Add the following lines:
-
-```
+# Append:
 lxc.cgroup2.devices.allow: c 188:* rwm
 lxc.mount.entry: /dev/ttyUSB0 dev/ttyUSB0 none bind,optional,create=file
-```
 
-Restart the container:
-
-```bash
+# Reboot the container
 pct reboot <CTID>
 ```
 
-## Install modbus2mqtt
+## First use
 
-Enter the container:
+- With `addon-oidc` (+ optionally `addon-ssl`): open `https://<hostname>:3443/` (or HTTP if SSL is off) → redirect to Zitadel → log in with a user that has the `admin` project role. See [authentication.md](authentication.md).
+- Without addons: open `http://<hostname>:3000/` directly; the UI is reachable without login (open-access mode, suitable for trusted LANs).
 
-```bash
-pct enter <CTID>
-```
+Follow the [getting-started guide](getting-started.md) for the initial MQTT / bus / slave configuration.
 
-Install modbus2mqtt from GitHub Release:
+## Assigning the Zitadel `admin` role
 
-```bash
-# Update Alpine repositories
-apk update
-apk upgrade
+The OIDC app requires project role `admin` on the `modbus2mqtt` project. Assign it in the Zitadel console under *Projects → modbus2mqtt → Authorizations*, or pre-provision users via the [Zitadel helper script](../scripts/create-zitadel-dev-oidc-app.sh) (`DEV_USERNAME=…`).
 
-# Set version (visit GitHub Releases for latest version)
-VERSION="0.16.56"
+## Reconfiguring addons
 
-# Detect architecture
-ARCH=$(uname -m)
+Toggle addons on an existing container from the deployer UI (**Reconfigure**). The pre-start scripts are idempotent; OIDC secrets are rotated only when the addon is freshly enabled.
 
-# Download and install public signing key (architecture-independent)
-wget https://github.com/modbus2mqtt/server/releases/download/v${VERSION}/packager.rsa.pub \
-  -O /etc/apk/keys/packager-modbus2mqtt.rsa.pub
+## Upgrades
 
-# Note: The published public key is IDENTICAL for all architectures (single key pair).
-
-# Download and install package (architecture-specific)
-wget https://github.com/modbus2mqtt/server/releases/download/v${VERSION}/modbus2mqtt-${VERSION}-r0-${ARCH}.apk
-apk add modbus2mqtt-${VERSION}-r0-${ARCH}.apk
-
-# The service is automatically enabled and started by the package installation
-
-# Check service status
-rc-service modbus2mqtt status
-```
-
-**Note:** Visit [GitHub Releases](https://github.com/modbus2mqtt/server/releases) to find the latest version number.
-
-### Package Verification
-
-The public key (`packager.rsa.pub`) verifies that packages are signed by the official build system. This ensures the integrity and authenticity of the downloaded package.
-
-To verify the key fingerprint:
-
-```bash
-sha256sum /etc/apk/keys/packager-modbus2mqtt.rsa.pub
-```
-
-### Configuration
-
-modbus2mqtt provides a Web UI for configuration. After installation, access it via:
-
-```
-http://<container-ip>:3000
-```
-
-If no configuration exists, the service starts with the root URL and guides you through the initial setup via the Web UI.
+Pick a new **Version** (OCI image tag) in the deployer and run an upgrade. Volumes are preserved.
 
 ## Networking
 
-### Port Forwarding
+The deployer attaches the container to the network bridge you pick during install. For exposure beyond the Proxmox host, either:
 
-To access modbus2mqtt from outside Proxmox:
+- assign a static LAN IP in the parameters, or
+- port-forward from the host:
 
-1. Note the container IP: `ip addr show`
-2. On Proxmox host, add iptables rule:
+  ```bash
+  iptables -t nat -A PREROUTING -p tcp --dport 3443 -j DNAT --to <container-ip>:3443
+  ```
 
-```bash
-iptables -t nat -A PREROUTING -p tcp --dport 3000 -j DNAT --to <container-ip>:3000
-```
-
-Or use Proxmox built-in port forwarding in the container settings.
-
-### Firewall Rules (Alpine)
-
-Alpine uses `iptables` or `awall` for firewall configuration:
-
-```bash
-# Using iptables
-apk add iptables
-iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-iptables -A INPUT -p tcp --dport 3000 -j ACCEPT
-
-# Or using awall (Alpine Wall)
-apk add awall
-echo 'variable:
-  port_ssh: 22
-  port_modbus2mqtt: 3000
-filter:
-  - { in: internet, out: _fw, service: tcp/$port_ssh, action: accept }
-  - { in: internet, out: _fw, service: tcp/$port_modbus2mqtt, action: accept }' > /etc/awall/optional/modbus2mqtt.json
-awall enable modbus2mqtt
-awall activate
-```
-
-## Autostart Configuration
-
-Enable container autostart in Proxmox:
-
-```bash
-pct set <CTID> -onboot 1
-```
-
-The modbus2mqtt service is automatically configured and enabled during package installation.
-
-## Resource Management
-
-Monitor resource usage:
-
-```bash
-pct status <CTID>
-pct config <CTID>
-```
-
-Alpine Linux is very lightweight and efficient. Typical resource usage:
-
-- Memory: 256-512 MB for modbus2mqtt
-- Storage: 2-4 GB (Alpine base is ~130 MB)
-
-Adjust resources if needed:
-
-```bash
-pct set <CTID> -memory 1024 -cores 2
-```
-
-## Backup and Restore
-
-### Backup
+## Backups
 
 ```bash
 vzdump <CTID> --compress zstd --storage local
 ```
 
-### Restore
+Enable autostart:
 
-In Proxmox web interface:
-
-1. Go to **Storage** → **Backups**
-2. Select the backup
-3. Click **Restore**
+```bash
+pct set <CTID> -onboot 1
+```
 
 ## Troubleshooting
 
-### Container Won't Start
-
-Check logs:
-
-```bash
-pct status <CTID>
-cat /var/log/pve/tasks/active
-```
-
-### USB Device Not Visible
-
-Verify device permissions in Alpine:
-
-```bash
-ls -l /dev/ttyUSB0
-chmod 666 /dev/ttyUSB0  # temporary fix
-```
-
-For permanent fix with Alpine, add user to dialout group:
-
-```bash
-addgroup root dialout
-```
-
-Or create udev rule:
-
-```bash
-echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"' > /etc/udev/rules.d/99-usb-serial.rules
-```
-
-### Network Issues
-
-Check network configuration in Alpine:
-
-```bash
-pct enter <CTID>
-ip addr show
-ping google.com
-
-# Check Alpine networking
-rc-service networking status
-```
-
-### Service Not Starting
-
-Check OpenRC service status:
-
-```bash
-rc-service modbus2mqtt status
-rc-service modbus2mqtt restart
-
-# View logs
-tail -f /var/log/modbus2mqtt.log
-```
+| Symptom | Where to look |
+|---|---|
+| Container won't start | `pct status <CTID>`, `/var/log/pve/tasks/` |
+| USB device not visible | `ls -l /dev/ttyUSB0`, check the `lxc.mount.entry` line in `/etc/pve/lxc/<CTID>.conf` |
+| OIDC callback fails | Compare the callback URL registered in Zitadel with `OIDC_CALLBACK_URL` inside the container (`pct exec <CTID> env \| grep OIDC`). See [authentication.md](authentication.md) for common `redirect_uri` pitfalls. |
+| Login redirect loop | Browser is hitting HTTP while the session cookie was set on HTTPS (or vice versa). Stick to one scheme and make sure the Zitadel redirect URI matches. |
+| `OIDC_*` not injected after reconfigure | Check the deployer task log — the pre-start script prints the issuer, callback URL, and any failures. |
 
 ## Next Steps
 
-- [Configuration Guide](./configuration.md)
-- [Adding Devices](./adding-devices.md)
-- [Creating Specifications](./creating-specifications.md)
+- [Getting Started](getting-started.md)
+- [Authentication](authentication.md)
+- [Development](development.md)

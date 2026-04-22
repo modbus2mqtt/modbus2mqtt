@@ -79,14 +79,14 @@ TODO:
 
 Ziel: Sensitive Daten (Passwörter, Tokens) nicht mehr an alle Frontend-Komponenten senden.
 
-Aktuell: `GET /api/configuration` liefert die volle `Iconfiguration` inkl. `password` (bcrypt hash), `githubPersonalToken` (Klartext!), `mqttconnect.password` (Klartext) an ALLE Frontend-Komponenten.
+Aktuell: `GET /api/configuration` liefert die volle `Iconfiguration` inkl. `githubPersonalToken` (Klartext!) und `mqttconnect.password` (Klartext) an ALLE Frontend-Komponenten.
 
 TODO:
 
 - `Iconfiguration` in drei Stufen aufteilen:
   - `IconfigurationPublic` - sicher für alle Komponenten (version, mqttbasetopic, displayHex, etc.)
   - `IconfigurationSettings extends IconfigurationPublic` - für Configure-Seite (mit maskierten Passwörtern `'***'`)
-  - `Iconfiguration extends IconfigurationSettings` - backend-only (password, username, frontendDir, supervisor_host)
+  - `Iconfiguration extends IconfigurationSettings` - backend-only (githubPersonalToken, frontendDir, supervisor_host)
 - Stripping-Funktionen in `backend/src/server/config.ts`:
   - `toPublicConfig(config): IconfigurationPublic`
   - `toSettingsConfig(config): IconfigurationSettings` (Passwörter als `'***'`)

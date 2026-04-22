@@ -15,7 +15,7 @@ docker run -d \
   -p 3000:3000 \
   -v /path/to/config:/config \
   --device=/dev/ttyUSB0 \
-  modbus2mqtt/server:latest
+  modbus2mqtt/modbus2mqtt:latest
 ```
 
 ### Using Docker Compose
@@ -27,7 +27,7 @@ version: '3.8'
 
 services:
   modbus2mqtt:
-    image: modbus2mqtt/server:latest
+    image: modbus2mqtt/modbus2mqtt:latest
     container_name: modbus2mqtt
     ports:
       - '3000:3000'
@@ -67,7 +67,7 @@ docker-compose up -d
 
 **Required**: `/config` for persistent configuration
 **Optional**: `/data` Contains public specifications.
-**Optional**: `/ssl` location for certificates and `security.txt`. A key file to be used for en/decrypt passwords. If this file is lost, the passwords and tokens must be reentered.
+**Optional**: `/ssl` location for TLS certificates (`fullchain.pem`, `privkey.pem`) and `secrets.txt`. The `secrets.txt` file holds a local random key used e.g. as fallback for `OIDC_SESSION_SECRET`. Losing it invalidates existing OIDC browser sessions — users simply have to log in again.
 
 ### Device Access
 
@@ -90,6 +90,8 @@ ls -l /dev/ttyACM*
 - `NODE_ENV` - Set to `production` for production use
 - `MQTT_URL` - MQTT broker URL (default: `mqtt://localhost:1883`)
 - `HTTP_PORT` - HTTP server port (default: `3000`)
+- `MODBUS2MQTT_HTTPS_PORT` - HTTPS server port (default: `3443`, only active if TLS certs are found in `/ssl`)
+- `OIDC_ENABLED`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_CALLBACK_URL`, `OIDC_SESSION_SECRET` - see [authentication](authentication.md) for the full OIDC setup
 
 ## Accessing the UI
 
@@ -104,7 +106,7 @@ http://localhost:3000
 Pull the latest image:
 
 ```bash
-docker pull modbus2mqtt/server:latest
+docker pull modbus2mqtt/modbus2mqtt:latest
 docker-compose down
 docker-compose up -d
 ```
@@ -138,10 +140,10 @@ sudo chown -R 1000:20 ./config ./data
 chmod -R 755 ./config ./data
 
 # Run container (data mount optional, only needed for SSH)
-docker run -d -p 3000:3000 -v ./config:/config modbus2mqtt/server:latest
+docker run -d -p 3000:3000 -v ./config:/config modbus2mqtt/modbus2mqtt:latest
 
 # With SSH support
-docker run -d -p 3000:3000 -p 2222:22 -v ./config:/config -v ./data:/data modbus2mqtt/server:latest
+docker run -d -p 3000:3000 -p 2222:22 -v ./config:/config -v ./data:/data modbus2mqtt/modbus2mqtt:latest
 ```
 
 **Option 2: User mapping in Docker**
@@ -151,7 +153,7 @@ docker run -d \
   --user 1000:20 \
   -p 3000:3000 \
   -v ./config:/config \
-  modbus2mqtt/server:latest
+  modbus2mqtt/modbus2mqtt:latest
 ```
 
 **Option 3: Docker Compose with user mapping**
@@ -159,7 +161,7 @@ docker run -d \
 ```yaml
 services:
   modbus2mqtt:
-    image: modbus2mqtt/server:latest
+    image: modbus2mqtt/modbus2mqtt:latest
     user: '1000:20'
     ports:
       - '3000:3000'
@@ -231,7 +233,7 @@ ls -l /dev/ttyUSB0
 sudo usermod -a -G dialout $USER
 
 # Mount device in container
-docker run --device=/dev/ttyUSB0:/dev/ttyUSB0 modbus2mqtt/server:latest
+docker run --device=/dev/ttyUSB0:/dev/ttyUSB0 modbus2mqtt/modbus2mqtt:latest
 ```
 
 ## Advanced Configuration
@@ -259,7 +261,7 @@ docker run -d \
   -p 2222:22 \
   -v ./config:/config \
   -v ./data:/data \
-  modbus2mqtt/server:latest
+  modbus2mqtt/modbus2mqtt:latest
 
 # Connect via SSH
 ssh -p 2222 root@localhost
@@ -270,7 +272,7 @@ ssh -p 2222 root@localhost
 ```yaml
 services:
   modbus2mqtt:
-    image: modbus2mqtt/server:latest
+    image: modbus2mqtt/modbus2mqtt:latest
     ports:
       - '3000:3000'
       - '2222:22' # SSH access

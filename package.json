@@ -2,14 +2,14 @@
   "name": "modbus2mqtt",
   "version": "0.20.0",
   "sshserver": "homeassistant@homeassistant.lan",
-  "homepage": "https://github.com/modbus2mqtt/server/README.md",
+  "homepage": "https://github.com/modbus2mqtt/modbus2mqtt/README.md",
   "description": "server for modbus2mqtt for REST API of configuration and publishing modbus values to mqtt",
   "keywords": [
     "modbus2mqtt",
     "specification",
     "validation"
   ],
-  "bugs": "https://github.com/modbus2mqtt/server/issues",
+  "bugs": "https://github.com/modbus2mqtt/modbus2mqtt/issues",
   "packageManager": "pnpm@10.28.2",
   "type": "module",
   "bin": {
@@ -30,7 +30,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/modbus2mqtt/server.git"
+    "url": "git+https://github.com/modbus2mqtt/modbus2mqtt.git"
   },
   "credits": "multiple choice by Studio 365 from <a href='https://thenounproject.com/browse/icons/term/multiple-choice/' target='_blank' title='multiple choice Icons'>Noun Project</a> (CC BY 3.0)",
   "scripts": {
