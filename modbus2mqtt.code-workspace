@@ -6,7 +6,7 @@
     { "path": "cypress" },
     { "path": "scripts" },
     { "path": "docs" },
-    { "path": "../lxc-manager" },
+    { "path": "../oci-lxc-deployer-green" },
   ],
   "settings": {
     "typescript.tsdk": "node_modules/typescript/lib",
@@ -49,6 +49,26 @@
       "Angular.ng-template",
       "cypress.cypress",
       "streetsidesoftware.code-spell-checker",
+    ],
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Run Modbus2mqtt Server (OIDC)",
+        "preLaunchTask": "npm: build",
+        "timeout": 10000,
+        "program": "${workspaceFolder:modbus2mqtt}/dist/server/modbus2mqtt.js",
+        "args": ["-s", "ssl", "-c", "../config-dir", "-d", "../data-dir"],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder:modbus2mqtt}",
+        "env": { "DEBUG": "" },
+        "envFile": "${workspaceFolder:modbus2mqtt}/.env.oidc",
+        "request": "launch",
+        "skipFiles": ["<node_internals>/**"],
+        "sourceMaps": true,
+        "type": "node",
+      },
     ],
   },
 }

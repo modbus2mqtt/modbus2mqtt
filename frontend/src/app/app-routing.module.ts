@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router'
 import { SpecificationComponent } from '@app/specification/specification/specification.component'
-import { LoginComponent } from '@app/login/login.component'
 import { AuthGuardService } from '@app/services/auth-guard.service'
 import { SelectModbusComponent } from '@app/select-modbus/select-modbus.component'
 import { SelectSlaveComponent } from '@app/select-slave/select-slave.component'
@@ -9,8 +8,6 @@ import { SpecificationsComponent } from '@app/specifications/specifications.comp
 import { RoutingNames } from '@shared/server'
 export const APP_ROUTES: Routes = [
   { path: '', component: RootRoutingComponent, pathMatch: 'full' },
-  { path: RoutingNames.login, component: LoginComponent },
-  { path: RoutingNames.register, component: LoginComponent },
   {
     path: RoutingNames.configure,
     loadComponent: () => import('@app/configure/configure.component').then((m) => m.ConfigureComponent),
@@ -38,6 +35,3 @@ export const APP_ROUTES: Routes = [
     canDeactivate: [(component: SpecificationComponent) => !component.canDeactivate()],
   },
 ]
-// bootstrapApplication(AppComponent,{
-//   providers:[provideRouter(routes, withComponentInputBinding())]
-// })

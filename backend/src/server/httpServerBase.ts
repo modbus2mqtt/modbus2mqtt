@@ -5,7 +5,7 @@ import { Application, NextFunction, Request } from 'express'
 import type { ParamsDictionary } from 'express-serve-static-core'
 import type { ParsedQs } from 'qs'
 import express from 'express'
-import { Config, MqttValidationResult } from './config.js'
+import { Config } from './config.js'
 import { HttpErrorsEnum } from '../shared/specification/index.js'
 import { join, basename } from 'path'
 import { parse } from 'node-html-parser'
@@ -13,9 +13,9 @@ import * as fs from 'fs'
 import { LogLevelEnum, Logger } from '../specification/index.js'
 
 import { apiUri } from '../shared/server/index.js'
-import { AddressInfo } from 'net'
-import { MqttSubscriptions } from './mqttsubscriptions.js'
 import { ConfigPersistence } from './persistence/configPersistence.js'
+import { createAuthMiddleware } from './auth/authMiddleware.js'
+import { initOidc, registerOidcRoutes, setupSession, type OidcConfig } from './auth/oidc.js'
 
 interface IAddonInfo {
   slug: string
@@ -37,6 +37,7 @@ export class HttpServerBase {
   languages = ['en']
   server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse>
   httpsServer?: https.Server
+  protected oidcConfig: OidcConfig | null = null
   constructor(private angulardir: string = '.') {
     this.app = express()
   }
@@ -108,33 +109,6 @@ export class HttpServerBase {
     if (this.httpsServer) this.httpsServer.close()
     if (this.server) this.server.close()
   }
-  private static getAuthTokenFromHeader(req: Request): string | undefined {
-    let authHeader: string | undefined = undefined
-    if (req.header) authHeader = req.header('Authorization')
-    if (authHeader) {
-      const tokenPos = authHeader!.indexOf(' ') + 1
-      return authHeader.substring(tokenPos)
-    }
-    return undefined
-  }
-  static getAuthTokenFromUrl(url: string): string | undefined {
-    const parts = url.split('/')
-    const apiIdx = parts.findIndex((part) => ['api', 'download'].includes(part))
-    if (apiIdx >= 2) {
-      return parts[apiIdx - 1]
-    }
-
-    return undefined
-  }
-  protected static validateUserToken(req: Request, token: string | undefined): MqttValidationResult {
-    if (token == undefined) {
-      token = HttpServerBase.getAuthTokenFromUrl(req.url)
-      if (token == undefined) return MqttValidationResult.error
-      req.url = req.url.replace(token + '/', '')
-    }
-    return Config.validateUserToken(token)
-  }
-
   private getDirectoryForLanguage(req: Request): string {
     let lang = req.acceptsLanguages(['en'])
     if (!lang) lang = 'en'
@@ -198,100 +172,36 @@ export class HttpServerBase {
     })
   }
   validate() {}
-  authenticate(req: Request, res: http.ServerResponse, next: NextFunction) {
-    // E2E reset endpoint bypasses auth when enabled
-    if (process.env.MODBUS2MQTT_E2E && req.url === apiUri.e2eReset) {
-      next()
-      return
-    }
-    //  req.header('')
-    // All api calls and a user registration when a user is already registered needs authorization
-    debugUrl('authenticate' + req.url)
-    const config = Config.getConfiguration()
-    let token = HttpServerBase.getAuthTokenFromUrl(req.url)
-    if (token != undefined) req.url = req.url.replace(token + '/', '')
-    else token = HttpServerBase.getAuthTokenFromHeader(req)
-    const slaveTopicFound =
-      null !=
-      MqttSubscriptions.getInstance()
-        .getSlaveBaseTopics()
-        .find((tp) => tp.startsWith(req.url.substring(1)))
-    if (
-      req.url.indexOf('/api/') >= 0 ||
-      req.url.indexOf('/user/register') >= 0 ||
-      req.url.indexOf('/download/') >= 0 ||
-      slaveTopicFound
-    ) {
-      const authStatus = Config.getAuthStatus()
-      if (authStatus.hassiotoken) {
-        const address = (req.socket.address() as AddressInfo).address
-        if (
-          !address ||
-          (address.indexOf('172.30.33') < 0 &&
-            address.indexOf('172.30.32') < 0 &&
-            address.indexOf('127.0.0.1') < 0 &&
-            address.indexOf('::1') < 0)
-        ) {
-          log.log(LogLevelEnum.warn, 'Denied: IP Address is not allowed ' + address)
-          this.returnResult(req, res, HttpErrorsEnum.ErrForbidden, 'Unauthorized (See server log)')
-          return
-        }
-        debug('Supervisor: validate hassio token')
-        next()
-        return
-      } else {
-        if (!config.password || (config.password.length == 0 && req.url.indexOf(apiUri.userRegister) >= 0)) {
-          next()
-          return
-        }
-        switch (Config.validateUserToken(token)) {
-          case MqttValidationResult.OK:
-            next()
-            return
-          case MqttValidationResult.tokenExpired:
-            log.log(LogLevelEnum.error, 'Token expired')
-            this.returnResult(req, res, HttpErrorsEnum.ErrUnauthorized, 'Token expired')
-            return
-          default:
-            // case MqttValidationResult.error:
-            this.returnResult(req, res, HttpErrorsEnum.ErrForbidden, 'Unauthorized (See server log)')
-            return
-        }
-      }
-      // Check addon access
-    }
-
-    // No authentication required
-    next()
-    return
-  }
 
   initApp() {}
   init(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      try {
-        Config.executeHassioGetRequest<{ data: IAddonInfo }>(
-          '/addons/self/info',
-          (info) => {
-            //this.ingressUrl = join("/hassio/ingress/", info.data.slug);
-            this.ingressUrl = info.data.ingress_entry
-            const port = Config.getConfiguration().httpport
-            log.log(LogLevelEnum.info, 'Hassio authentication prefix:' + this.ingressUrl + ' modbus2mqtt: ' + port)
-            this.initBase()
-            resolve()
-          },
-          (e) => {
-            const port = Config.getConfiguration().httpport
-            log.log(LogLevelEnum.warn, 'Hassio authentication failed ' + e.message + ' modbus2mqtt: ' + port)
+    return initOidc().then(
+      (oidc) =>
+        new Promise<void>((resolve) => {
+          this.oidcConfig = oidc
+          try {
+            Config.executeHassioGetRequest<{ data: IAddonInfo }>(
+              '/addons/self/info',
+              (info) => {
+                this.ingressUrl = info.data.ingress_entry
+                const port = Config.getConfiguration().httpport
+                log.log(LogLevelEnum.info, 'Hassio authentication prefix:' + this.ingressUrl + ' modbus2mqtt: ' + port)
+                this.initBase()
+                resolve()
+              },
+              (e) => {
+                const port = Config.getConfiguration().httpport
+                log.log(LogLevelEnum.warn, 'Hassio authentication failed ' + e.message + ' modbus2mqtt: ' + port)
+                this.initBase()
+                resolve()
+              }
+            )
+          } catch {
             this.initBase()
             resolve()
           }
-        )
-      } catch {
-        this.initBase()
-        resolve()
-      }
-    })
+        })
+    )
   }
   private compareIngressUrl(req: Request) {
     const h = req.header('X-Ingress-Path')
@@ -372,8 +282,13 @@ export class HttpServerBase {
       res.setHeader('Access-Control-Allow-Credentials', 'true')
       next()
     })
+    // Session + OIDC routes (only active if OIDC is configured)
+    if (this.oidcConfig) {
+      setupSession(this.app)
+      registerOidcRoutes(this.app, this.oidcConfig)
+    }
     // angular files have full path including language e.G. /en-US/polyfill.js
-    this.app.use(this.authenticate.bind(this))
+    this.app.use(createAuthMiddleware(this.oidcConfig))
     this.app.use(this.processStaticAngularFiles.bind(this))
     this.app.use(express.static(this.angulardir))
     this.app.get('/', (req: Request, res: express.Response) => {

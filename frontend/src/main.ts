@@ -9,7 +9,13 @@ import { AuthGuardService } from './app/services/auth-guard.service'
 import { AuthHeaderInterceptor } from './interceptors/auth-header.interceptor'
 import { APP_ROUTES } from './app/app-routing.module'
 import { provideAnimations } from '@angular/platform-browser/animations'
-import { provideZonelessChangeDetection } from '@angular/core'
+import { APP_INITIALIZER, inject, provideZonelessChangeDetection } from '@angular/core'
+import { AuthService } from './app/services/auth.service'
+
+function initializeAuth(): () => Promise<void> {
+  const auth = inject(AuthService)
+  return () => auth.loadAuthConfig()
+}
 
 bootstrapApplication(AppComponent, {
   providers: [
@@ -25,6 +31,11 @@ bootstrapApplication(AppComponent, {
     {
       provide: HTTP_INTERCEPTORS,
       useClass: AuthHeaderInterceptor,
+      multi: true,
+    },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initializeAuth,
       multi: true,
     },
     provideZonelessChangeDetection(),

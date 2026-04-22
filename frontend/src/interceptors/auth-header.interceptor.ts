@@ -1,18 +1,23 @@
-import { Injectable } from '@angular/core'
-import { HttpRequest, HttpHandler, HttpEvent, HttpInterceptor } from '@angular/common/http'
-import { Observable } from 'rxjs'
-import { SessionStorage } from '../app/services/SessionStorage'
+import { Injectable, inject } from '@angular/core'
+import { HttpRequest, HttpHandler, HttpEvent, HttpInterceptor, HttpErrorResponse } from '@angular/common/http'
+import { Observable, catchError, throwError } from 'rxjs'
+import { AuthService } from '../app/services/auth.service'
 
 @Injectable()
 export class AuthHeaderInterceptor implements HttpInterceptor {
-  constructor() {}
+  private auth = inject(AuthService)
+
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    const token = new SessionStorage().getAuthToken()
-    if (token) {
-      const authReq = request.clone({
-        headers: request.headers.set('Authorization', 'Bearer ' + token),
+    // Send session cookie with every request so OIDC-authenticated users are recognised
+    const authReq = request.clone({ withCredentials: true })
+
+    return next.handle(authReq).pipe(
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 401 && this.auth.isOidcEnabled) {
+          this.auth.login()
+        }
+        return throwError(() => error)
       })
-      return next.handle(authReq)
-    } else return next.handle(request)
+    )
   }
 }

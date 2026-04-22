@@ -16,8 +16,6 @@ export enum HttpErrorsEnum {
   SrvErrInternalServerError = 500,
 }
 export enum RoutingNames {
-  login = 'login',
-  register = 'register',
   configure = 'configure',
   busses = 'busses',
   specifications = 'specifications',
@@ -65,12 +63,9 @@ export interface ITCPConnection {
 export type IModbusConnection = IRTUConnection | ITCPConnection
 
 export interface Iconfiguration {
-  password?: string
-  username?: string
   githubPersonalToken?: string
   version: string
   fakeModbus: boolean
-  noAuthentication: boolean
   mqttbasetopic: string
   mqttdiscoveryprefix: string
   mqttdiscoverylanguage: string
@@ -91,20 +86,11 @@ export interface Iconfiguration {
   displayHex?: boolean
   appVersion?: string
 }
-export enum AuthenticationErrors {
-  EnvironmentVariableSecretNotSet = 1,
-  HashError = 2,
-  InvalidUserPasswordCombination = 3,
-  InvalidParameters = 4,
-  SignError = 5,
-}
-
 export interface IUserAuthenticationStatus {
-  registered: boolean
   hassiotoken: boolean
-  hasAuthToken?: boolean
-  noAuthentication: boolean
-  authTokenExpired?: boolean
+  oidcEnabled: boolean
+  authenticated: boolean
+  user?: { name?: string; email?: string }
   mqttConfigured: boolean
   preSelectedBusId?: number
 }

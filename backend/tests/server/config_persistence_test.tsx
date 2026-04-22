@@ -61,8 +61,6 @@ it('round-trip: write then read produces identical values', async () => {
   original.mqttdiscoveryprefix = 'roundtrip_prefix'
   original.httpport = 4567
   // Clear all secrets to avoid YAML double-quote issues during round-trip
-  delete original.password
-  delete original.username
   delete original.githubPersonalToken
   original.mqttconnect.password = undefined
   original.mqttconnect.username = undefined

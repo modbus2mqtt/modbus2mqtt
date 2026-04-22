@@ -3,10 +3,8 @@ import { join } from 'path'
 import packageJson from '../../package.json' with { type: 'json' }
 import { Subject } from 'rxjs'
 import { getBaseFilename } from '../shared/specification/index.js'
-import jwt, { JwtPayload } from 'jsonwebtoken'
-import * as bcrypt from 'bcryptjs'
 import { LogLevelEnum, Logger, filesUrlPrefix } from '../specification/index.js'
-import { ImqttClient, AuthenticationErrors, Iconfiguration, IUserAuthenticationStatus } from '../shared/server/index.js'
+import { ImqttClient, Iconfiguration, IUserAuthenticationStatus } from '../shared/server/index.js'
 import { Bus } from './bus.js'
 import { IClientOptions } from 'mqtt'
 import { ConfigPersistence } from './persistence/configPersistence.js'
@@ -23,11 +21,6 @@ declare global {
 export {}
 const DEFAULT_MQTT_CONNECT_TIMEOUT = 60 * 1000
 const HASSIO_TIMEOUT = 3000
-export enum MqttValidationResult {
-  OK = 0,
-  tokenExpired = 1,
-  error = 2,
-}
 export enum ConfigListenerEvent {
   addSlave,
   deleteSlave,
@@ -36,85 +29,11 @@ export enum ConfigListenerEvent {
 }
 const log = new Logger('config')
 const debugAddon = Debug('config.addon')
-const saltRounds = 8
-const defaultTokenExpiryTime = 1000 * 60 * 60 * 24 // One day
 export class Config {
-  static tokenExpiryTime: number = defaultTokenExpiryTime
   static mqttHassioLoginData: ImqttClient | undefined = undefined
   private static persistence: ConfigPersistence
 
-  static async login(name: string, password: string): Promise<string> {
-    if (Config.config.noAuthentication) {
-      log.log(LogLevelEnum.error, 'Login called, but noAuthentication is configured')
-      throw AuthenticationErrors.InvalidParameters
-    }
-
-    if (Config.config && Config.config.username && Config.config.password) {
-      // Login
-      if (name === Config.config.username) {
-        let success = false
-        try {
-          success = await bcrypt.compare(password, Config.config.password)
-        } catch (err) {
-          log.log(LogLevelEnum.error, 'login: compare failed: ' + err)
-          throw AuthenticationErrors.InvalidParameters
-        }
-        if (success) {
-          try {
-            const s = jwt.sign({ password: password }, Config.secret, {
-              expiresIn: Math.floor(Config.tokenExpiryTime / 1000),
-              algorithm: 'HS256',
-            })
-            return s
-          } catch (err) {
-            log.log(LogLevelEnum.error, err)
-            throw AuthenticationErrors.SignError
-          }
-        } else {
-          throw AuthenticationErrors.InvalidUserPasswordCombination
-        }
-      } else {
-        log.log(LogLevelEnum.error, 'login: Username was not set')
-        throw AuthenticationErrors.InvalidParameters
-      }
-    }
-    throw AuthenticationErrors.InvalidParameters
-  }
-  static async register(name: string | undefined, password: string | undefined, noAuthentication: boolean): Promise<void> {
-    if (noAuthentication == true) {
-      Config.config.noAuthentication = true
-      new Config().writeConfiguration(Config.config)
-      return
-    } else if (Config.config && password) {
-      const enc = await bcrypt.hash(password, saltRounds)
-      Config.config.password = enc
-      Config.config.username = name
-      new Config().writeConfiguration(Config.config)
-    } else {
-      throw AuthenticationErrors.InvalidParameters
-    }
-  }
-  static validateUserToken(token: string | undefined): MqttValidationResult {
-    if (this.config.noAuthentication) return MqttValidationResult.OK
-    if (token == undefined) return MqttValidationResult.error
-
-    try {
-      const payload = jwt.verify(token, Config.secret) as JwtPayload & { password: string }
-      if (bcrypt.compareSync(payload.password, Config.config.password!)) {
-        return MqttValidationResult.OK
-      }
-      return MqttValidationResult.error
-    } catch (err: unknown) {
-      if (typeof err === 'object' && err && 'name' in err && (err as { name?: string }).name === 'TokenExpiredError') {
-        return MqttValidationResult.tokenExpired
-      }
-      log.log(LogLevelEnum.error, 'JWT validation failed: ' + String(err))
-      return MqttValidationResult.error
-    }
-  }
-
   private static config: Iconfiguration
-  private static secret: string
   private static specificationsChanged = new Subject<string>()
   private static newConfig: Iconfiguration = {
     version: CONFIG_VERSION,
@@ -126,7 +45,6 @@ export class Config {
     },
     httpport: 3000,
     fakeModbus: false,
-    noAuthentication: false,
   }
 
   private static ensurePersistence(): ConfigPersistence {
@@ -137,10 +55,6 @@ export class Config {
   }
 
   static getConfiguration(): Iconfiguration {
-    if (Config.secret == undefined) {
-      Config.secret = Config.ensurePersistence().ensureSecret()
-    }
-
     if (Config.config) {
       Config.config.version = Config.config.version ? Config.config.version : CONFIG_VERSION
       Config.config.mqttbasetopic = Config.config.mqttbasetopic ? Config.config.mqttbasetopic : 'modbus2mqtt'
@@ -157,7 +71,6 @@ export class Config {
       delete Config.config.mqttconnect.will
       Config.config.httpport = Config.config.httpport ? Config.config.httpport : 3000
       Config.config.fakeModbus = Config.config.fakeModbus ? Config.config.fakeModbus : false
-      Config.config.noAuthentication = Config.config.noAuthentication ? Config.config.noAuthentication : false
       Config.config.tcpBridgePort = Config.config.tcpBridgePort ? Config.config.tcpBridgePort : 502
       Config.config.appVersion = Config.config.appVersion ? Config.config.appVersion : packageJson.version
       Config.config.mqttusehassio =
@@ -191,12 +104,9 @@ export class Config {
   }
   static getAuthStatus(): IUserAuthenticationStatus {
     return {
-      registered:
-        Config.config.mqttusehassio ||
-        Config.config.noAuthentication ||
-        (Config.config.username != undefined && Config.config.password != undefined),
       hassiotoken: Config.config.mqttusehassio ? Config.config.mqttusehassio : false,
-      noAuthentication: Config.config.noAuthentication ? Config.config.noAuthentication : false,
+      oidcEnabled: process.env.OIDC_ENABLED === 'true',
+      authenticated: false,
       mqttConfigured: false,
       preSelectedBusId: Bus.getBusses().length == 1 ? Bus.getBusses()[0].getId() : undefined,
     }
@@ -402,7 +312,6 @@ export class Config {
 
     // Reset to fresh config
     Config.config = structuredClone(Config.newConfig)
-    Config.secret = undefined as unknown as string
     // Reset persistence so it picks up new dirs
     Config.persistence = undefined as unknown as ConfigPersistence
 

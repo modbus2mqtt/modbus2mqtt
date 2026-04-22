@@ -9,10 +9,6 @@ pollintervall: 1 min
 httpport: 3000
 mqttdiscoverylanguage: en
 rootUrl: http://localhost:3000
-password: '!secret password'
-username: '!secret username'
-tokenExpiryTime: 10min
-tokenExpiryTimeInMSec: 600000
 mqttconnect:
   connectTimeout: 1000
   username: '!secret mqttuser'
@@ -24,5 +20,4 @@ secretsfile: secrets.txt
 mqttusehassiotoken: false
 githubPersonalToken: '!secret githubPersonalToken'
 mqttusehassio: false
-noAuthentication: false
 supervisor_host: supervisor

@@ -32,7 +32,6 @@ class ApiServiceMock {
 const buildConfig = (): Iconfiguration => ({
   version: 'test',
   fakeModbus: true,
-  noAuthentication: true,
   mqttbasetopic: 'base',
   mqttdiscoveryprefix: 'homeassistant',
   mqttdiscoverylanguage: 'en',

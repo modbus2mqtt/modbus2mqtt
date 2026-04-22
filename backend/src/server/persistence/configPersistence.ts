@@ -70,8 +70,6 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
       mqttpassword?: string
       mqttuser?: string
       githubPersonalToken?: string
-      username?: string
-      password?: string
     } = {}
 
     if (cpConfig.mqttconnect.password) {
@@ -85,14 +83,6 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
     if (cpConfig.githubPersonalToken) {
       secrets.githubPersonalToken = cpConfig.githubPersonalToken
       cpConfig.githubPersonalToken = '!secret githubPersonalToken'
-    }
-    if (cpConfig.username) {
-      secrets.username = cpConfig.username
-      cpConfig.username = '!secret username'
-    }
-    if (cpConfig.password) {
-      secrets.password = cpConfig.password
-      cpConfig.password = '!secret password'
     }
 
     const nonConfigs: string[] = ['mqttusehassio', 'filelocation', 'appVersion']

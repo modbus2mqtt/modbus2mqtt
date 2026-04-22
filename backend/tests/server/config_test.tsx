@@ -1,10 +1,9 @@
-import { expect, it, test, afterAll, beforeAll } from 'vitest'
-import { Config, MqttValidationResult } from '../../src/server/config.js'
+import { expect, it, afterAll, beforeAll } from 'vitest'
+import { Config } from '../../src/server/config.js'
 import { ConfigPersistence } from '../../src/server/persistence/configPersistence.js'
 import { getFileNameFromName } from '../../src/shared/specification/index.js'
 import * as fs from 'fs'
 import { setConfigsDirsForTest } from './configsbase.js'
-import { AuthenticationErrors } from '../../src/shared/server/index.js'
 import Debug from 'debug'
 import { ConfigTestHelper, TempConfigDirHelper } from './testhelper.js'
 setConfigsDirsForTest()
@@ -16,66 +15,25 @@ let tempHelper: TempConfigDirHelper
 
 beforeAll(() => {
   return new Promise<void>((resolve, reject) => {
-    // Suite-Isolation via Temp-Verzeichnisse, dann ConfigTestHelper
     tempHelper = new TempConfigDirHelper('config_test')
     tempHelper.setup()
     configTestHelper = new ConfigTestHelper('config-test')
     configTestHelper.setup()
     const config = new Config()
-    config.readYamlAsync().then(() => {
-      const cfg = Config.getConfiguration()
-      Config.tokenExpiryTime = 2000
-      cfg.noAuthentication = false
-      expect((cfg as any).noentry).toBeUndefined()
-      new Config().writeConfiguration(cfg)
-      Config.register('test', 'test123', false).then(() => {
-        Config.login('test', 'test123')
-          .then(() => {
-            resolve()
-          })
-          .catch((e: unknown) => {
-            reject(e)
-          })
-      })
-    })
+    config.readYamlAsync().then(
+      () => {
+        const cfg = Config.getConfiguration()
+        expect((cfg as any).noentry).toBeUndefined()
+        new Config().writeConfiguration(cfg)
+        resolve()
+      },
+      (e) => reject(e)
+    )
   })
 })
 afterAll(() => {
-  const cfg = Config.getConfiguration()
-  cfg.noAuthentication = false
-  new Config().writeConfiguration(cfg)
   configTestHelper.restore()
   if (tempHelper) tempHelper.cleanup()
-})
-test('register/login/validate', async () => {
-  const cfg = Config.getConfiguration()
-  Config.tokenExpiryTime = 2000
-  expect((cfg as any).noentry).toBeUndefined()
-  new Config().writeConfiguration(cfg)
-  await new Promise<void>((resolve, reject) => {
-    Config.register('test', 'test123', false)
-      .then(() => {
-        Config.login('test', 'test123').then((token) => {
-          expect(Config.validateUserToken(token)).toBe(MqttValidationResult.OK)
-          setTimeout(() => {
-            expect(Config.validateUserToken(token)).toBe(MqttValidationResult.tokenExpired)
-            Config.login('test', 'test124').catch((reason) => {
-              expect(reason).toBe(AuthenticationErrors.InvalidUserPasswordCombination)
-              resolve()
-            })
-          }, Config.tokenExpiryTime)
-        })
-      })
-      .catch(reject)
-  })
-})
-test('register/login/validate no Authentication', async () => {
-  const cfg = Config.getConfiguration()
-  expect((cfg as any).noentry).toBeUndefined()
-  new Config().writeConfiguration(cfg)
-  await Config.register(undefined, undefined, true).then(() => {
-    expect(Config.validateUserToken(undefined)).toBe(MqttValidationResult.OK)
-  })
 })
 it('getFileNameFromName remove non ascii characters', () => {
   const name = '/\\*& asdf+-_.'

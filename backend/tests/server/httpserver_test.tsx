@@ -248,7 +248,8 @@ it('supervisor login', async () => {
   const response = await supertest(httpServer['app']).get(apiUri.userAuthenticationStatus).expect(200)
   const status = response.body as any as IUserAuthenticationStatus
   expect(status.mqttConfigured).toBeTruthy()
-  expect(status.hasAuthToken).toBeFalsy()
+  expect(status.hassiotoken).toBeTruthy()
+  expect(status.authenticated).toBeFalsy()
 })
 
 it('GET /' + apiUri.specifications, async () => {

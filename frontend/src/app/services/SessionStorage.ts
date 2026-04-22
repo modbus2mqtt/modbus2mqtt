@@ -1,5 +1,4 @@
 const showExpertOptionsItem = 'showExpertOptions'
-const authToken = 'modbus2mqtt.authToken'
 export class SessionStorage {
   toggleShowExpertOptions() {
     const options = sessionStorage.getItem(showExpertOptionsItem)
@@ -8,15 +7,5 @@ export class SessionStorage {
   }
   getShowExpertOptions(): boolean {
     return sessionStorage.getItem(showExpertOptionsItem) != null
-  }
-  setAuthToken(token: string) {
-    sessionStorage.setItem(authToken, token)
-  }
-  removeAuthToken() {
-    sessionStorage.removeItem(authToken)
-  }
-
-  getAuthToken(): string | null {
-    return sessionStorage.getItem(authToken)
   }
 }

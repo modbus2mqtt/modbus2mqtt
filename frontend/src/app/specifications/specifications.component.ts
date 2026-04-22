@@ -18,7 +18,6 @@ import { MatTooltip } from '@angular/material/tooltip'
 import { NgClass } from '@angular/common';
 import { MatButton, MatIconButton } from '@angular/material/button'
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card'
-import { SessionStorage } from '../services/SessionStorage'
 import { InfoboxComponent } from '../infobox/infobox.component'
 
 interface IspecificationSummaryWithMessages extends IspecificationSummary {
@@ -203,11 +202,8 @@ export class SpecificationsComponent implements OnInit {
     if (input && (input as HTMLInputElement).files !== null) this.onJsonFileDropped((input as HTMLInputElement).files!)
   }
   generateDownloadLink(what: string): string {
-    const url = 'download/' + what
-    if (!this.authStatus || this.authStatus.hassiotoken == undefined) {
-      const authToken = new SessionStorage().getAuthToken()
-      if (authToken) return authToken + '/' + url
-    }
-    return url
+    // Downloads go through the normal /download/<what> route — session cookie
+    // (OIDC) or HA IP-whitelist covers the auth case.
+    return 'download/' + what
   }
 }

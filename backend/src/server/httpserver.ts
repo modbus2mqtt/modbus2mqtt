@@ -4,7 +4,8 @@ import os from 'os'
 import { Request as ExpressRequest } from 'express'
 import * as express from 'express'
 import { ConverterMap, filesUrlPrefix, M2mGitHub } from '../specification/index.js'
-import { Config, MqttValidationResult } from './config.js'
+import { Config } from './config.js'
+import type { AuthSession } from './auth/oidc.js'
 import { ConfigPersistence } from './persistence/configPersistence.js'
 import { Modbus } from './modbus.js'
 import {
@@ -134,15 +135,19 @@ export class HttpServer extends HttpServerBase {
       debug(req.url)
       req.acceptsLanguages()
       const config = Config.getConfiguration()
-      const authHeader = req.header('Authorization')
       const a: IUserAuthenticationStatus = Config.getAuthStatus()
 
-      a.hasAuthToken = authHeader ? true : false
-      a.authTokenExpired =
-        authHeader != undefined && HttpServer.validateUserToken(req, undefined) == MqttValidationResult.tokenExpired
+      const sess = (req as express.Request & { session?: AuthSession }).session
+      if (sess?.authenticated) {
+        a.authenticated = true
+        const user: { name?: string; email?: string } = {}
+        if (sess.userName) user.name = sess.userName
+        if (sess.userEmail) user.email = sess.userEmail
+        a.user = user
+      }
 
-      if (a.registered && (a.hassiotoken || a.hasAuthToken || a.noAuthentication))
-        a.mqttConfigured = Config.isMqttConfigured(config.mqttconnect)
+      // mqttConfigured is surfaced once auth is satisfied (HA, OIDC-authenticated, or open)
+      if (a.hassiotoken || a.authenticated || !a.oidcEnabled) a.mqttConfigured = Config.isMqttConfigured(config.mqttconnect)
 
       this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(a))
       return
@@ -153,47 +158,6 @@ export class HttpServer extends HttpServerBase {
       const a = ConverterMap.getConverters()
       this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(a))
       return
-    })
-    this.get(apiUri.userLogin, (req: express.Request, res: express.Response) => {
-      debug('(/user/login')
-      const name = req.query['name'] !== undefined ? String(req.query['name']) : undefined
-      const password = req.query['password'] !== undefined ? String(req.query['password']) : undefined
-      if (name && password) {
-        Config.login(name, password)
-          .then((result) => {
-            if (result) {
-              res.statusCode = 200
-              const a = {
-                result: 'OK',
-                token: result,
-              }
-              this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(a))
-            } else {
-              this.returnResult(req, res, HttpErrorsEnum.ErrForbidden, '{result: "Forbidden"}')
-            }
-          })
-          .catch((err) => {
-            this.returnResult(req, res, HttpErrorsEnum.ErrForbidden, '{result: "' + err + '"}', err)
-          })
-      } else {
-        this.returnResult(req, res, HttpErrorsEnum.ErrInvalidParameter, '{result: "Invalid Parameter"}')
-      }
-    })
-
-    this.post(apiUri.userRegister, (req: ExpressRequest, res: http.ServerResponse) => {
-      debug('(/user/register')
-      res.statusCode = 200
-      if ((req.body.username && req.body.password) || req.body.noAuthentication) {
-        Config.register(req.body.username, req.body.password, req.body.noAuthentication)
-          .then(() => {
-            this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify({ result: 'OK' }))
-          })
-          .catch((err) => {
-            this.returnResult(req, res, HttpErrorsEnum.ErrBadRequest, JSON.stringify({ result: err }))
-          })
-      } else {
-        this.returnResult(req, res, HttpErrorsEnum.ErrBadRequest, JSON.stringify({ result: 'Invalid Parameter' }))
-      }
     })
     this.get(apiUri.specsDetection, (req: express.Request, res: http.ServerResponse) => {
       debug(req.url)

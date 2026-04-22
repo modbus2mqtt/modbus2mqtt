@@ -8,10 +8,7 @@ mqttconnect:
   clean: false
 httpport: 3000
 fakeModbus: false
-noAuthentication: false
 filelocation: __tests__/yaml-dir
 tcpBridgePort: 502
 mqttusehassio: false
 supervisor_host: supervisor
-password: '!secret password'
-username: '!secret username'

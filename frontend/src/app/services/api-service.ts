@@ -14,7 +14,6 @@ import {
   IimportMessages,
   Converters,
 } from '@shared/specification'
-import { SessionStorage } from './SessionStorage'
 import { ActivatedRoute, Router } from '@angular/router'
 import { I18nService } from './i18n.service'
 import { ImodbusEntityWithName } from './specificationInterface'
@@ -40,18 +39,16 @@ export class ApiService {
     private activeatedRoute: ActivatedRoute
   ) {
     this.errorHandler = (err: HttpErrorResponse) => {
-      if ([HttpErrorsEnum.ErrUnauthorized, HttpErrorsEnum.ErrForbidden].includes(err.status)) {
-        new SessionStorage().removeAuthToken()
-        this.router.navigate(['login'], { queryParams: { toUrl: router.url } })
-      } else {
-        let msg = ''
-        if (err.error)
-          if (err.error.error) msg += err.error.error + '\n'
-          else msg += err.error + '\n'
-        msg += err.statusText
-        if (!err.error && !err.statusText && err.message) msg = err.message
-        alert(msg)
-      }
+      // 401 is handled by AuthHeaderInterceptor (redirects to OIDC login if enabled).
+      // Keep other errors visible to the user.
+      if ([HttpErrorsEnum.ErrUnauthorized, HttpErrorsEnum.ErrForbidden].includes(err.status)) return
+      let msg = ''
+      if (err.error)
+        if (err.error.error) msg += err.error.error + '\n'
+        else msg += err.error + '\n'
+      msg += err.statusText
+      if (!err.error && !err.statusText && err.message) msg = err.message
+      alert(msg)
     }
     if ((window as any).configuration && (window as any).configuration.rootUrl) this.rootUrl = (window as any).configuration.rootUrl
   }
@@ -179,32 +176,6 @@ export class ApiService {
       })
     )
   }
-  getUserLogin(username: string, password: string): Observable<string> {
-    return this.httpClient.get<any>(this.getFullUri(apiUri.userLogin) + `?name=${username}&password=${password}`).pipe(
-      map((value) => {
-        return value.token
-      }),
-      catchError((err) => {
-        this.errorHandler(err)
-        return new Observable<string>()
-      })
-    )
-  }
-  postUserRegister(username: string | undefined, password: string | undefined, noAuthentication: boolean): Observable<void> {
-    return this.httpClient
-      .post<void>(this.getFullUri(apiUri.userRegister), {
-        username: username,
-        password: password,
-        noAuthentication: noAuthentication,
-      })
-      .pipe(
-        catchError((err) => {
-          this.errorHandler(err)
-          return new Observable<void>()
-        })
-      )
-  }
-
   getSpecsDetection(
     busid: number,
     specificSlaveId: number,
