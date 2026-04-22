@@ -1,0 +1,194 @@
+#!/bin/sh
+# Rebase current branch on upstream/main and optionally push.
+# After push, checks other local branches for stale commits
+# and rebases them automatically.
+#
+# Usage:
+#   ./scripts/git-rebase          # rebase only
+#   ./scripts/git-rebase --push   # rebase + force-push + rebase other branches
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# Get worktree path for a branch, or empty if not in a worktree
+worktree_path_for() {
+  git worktree list --porcelain 2>/dev/null | awk -v branch="refs/heads/$1" '
+    /^worktree / { path = substr($0, 10) }
+    $0 == "branch " branch { print path; exit }
+  '
+}
+
+# Rebase other local branches that are ahead of upstream/main.
+# Skips the current branch and branches in other worktrees.
+# On conflict: abort and warn.
+rebase_other_branches() {
+  set +e  # Errors in other branches must not abort the script
+  current="$1"
+  echo ""
+  echo "${BLUE}==> Checking other branches...${NC}"
+
+  # Fetch latest remote tracking refs
+  git fetch origin --prune --quiet 2>/dev/null || true
+
+  branches_checked=0
+  branches_rebased=0
+  branches_skipped=0
+  branches_conflict=0
+
+  for branch in $(git branch --format='%(refname:short)' | grep -v "^${current}$"); do
+    # Skip main — it's typically synced separately
+    [ "$branch" = "main" ] && continue
+
+    ahead=$(git rev-list --count "upstream/main..${branch}" 2>/dev/null) || continue
+    [ "$ahead" = "0" ] && continue
+
+    diff_files=$(git diff --name-only "upstream/main...${branch}" 2>/dev/null | wc -l | tr -d ' ')
+    branches_checked=$((branches_checked + 1))
+
+    if [ "$diff_files" = "0" ]; then
+      label="${DIM}(only stale commits, will be cleaned up)${NC}"
+    else
+      label="(${diff_files} files differ)"
+    fi
+
+    echo "  ${branch}: +${ahead} ahead, ${label}"
+
+    # Branch in another worktree — rebase via git -C
+    wt_path=$(worktree_path_for "$branch")
+    if [ -n "$wt_path" ]; then
+      old_sha=$(git -C "$wt_path" rev-parse HEAD)
+      if git -C "$wt_path" rebase upstream/main --quiet 2>/dev/null; then
+        new_sha=$(git -C "$wt_path" rev-parse HEAD)
+        if [ "$new_sha" != "$old_sha" ]; then
+          if git -C "$wt_path" push --force-with-lease --quiet 2>/dev/null; then
+            new_ahead=$(git -C "$wt_path" rev-list --count "upstream/main..HEAD" 2>/dev/null)
+            echo "    ${GREEN}✓ Rebased and pushed in ${wt_path}${NC} (+${new_ahead} commits)"
+            branches_rebased=$((branches_rebased + 1))
+          else
+            echo "    ${YELLOW}✓ Rebased in ${wt_path}, push failed${NC}"
+            branches_rebased=$((branches_rebased + 1))
+          fi
+        else
+          echo "    ${DIM}  Already up to date (${wt_path})${NC}"
+          branches_skipped=$((branches_skipped + 1))
+        fi
+      else
+        git -C "$wt_path" rebase --abort 2>/dev/null || true
+        echo "    ${RED}✗ Rebase conflict in ${wt_path}${NC}"
+        echo "    ${RED}  Open workspace ${wt_path} and run ./scripts/git-rebase --push${NC}"
+        branches_conflict=$((branches_conflict + 1))
+      fi
+      continue
+    fi
+
+    git checkout "$branch" --quiet 2>/dev/null
+    old_sha=$(git rev-parse HEAD)
+
+    if [ "$diff_files" = "0" ]; then
+      # No net diff — safe to reset (squash-merged commits can't be detected by rebase)
+      git reset --hard upstream/main --quiet 2>/dev/null
+      if git push --force-with-lease --quiet 2>/dev/null; then
+        echo "    ${GREEN}✓ Reset to upstream/main and pushed${NC} (${ahead} stale commits removed)"
+        branches_rebased=$((branches_rebased + 1))
+      else
+        echo "    ${YELLOW}✓ Reset locally, push failed${NC}"
+        branches_rebased=$((branches_rebased + 1))
+      fi
+    elif git rebase upstream/main --quiet 2>/dev/null; then
+      # Normal rebase for branches with real changes
+      new_sha=$(git rev-parse HEAD)
+      if [ "$new_sha" != "$old_sha" ]; then
+        new_ahead=$(git rev-list --count "upstream/main..${branch}" 2>/dev/null)
+        if git push --force-with-lease --quiet 2>/dev/null; then
+          echo "    ${GREEN}✓ Rebased and pushed${NC} (+${new_ahead} commits)"
+          branches_rebased=$((branches_rebased + 1))
+        else
+          echo "    ${YELLOW}✓ Rebased locally, push failed${NC}"
+          branches_rebased=$((branches_rebased + 1))
+        fi
+      else
+        # SHA unchanged after rebase, but remote might still be outdated
+        remote_sha=$(git rev-parse "origin/${branch}" 2>/dev/null || echo "")
+        if [ -n "$remote_sha" ] && [ "$remote_sha" != "$new_sha" ]; then
+          if git push --force-with-lease --quiet 2>/dev/null; then
+            echo "    ${GREEN}✓ Pushed pending rebase${NC}"
+            branches_rebased=$((branches_rebased + 1))
+          else
+            echo "    ${YELLOW}✓ Local is rebased, push failed${NC}"
+            branches_rebased=$((branches_rebased + 1))
+          fi
+        else
+          echo "    ${DIM}  Already up to date${NC}"
+          branches_skipped=$((branches_skipped + 1))
+        fi
+      fi
+    else
+      git rebase --abort 2>/dev/null || true
+      echo "    ${RED}✗ Rebase conflict — needs manual resolution${NC}"
+      echo "    ${RED}  Run: git checkout ${branch} && git rebase upstream/main${NC}"
+      branches_conflict=$((branches_conflict + 1))
+    fi
+  done
+
+  # Return to original branch
+  git checkout "$current" --quiet 2>/dev/null
+
+  if [ "$branches_checked" = "0" ]; then
+    echo "  ${DIM}No other branches ahead of upstream/main.${NC}"
+  else
+    echo ""
+    echo "  ${DIM}Checked: ${branches_checked}, rebased: ${branches_rebased}, conflicts: ${branches_conflict}${NC}"
+  fi
+  set -e
+}
+
+# --- Main ---
+
+# Check upstream remote
+if ! git remote get-url upstream >/dev/null 2>&1; then
+  echo "${RED}Error: No 'upstream' remote configured.${NC}"
+  echo "Add it with: git remote add upstream git@github.com:modbus2mqtt/modbus2mqtt.git"
+  exit 1
+fi
+
+echo "${BLUE}==> Fetching upstream...${NC}"
+git fetch upstream
+
+# Check if current branch has 0 net diff (all commits already in upstream)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+current_ahead=$(git rev-list --count "upstream/main..${CURRENT_BRANCH}" 2>/dev/null || echo "0")
+current_diff=$(git diff --name-only "upstream/main...${CURRENT_BRANCH}" 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$current_ahead" -gt 0 ] && [ "$current_diff" = "0" ]; then
+  echo "${BLUE}==> Current branch has only stale commits (0 net diff) — resetting to upstream/main${NC}"
+  git reset --hard upstream/main
+  echo "${GREEN}✓ Reset to upstream/main${NC} (${current_ahead} stale commits removed)"
+else
+  echo "${BLUE}==> Rebasing on upstream/main...${NC}"
+  if git rebase upstream/main; then
+    echo "${GREEN}✓ Rebased on upstream/main${NC}"
+  else
+    echo "${RED}Rebase failed. Resolve conflicts, then:${NC}"
+    echo "  git rebase --continue"
+    echo "  git push --force-with-lease"
+    exit 1
+  fi
+fi
+
+if [ "$1" = "--push" ]; then
+  echo "${BLUE}==> Pushing with --force-with-lease...${NC}"
+  git push --force-with-lease -u origin "$CURRENT_BRANCH"
+  echo "${GREEN}✓ Rebased and pushed.${NC}"
+
+  # After successful push: check and rebase other branches
+  rebase_other_branches "$CURRENT_BRANCH"
+else
+  echo ""
+  echo "Push with: git push --force-with-lease origin $CURRENT_BRANCH"
+  echo "Or run:    ./scripts/git-rebase --push"
+fi

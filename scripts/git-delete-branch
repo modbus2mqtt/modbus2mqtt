@@ -1,0 +1,58 @@
+#!/bin/sh
+# Delete a feature branch locally and on the remote (origin).
+#
+# Usage:
+#   ./scripts/git-delete-branch feat/my-feature
+#   ./scripts/git-delete-branch                    # deletes the current branch
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+
+# Safety: refuse to delete main/master
+case "$BRANCH" in
+  main|master)
+    echo "${RED}Error: Refusing to delete '${BRANCH}'.${NC}"
+    exit 1
+    ;;
+esac
+
+# If deleting the current branch, switch to a detached HEAD from upstream/main
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "$CURRENT_BRANCH" ]; then
+  echo "${BLUE}==> Switching off branch '${BRANCH}'...${NC}"
+  git fetch upstream 2>/dev/null || true
+  if git rev-parse upstream/main >/dev/null 2>&1; then
+    git checkout upstream/main --detach
+  else
+    echo "${RED}Error: Cannot switch off current branch. Checkout another branch first.${NC}"
+    exit 1
+  fi
+fi
+
+# Delete local branch
+if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
+  echo "${BLUE}==> Deleting local branch '${BRANCH}'...${NC}"
+  git branch -D "$BRANCH"
+  echo "${GREEN}✓ Local branch deleted${NC}"
+else
+  echo "${YELLOW}Local branch '${BRANCH}' does not exist${NC}"
+fi
+
+# Delete remote branch
+if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+  echo "${BLUE}==> Deleting remote branch 'origin/${BRANCH}'...${NC}"
+  git push origin --delete "$BRANCH"
+  echo "${GREEN}✓ Remote branch deleted${NC}"
+else
+  echo "${YELLOW}Remote branch 'origin/${BRANCH}' does not exist${NC}"
+fi
+
+echo "${GREEN}✓ Done. Start a new feature with:${NC}"
+echo "  git fetch upstream"
+echo "  git checkout -b feat/new-feature upstream/main"

@@ -62,6 +62,43 @@
         "options": { "cwd": "${workspaceFolder:modbus2mqtt}" },
         "problemMatcher": [],
       },
+      {
+        "label": "Git Workflow",
+        "type": "shell",
+        "command": "sh",
+        "args": ["-c", "${input:gitAction}"],
+        "options": { "cwd": "${workspaceFolder:modbus2mqtt}" },
+        "problemMatcher": [],
+        "presentation": { "reveal": "always", "focus": true },
+      },
+      {
+        "label": "Git: Create Feature Branch",
+        "type": "shell",
+        "command": "./scripts/git-create-branch",
+        "args": ["${input:branchName}"],
+        "options": { "cwd": "${workspaceFolder:modbus2mqtt}" },
+        "problemMatcher": [],
+        "presentation": { "reveal": "always", "focus": true },
+      },
+    ],
+    "inputs": [
+      {
+        "id": "gitAction",
+        "type": "pickString",
+        "description": "Git Workflow Action",
+        "options": [
+          { "label": "Rebase on upstream/main", "value": "./scripts/git-rebase" },
+          { "label": "Rebase + Push", "value": "./scripts/git-rebase --push" },
+          { "label": "Create PR to upstream", "value": "./scripts/git-pr" },
+          { "label": "Delete Current Branch", "value": "./scripts/git-delete-branch" },
+        ],
+      },
+      {
+        "id": "branchName",
+        "type": "promptString",
+        "description": "Branch name (auto-prefixes with feat/ if no prefix given)",
+        "default": "feat/",
+      },
     ],
   },
   "launch": {

@@ -1,0 +1,61 @@
+#!/bin/sh
+# Create a PR from the current branch to upstream/main.
+#
+# Usage:
+#   ./scripts/git-pr                    # opens PR with default settings
+#   ./scripts/git-pr --draft            # opens as draft PR
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Check gh CLI
+if ! command -v gh >/dev/null 2>&1; then
+  echo "${RED}Error: GitHub CLI (gh) is not installed.${NC}"
+  echo "Install from: https://cli.github.com/"
+  exit 1
+fi
+
+# Get current branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Safety: refuse on main/master
+case "$CURRENT_BRANCH" in
+  main|master)
+    echo "${RED}Error: Cannot create PR from '${CURRENT_BRANCH}'.${NC}"
+    echo "Create a feature branch first: ./scripts/git-create-branch my-feature"
+    exit 1
+    ;;
+esac
+
+# Detect upstream repo from remote URL
+UPSTREAM_REPO=$(git remote get-url upstream 2>/dev/null | sed 's|.*github.com[:/]||;s|\.git$||')
+if [ -z "$UPSTREAM_REPO" ]; then
+  echo "${RED}Error: No 'upstream' remote configured.${NC}"
+  echo "Add it with: git remote add upstream git@github.com:modbus2mqtt/modbus2mqtt.git"
+  exit 1
+fi
+
+# Ensure branch is pushed to origin
+if ! git ls-remote --exit-code --heads origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
+  echo "${BLUE}==> Pushing branch to origin...${NC}"
+  git push -u origin "$CURRENT_BRANCH"
+fi
+
+# Check if PR already exists
+EXISTING_PR=$(gh pr list --repo "$UPSTREAM_REPO" --head "$CURRENT_BRANCH" --json url --jq '.[0].url' 2>/dev/null || echo "")
+if [ -n "$EXISTING_PR" ]; then
+  echo "${YELLOW}PR already exists: ${EXISTING_PR}${NC}"
+  echo "Opening in browser..."
+  gh pr view --repo "$UPSTREAM_REPO" --web "$CURRENT_BRANCH"
+  exit 0
+fi
+
+# Create PR
+echo "${BLUE}==> Creating PR: ${CURRENT_BRANCH} → ${UPSTREAM_REPO}/main${NC}"
+gh pr create --base main --repo "$UPSTREAM_REPO" "$@"
+
+echo "${GREEN}✓ PR created${NC}"

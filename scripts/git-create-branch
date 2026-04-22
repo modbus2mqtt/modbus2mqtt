@@ -1,0 +1,52 @@
+#!/bin/sh
+# Create a new feature branch from the latest upstream/main.
+#
+# Usage:
+#   ./scripts/git-create-branch feat/my-feature
+#   ./scripts/git-create-branch my-feature          # auto-prefixes with feat/
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+if [ -z "$1" ]; then
+  echo "${RED}Usage: ./scripts/git-create-branch <branch-name>${NC}"
+  echo "Example: ./scripts/git-create-branch feat/my-feature"
+  echo "         ./scripts/git-create-branch my-feature  (auto-prefixes feat/)"
+  exit 1
+fi
+
+BRANCH="$1"
+
+# Auto-prefix with feat/ if no prefix is present
+case "$BRANCH" in
+  feat/*|fix/*|chore/*|docs/*|refactor/*|test/*|ci/*)
+    # Already has a conventional prefix
+    ;;
+  *)
+    BRANCH="feat/${BRANCH}"
+    echo "${BLUE}Auto-prefixed branch name: ${BRANCH}${NC}"
+    ;;
+esac
+
+# Check upstream remote
+if ! git remote get-url upstream >/dev/null 2>&1; then
+  echo "${RED}Error: No 'upstream' remote configured.${NC}"
+  echo "Add it with: git remote add upstream git@github.com:modbus2mqtt/modbus2mqtt.git"
+  exit 1
+fi
+
+echo "${BLUE}==> Fetching upstream...${NC}"
+git fetch upstream
+
+echo "${BLUE}==> Creating branch '${BRANCH}' from upstream/main...${NC}"
+git checkout -b "$BRANCH" upstream/main
+
+echo "${GREEN}✓ Branch '${BRANCH}' created from upstream/main${NC}"
+echo ""
+echo "Next steps:"
+echo "  1. Make your changes and commit"
+echo "  2. Push: git push -u origin ${BRANCH}"
+echo "  3. Create PR: gh pr create --base main --repo modbus2mqtt/modbus2mqtt"
