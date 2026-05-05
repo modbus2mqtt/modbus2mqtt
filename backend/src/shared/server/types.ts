@@ -12,6 +12,7 @@ export enum HttpErrorsEnum {
   ErrNotFound = 404,
   ErrNotAcceptable = 406,
   ErrRequestTimeout = 408,
+  ErrConflict = 409,
   ErrInvalidParameter = 422,
   SrvErrInternalServerError = 500,
 }

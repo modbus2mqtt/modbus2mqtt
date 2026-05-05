@@ -5,9 +5,11 @@ import { join } from 'path'
 import Debug from 'debug'
 import AdmZip from 'adm-zip'
 import stream from 'stream'
-import { Iconfiguration } from '../../shared/server/index.js'
+import { HttpErrorsEnum, Iconfiguration, IModbusConnection, Islave } from '../../shared/server/index.js'
 import { ISingletonPersistence } from './persistence.js'
-import { Logger, LogLevelEnum } from '../../specification/index.js'
+import { IfileSpecification, Logger, LogLevelEnum } from '../../specification/index.js'
+import { SpecPersistence } from '../../specification/specPersistence.js'
+import { BusPersistence } from './busPersistence.js'
 
 const debug = Debug('configPersistence')
 const log = new Logger('configPersistence')
@@ -30,6 +32,15 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
     }
     if (!fs.existsSync(ConfigPersistence.configDir)) {
       return undefined
+    }
+
+    if (fs.existsSync(this.getImportMarkerPath())) {
+      throw new Error(
+        'Local configuration is in an inconsistent state from a partial import. ' +
+          'Delete ' +
+          ConfigPersistence.getLocalDir() +
+          ' and re-import.'
+      )
     }
 
     const yamlFile = this.getConfigPath()
@@ -173,6 +184,144 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
       if (fs.existsSync(fn)) return fs.readFileSync(fn, { encoding: 'utf8' }).toString()
     }
     return undefined
+  }
+
+  getImportMarkerPath(): string {
+    return join(ConfigPersistence.getLocalDir(), '.import-in-progress')
+  }
+
+  hasLocalUserContent(): boolean {
+    const localDir = ConfigPersistence.getLocalDir()
+    if (!fs.existsSync(localDir)) return false
+    if (fs.existsSync(this.getConfigPath())) return true
+    const busDir = join(localDir, 'busses')
+    if (fs.existsSync(busDir) && fs.readdirSync(busDir).length > 0) return true
+    const specDir = join(localDir, 'specifications')
+    if (fs.existsSync(specDir)) {
+      const specEntries = fs.readdirSync(specDir).filter((f) => f !== 'files')
+      if (specEntries.length > 0) return true
+      const filesDir = join(specDir, 'files')
+      if (fs.existsSync(filesDir) && fs.readdirSync(filesDir).length > 0) return true
+    }
+    return false
+  }
+
+  async importLocalZip(zip: Buffer): Promise<{ ok: boolean; status: HttpErrorsEnum; message: string }> {
+    if (this.hasLocalUserContent()) {
+      return { ok: false, status: HttpErrorsEnum.ErrConflict, message: 'local directory not empty' }
+    }
+
+    let archive: AdmZip
+    try {
+      archive = new AdmZip(zip)
+    } catch (e) {
+      return { ok: false, status: HttpErrorsEnum.ErrBadRequest, message: 'Invalid ZIP: ' + (e as Error).message }
+    }
+    const entries = archive.getEntries()
+    if (entries.length === 0) {
+      return { ok: false, status: HttpErrorsEnum.ErrBadRequest, message: 'ZIP is empty' }
+    }
+
+    const localDir = ConfigPersistence.getLocalDir()
+    for (const entry of entries) {
+      if (entry.isDirectory) continue
+      const name = entry.entryName
+      const norm = path.normalize(name)
+      if (path.isAbsolute(name) || name.startsWith('/') || norm.startsWith('..') || norm.includes('..' + path.sep)) {
+        return { ok: false, status: HttpErrorsEnum.ErrBadRequest, message: 'Invalid ZIP entry path: ' + name }
+      }
+    }
+
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true })
+    const markerPath = this.getImportMarkerPath()
+    fs.writeFileSync(markerPath, '', { encoding: 'utf8' })
+
+    try {
+      const busPersistence = new BusPersistence(localDir)
+      const specPersistence = new SpecPersistence(ConfigPersistence.configDir, ConfigPersistence.dataDir)
+
+      for (const entry of entries) {
+        if (entry.isDirectory) continue
+        const name = entry.entryName
+        const base = path.basename(name)
+
+        if (base === 'secrets.yaml') {
+          debug('Skipping secrets.yaml in ZIP')
+          continue
+        }
+
+        if (name === 'modbus2mqtt.yaml') {
+          const targetFile = this.getConfigPath()
+          if (!fs.existsSync(path.dirname(targetFile))) {
+            fs.mkdirSync(path.dirname(targetFile), { recursive: true })
+          }
+          fs.writeFileSync(targetFile, entry.getData(), { flag: 'w' })
+          continue
+        }
+
+        const busMatch = /^busses\/bus\.(\d+)\/(.+)$/.exec(name)
+        if (busMatch) {
+          const busId = parseInt(busMatch[1], 10)
+          const fileInBus = busMatch[2]
+          if (fileInBus.includes('/')) {
+            log.log(LogLevelEnum.warn, 'Skipping unexpected nested bus entry: ' + name)
+            continue
+          }
+          const yamlContent = entry.getData().toString('utf8')
+          const parsed = parse(yamlContent)
+          if (fileInBus === 'bus.yaml') {
+            busPersistence.writeBus(busId, parsed as IModbusConnection)
+          } else if (fileInBus.startsWith('s') && fileInBus.endsWith('.yaml')) {
+            busPersistence.writeSlave(busId, parsed as Islave)
+          } else {
+            log.log(LogLevelEnum.warn, 'Skipping unknown bus file: ' + name)
+          }
+          continue
+        }
+
+        if (name.startsWith('specifications/files/')) {
+          const target = join(localDir, name)
+          const targetDir = path.dirname(target)
+          if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true })
+          fs.writeFileSync(target, entry.getData())
+          continue
+        }
+
+        const specJsonMatch = /^specifications\/([^/]+)\.json$/.exec(name)
+        if (specJsonMatch) {
+          const filename = specJsonMatch[1]
+          const jsonContent = entry.getData().toString('utf8')
+          const spec = JSON.parse(jsonContent) as IfileSpecification
+          spec.filename = filename
+          specPersistence.writeItem(filename, spec)
+          continue
+        }
+
+        const specYamlMatch = /^specifications\/([^/]+)\.yaml$/.exec(name)
+        if (specYamlMatch) {
+          // Legacy YAML spec — copy raw; Migrator will upgrade to JSON on next read.
+          const target = join(localDir, name)
+          const targetDir = path.dirname(target)
+          if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true })
+          fs.writeFileSync(target, entry.getData())
+          continue
+        }
+
+        log.log(LogLevelEnum.warn, 'Skipping unexpected ZIP entry: ' + name)
+      }
+
+      const secretsPath = this.getSecretsPath()
+      if (!fs.existsSync(secretsPath)) {
+        fs.writeFileSync(secretsPath, '', { encoding: 'utf8' })
+      }
+
+      fs.unlinkSync(markerPath)
+      return { ok: true, status: HttpErrorsEnum.OK, message: 'imported' }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      log.log(LogLevelEnum.error, 'Import failed: ' + msg)
+      return { ok: false, status: HttpErrorsEnum.SrvErrInternalServerError, message: 'Import failed: ' + msg }
+    }
   }
 
   async createLocalExportZip(writable: stream.Writable): Promise<void> {

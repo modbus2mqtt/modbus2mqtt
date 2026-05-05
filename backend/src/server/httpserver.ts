@@ -336,6 +336,36 @@ export class HttpServer extends HttpServerBase {
         this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(result))
       })
     })
+    this.app.post(
+      apiUri.uploadLocal,
+      express.raw({ type: 'application/zip', limit: '50mb' }),
+      (req: express.Request, res: http.ServerResponse) => {
+        debug(req.url)
+        const buffer = req.body as Buffer
+        if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+          this.returnResult(
+            req as ExpressRequest,
+            res,
+            HttpErrorsEnum.ErrBadRequest,
+            JSON.stringify({ ok: false, message: 'No ZIP body received (Content-Type: application/zip required)' })
+          )
+          return
+        }
+        Config.importLocalZip(buffer)
+          .then((result) => {
+            this.returnResult(req as ExpressRequest, res, result.status as unknown as HttpErrorsEnum, JSON.stringify(result))
+          })
+          .catch((e) => {
+            this.returnResult(
+              req as ExpressRequest,
+              res,
+              HttpErrorsEnum.SrvErrInternalServerError,
+              JSON.stringify({ ok: false, message: 'import error: ' + (e as Error).message })
+            )
+          })
+      }
+    )
+
     this.get(apiUri.download, (req: express.Request, res: http.ServerResponse) => {
       debug(req.url)
       if (req.params && req.params['what']) {

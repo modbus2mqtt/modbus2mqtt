@@ -336,6 +336,9 @@ export class Config {
   static async createZipFromLocal(_filename: string, r: import('stream').Writable): Promise<void> {
     return Config.ensurePersistence().createLocalExportZip(r)
   }
+  static async importLocalZip(buffer: Buffer) {
+    return Config.ensurePersistence().importLocalZip(buffer)
+  }
 }
 export function getSpecificationImageOrDocumentUrl(rootUrl: string | undefined, specName: string, url: string): string {
   const fn = getBaseFilename(url)
