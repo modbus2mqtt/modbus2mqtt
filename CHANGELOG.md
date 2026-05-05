@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.22.0...modbus2mqtt-v0.23.0) (2026-05-05)
+
+
+### Features
+
+* discovery hardware version  ([#240](https://github.com/modbus2mqtt/modbus2mqtt/issues/240)) ([33aa7fb](https://github.com/modbus2mqtt/modbus2mqtt/commit/33aa7fb5c78e036bf2d2a0e10544af86587c2d0b))
+
 ## [0.22.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.21.0...modbus2mqtt-v0.22.0) (2026-05-05)
 
 
