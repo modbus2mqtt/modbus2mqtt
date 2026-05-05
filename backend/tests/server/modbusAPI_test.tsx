@@ -13,7 +13,7 @@ import {
   LogLevelEnum,
 } from '../../src/specification/index.js'
 import { ModbusAPI } from '../../src/server/modbusAPI.js'
-import { TempConfigDirHelper } from './testhelper.js'
+import { TempConfigDirHelper, getAvailablePort } from './testhelper.js'
 
 const debug = Debug('bustest')
 setConfigsDirsForTest()
@@ -54,7 +54,9 @@ async function testRead(
   const tcpServer = new ModbusServer()
   const bus = Bus.getBus(1)
   expect(bus).toBeDefined()
-  await tcpServer.startServer((bus!.properties.connectionData as any)['port'])
+  const port = await getAvailablePort()
+  ;(bus!.properties.connectionData as any)['port'] = port
+  await tcpServer.startServer(port)
   debug('Connected to TCP server')
   const modbusAPI = new ModbusAPI(bus!)
   try {
@@ -85,7 +87,9 @@ async function testWrite(
   const tcpServer = new ModbusServer()
   const bus = Bus.getBus(1)
   expect(bus).toBeDefined()
-  await tcpServer.startServer((bus!.properties.connectionData as any)['port'])
+  const port = await getAvailablePort()
+  ;(bus!.properties.connectionData as any)['port'] = port
+  await tcpServer.startServer(port)
   const modbusAPI = new ModbusAPI(bus!)
   try {
     await modbusAPI.initialConnect()
