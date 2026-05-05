@@ -18,12 +18,17 @@ import { MatOption } from '@angular/material/core'
 import { MatSelect } from '@angular/material/select'
 import { NgClass } from '@angular/common';
 import { MatInput } from '@angular/material/input'
-import { MatFormField, MatLabel, MatError } from '@angular/material/form-field'
+import { MatFormField, MatLabel, MatError, MatHint } from '@angular/material/form-field'
 import { MatStepLabel } from '@angular/material/stepper'
 import { MatIcon } from '@angular/material/icon'
 import { MatTooltip } from '@angular/material/tooltip'
 import { MatIconButton } from '@angular/material/button'
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card'
+
+// Let's Encrypt convention (also used by Home Assistant)
+const DEFAULT_CA_FILE = 'chain.pem'
+const DEFAULT_CERT_FILE = 'cert.pem'
+const DEFAULT_KEY_FILE = 'privkey.pem'
 
 @Component({
   selector: 'app-configure',
@@ -44,6 +49,7 @@ import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/m
     MatLabel,
     MatInput,
     MatError,
+    MatHint,
     MatSelect,
     MatOption,
     NgClass
@@ -53,6 +59,9 @@ import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/m
 export class ConfigureComponent implements OnInit {
   config: Iconfiguration | undefined = undefined
   @Output() isMqttConfiguredEvent = new EventEmitter<boolean>()
+  readonly defaultCaFile = DEFAULT_CA_FILE
+  readonly defaultCertFile = DEFAULT_CERT_FILE
+  readonly defaultKeyFile = DEFAULT_KEY_FILE
 
   constructor(
     private _formBuilder: FormBuilder,
@@ -67,8 +76,9 @@ export class ConfigureComponent implements OnInit {
       mqttserverurl: [null as string | null, this.requiredInNonAddonScenario],
       mqttuser: [null as string | null],
       mqttpassword: [null as string | null],
-      mqttkeyfile: [null as string | null],
       mqttcafile: [null as string | null],
+      mqttcertfile: [null as string | null],
+      mqttkeyfile: [null as string | null],
     })
   }
   private requiredInNonAddonScenario: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
@@ -114,12 +124,22 @@ export class ConfigureComponent implements OnInit {
       if (config.mqttdiscoverylanguage) {
         this.discoveryLanguageFormControl!.setValue(config.mqttdiscoverylanguage)
       }
+      if (config.mqttcaFile) {
+        this.configureMqttFormGroup.get('mqttcafile')!.setValue(config.mqttcaFile)
+      }
+      if (config.mqttcertFile) {
+        this.configureMqttFormGroup.get('mqttcertfile')!.setValue(config.mqttcertFile)
+      }
+      if (config.mqttkeyFile) {
+        this.configureMqttFormGroup.get('mqttkeyfile')!.setValue(config.mqttkeyFile)
+      }
       if (config.debugComponents) {
         this.debugComponentsFormControl!.setValue(config.debugComponents)
       }
 
       this.entityApiService.getSslFiles().subscribe((rc) => {
         this.sslFiles = rc
+        this.applyMtlsDefaultsIfAllPresent(config)
       })
       this.entityApiService.getUserAuthenticationStatus().subscribe((authStatus) => {
         this.authStatus = authStatus
@@ -132,8 +152,9 @@ export class ConfigureComponent implements OnInit {
     const mqttserverurl = form.get('mqttserverurl')
     const mqttuser = form.get('mqttuser')
     const mqttpassword = form.get('mqttpassword')
-    const mqttkeyfile = form.get('mqttkeyfile')
     const mqttcafile = form.get('mqttcafile')
+    const mqttcertfile = form.get('mqttcertfile')
+    const mqttkeyfile = form.get('mqttkeyfile')
     // Save changes to Config and Device
     if (config && mqttserverurl && mqttuser && mqttpassword && mqttserverurl.value) {
       {
@@ -144,12 +165,28 @@ export class ConfigureComponent implements OnInit {
         if (this.discoveryLanguageFormControl && this.discoveryLanguageFormControl.value!)
           config.mqttdiscoverylanguage = this.discoveryLanguageFormControl.value!
         if (mqttcafile) config.mqttcaFile = mqttcafile.value ? mqttcafile.value : undefined
-        else this.config && delete this.config.mqttcaFile
-        if (mqttkeyfile) config.mqttcertFile = mqttkeyfile.value ? mqttkeyfile.value : undefined
-        else config && delete config.mqttcertFile
+        else delete config.mqttcaFile
+        if (mqttcertfile) config.mqttcertFile = mqttcertfile.value ? mqttcertfile.value : undefined
+        else delete config.mqttcertFile
+        if (mqttkeyfile) config.mqttkeyFile = mqttkeyfile.value ? mqttkeyfile.value : undefined
+        else delete config.mqttkeyFile
         if (config.debugComponents) config.debugComponents = this.debugComponentsFormControl!.value
       }
     }
+  }
+
+  private applyMtlsDefaultsIfAllPresent(config: Iconfiguration) {
+    const allPresent =
+      this.sslFiles.includes(DEFAULT_CA_FILE) &&
+      this.sslFiles.includes(DEFAULT_CERT_FILE) &&
+      this.sslFiles.includes(DEFAULT_KEY_FILE)
+    if (!allPresent) return
+    const ca = this.configureMqttFormGroup.get('mqttcafile')
+    const cert = this.configureMqttFormGroup.get('mqttcertfile')
+    const key = this.configureMqttFormGroup.get('mqttkeyfile')
+    if (ca && !ca.value && !config.mqttcaFile) ca.setValue(DEFAULT_CA_FILE)
+    if (cert && !cert.value && !config.mqttcertFile) cert.setValue(DEFAULT_CERT_FILE)
+    if (key && !key.value && !config.mqttkeyFile) key.setValue(DEFAULT_KEY_FILE)
   }
 
   onChangekMqttConfig() {

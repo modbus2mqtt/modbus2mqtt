@@ -56,20 +56,31 @@
           }
         </mat-form-field>
         <mat-form-field class="width250pt">
-          <mat-label>CA certificate File (located in HA ssl directory)</mat-label>
+          <mat-label>CA certificate file (located in ssl directory)</mat-label>
           <mat-select matInput formControlName="mqttcafile" (selectionChange)="onChangekMqttConfig()">
             @for (c of sslFiles; track $index) {
               <mat-option [value]="c">{{ c }} </mat-option>
             }
           </mat-select>
+          <mat-hint>Example: {{ defaultCaFile }}</mat-hint>
         </mat-form-field>
         <mat-form-field class="width250pt">
-          <mat-label>Client key (located in HA ssl directory) for client authentication</mat-label>
+          <mat-label>Client certificate file (located in ssl directory)</mat-label>
+          <mat-select matInput formControlName="mqttcertfile" (selectionChange)="onChangekMqttConfig()">
+            @for (c of sslFiles; track $index) {
+              <mat-option [value]="c">{{ c }} </mat-option>
+            }
+          </mat-select>
+          <mat-hint>Example: {{ defaultCertFile }}</mat-hint>
+        </mat-form-field>
+        <mat-form-field class="width250pt">
+          <mat-label>Client key file (located in ssl directory)</mat-label>
           <mat-select matInput formControlName="mqttkeyfile" (selectionChange)="onChangekMqttConfig()">
             @for (c of sslFiles; track $index) {
               <mat-option [value]="c">{{ c }} </mat-option>
             }
           </mat-select>
+          <mat-hint>Example: {{ defaultKeyFile }}</mat-hint>
         </mat-form-field>
         <mat-form-field class="width250pt">
           <mat-label>language</mat-label>

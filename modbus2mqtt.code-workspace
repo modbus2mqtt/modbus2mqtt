@@ -109,7 +109,7 @@
         "preLaunchTask": "build modbus2mqtt",
         "timeout": 10000,
         "program": "${workspaceFolder:modbus2mqtt}/dist/server/modbus2mqtt.js",
-        "args": ["-s", "ssl", "-c", "../config-dir", "-d", "../data-dir"],
+        "args": ["-s", "certs", "-c", "../config-dir", "-d", "../data-dir"],
         "console": "integratedTerminal",
         "cwd": "${workspaceFolder:modbus2mqtt}",
         "env": { "DEBUG": "" },

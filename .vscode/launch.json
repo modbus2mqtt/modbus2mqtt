@@ -52,7 +52,7 @@
       "preLaunchTask": "npm: build",
       "timeout": 10000,
       "program": "${workspaceFolder}/dist/server/modbus2mqtt.js",
-      "args": ["-s", "ssl", "-c", "../config-dir", "-d", "../data-dir"],
+      "args": ["-s", "certs", "-c", "../config-dir", "-d", "../data-dir"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {
@@ -86,7 +86,7 @@
       "preLaunchTask": "npm: build.dev",
       "timeout": 10000,
       "program": "${workspaceFolder}/dist/server/modbus2mqtt.js",
-      "args": ["-s", "../ssl", "-y", "../yaml-dir-bridge"],
+      "args": ["-s", "certs", "-y", "../yaml-dir-bridge"],
       "console": "integratedTerminal",
       "env": {
         "DEBUG": ""
