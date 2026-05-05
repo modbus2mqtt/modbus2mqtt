@@ -16,7 +16,7 @@ import { promisify } from 'util'
 
 const execFile = promisify(execFileCb)
 
-const TEST_REPO = process.env.TEST_CONFIG_REPO || 'modbus2mqtt/modbus2mqtt.config.test'
+const TEST_REPO = process.env.TEST_CONFIG_REPO
 const TEST_RUN_ID = `inttest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
 /** Minimal valid IfileSpecification for testing */
@@ -82,8 +82,9 @@ describe('JSON spec validation (local, no GitHub needed)', () => {
 })
 
 const hasToken = !!process.env.GITHUB_TOKEN
+const hasTestRepo = !!TEST_REPO
 
-describe.skipIf(!hasToken)('GitHub integration (requires GITHUB_TOKEN)', () => {
+describe.skipIf(!hasToken || !hasTestRepo)('GitHub integration (requires GITHUB_TOKEN and TEST_CONFIG_REPO)', () => {
   let gh: M2mGithubValidate
   const branchName = `test/${TEST_RUN_ID}`
   let prNumber: number | undefined
@@ -91,7 +92,7 @@ describe.skipIf(!hasToken)('GitHub integration (requires GITHUB_TOKEN)', () => {
 
   beforeAll(async () => {
 
-    gh = new M2mGithubValidate(TEST_REPO)
+    gh = new M2mGithubValidate(TEST_REPO!)
 
     // 1. Clone test repo into temp dir (with token for push access)
     const tmpDir = fs.mkdtempSync(join(tmpdir(), 'm2m-inttest-'))
@@ -124,7 +125,7 @@ describe.skipIf(!hasToken)('GitHub integration (requires GITHUB_TOKEN)', () => {
           'pr',
           'create',
           '--repo',
-          TEST_REPO,
+          TEST_REPO!,
           '--base',
           'main',
           '--head',
