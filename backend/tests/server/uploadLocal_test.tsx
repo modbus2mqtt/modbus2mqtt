@@ -103,7 +103,7 @@ it('imports a minimal zip and creates empty secrets.yaml', async () => {
   expect(fs.existsSync(persistence.getConfigPath())).toBe(true)
   expect(fs.readFileSync(persistence.getConfigPath(), 'utf8')).toContain('imported')
   expect(fs.existsSync(persistence.getSecretsPath())).toBe(true)
-  expect(fs.readFileSync(persistence.getSecretsPath(), 'utf8')).toBe('')
+  expect(fs.readFileSync(persistence.getSecretsPath(), 'utf8')).toBe('{}\n')
   expect(fs.existsSync(persistence.getImportMarkerPath())).toBe(false)
 })
 
@@ -115,7 +115,7 @@ it('skips secrets.yaml entries inside the zip', async () => {
 
   expect(result.ok).toBe(true)
   // secrets.yaml in the zip was ignored — local secrets.yaml is empty
-  expect(fs.readFileSync(persistence.getSecretsPath(), 'utf8')).toBe('')
+  expect(fs.readFileSync(persistence.getSecretsPath(), 'utf8')).toBe('{}\n')
 })
 
 it('round-trip: re-imports an export zip into an empty directory', async () => {

@@ -352,7 +352,26 @@ export class HttpServer extends HttpServerBase {
           return
         }
         Config.importLocalZip(buffer)
-          .then((result) => {
+          .then(async (result) => {
+            if (result.ok) {
+              try {
+                MqttConnector.resetInstance()
+                await new Config().readYamlAsync()
+                new ConfigSpecification().readYaml()
+                ConfigBus.readBusses()
+                await Bus.readBussesFromConfig()
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e)
+                log.log(LogLevelEnum.error, 'Post-import reload failed: ' + msg)
+                this.returnResult(
+                  req as ExpressRequest,
+                  res,
+                  HttpErrorsEnum.SrvErrInternalServerError,
+                  JSON.stringify({ ok: false, message: 'imported but reload failed: ' + msg })
+                )
+                return
+              }
+            }
             this.returnResult(req as ExpressRequest, res, result.status as unknown as HttpErrorsEnum, JSON.stringify(result))
           })
           .catch((e) => {

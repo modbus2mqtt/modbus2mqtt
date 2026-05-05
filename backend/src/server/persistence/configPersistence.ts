@@ -51,7 +51,7 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
     const secretsFile = join(ConfigPersistence.getLocalDir(), 'secrets.yaml')
     let src: string = fs.readFileSync(yamlFile, { encoding: 'utf8' })
     if (fs.existsSync(secretsFile)) {
-      const secrets = parse(fs.readFileSync(secretsFile, { encoding: 'utf8' }))
+      const secrets = parse(fs.readFileSync(secretsFile, { encoding: 'utf8' })) ?? {}
       const srcLines = src.split('\n')
       src = ''
       srcLines.forEach((line) => {
@@ -312,7 +312,7 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
 
       const secretsPath = this.getSecretsPath()
       if (!fs.existsSync(secretsPath)) {
-        fs.writeFileSync(secretsPath, '', { encoding: 'utf8' })
+        fs.writeFileSync(secretsPath, '{}\n', { encoding: 'utf8' })
       }
 
       fs.unlinkSync(markerPath)
