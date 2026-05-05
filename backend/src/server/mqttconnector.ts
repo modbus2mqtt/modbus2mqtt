@@ -64,14 +64,28 @@ export class MqttConnector {
 
   validateConnection(connectionData: ImqttClient | undefined, callback: (valid: boolean, message: string) => void) {
     if (connectionData && connectionData.mqttserverurl != undefined) {
-      const client = connect(connectionData.mqttserverurl, connectionData as IClientOptions)
+      const opts: IClientOptions = {
+        ...(connectionData as IClientOptions),
+        reconnectPeriod: 0,
+        connectTimeout: 5000,
+      }
+      const client = connect(connectionData.mqttserverurl, opts)
+      let settled = false
+      const settle = (valid: boolean, message: string) => {
+        if (settled) return
+        settled = true
+        try {
+          client.end(true)
+        } catch {
+          /* ignore */
+        }
+        callback(valid, message)
+      }
       client.on('error', (e) => {
-        client!.end(() => {})
-        callback(false, connectionData.mqttserverurl + ': ' + e.toString())
+        settle(false, connectionData.mqttserverurl + ': ' + e.toString())
       })
       client.on('connect', () => {
-        callback(true, 'OK')
-        if (client) client.end(() => {})
+        settle(true, 'OK')
       })
     } else callback(false, 'no mqttserverlurl passed')
   }

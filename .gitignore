@@ -80,6 +80,7 @@ web_modules/
 
 # Local SSL certificates and key material
 ssl/
+certs/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -162,4 +163,3 @@ distprod
 .skip-precommit
 __tests__/server/tmp-httpserver**/*
 __tests__/server/*_single_*.tsx.*
-certs/
