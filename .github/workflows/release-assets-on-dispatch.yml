@@ -82,6 +82,7 @@ jobs:
       - name: Install dependencies and build
         run: |
           pnpm install --frozen-lockfile
+          (cd backend && pnpm install --frozen-lockfile)
           (cd frontend && pnpm install --frozen-lockfile)
           pnpm run build
 
