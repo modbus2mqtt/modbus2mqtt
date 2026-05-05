@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.23.0...modbus2mqtt-v0.24.0) (2026-05-05)
+
+
+### Features
+
+* import local dir rest api ([#242](https://github.com/modbus2mqtt/modbus2mqtt/issues/242)) ([1f204cf](https://github.com/modbus2mqtt/modbus2mqtt/commit/1f204cf4d7d5a52b819e5f15e7d2a23d71c9aa77))
+
 ## [0.23.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.22.0...modbus2mqtt-v0.23.0) (2026-05-05)
 
 
