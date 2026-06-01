@@ -3,6 +3,6 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["src", "tests", "__tests__"],
+  "include": ["src", "tests"],
   "exclude": ["../dist"]
 }

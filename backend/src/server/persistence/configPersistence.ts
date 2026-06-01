@@ -181,9 +181,36 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
   readCertificateFile(filename?: string): string | undefined {
     if (filename && ConfigPersistence.sslDir) {
       const fn = join(ConfigPersistence.sslDir, filename)
-      if (fs.existsSync(fn)) return fs.readFileSync(fn, { encoding: 'utf8' }).toString()
+      // Prevent path traversal: the resolved file must stay inside sslDir
+      const base = path.resolve(ConfigPersistence.sslDir)
+      const resolved = path.resolve(fn)
+      if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+        log.log(LogLevelEnum.error, `readCertificateFile: refusing path outside ssl directory: ${filename}`)
+        return undefined
+      }
+      if (fs.existsSync(fn) && fs.statSync(fn).isFile()) return fs.readFileSync(fn, { encoding: 'utf8' }).toString()
     }
     return undefined
+  }
+
+  /**
+   * Recursively lists all certificate files in the ssl directory.
+   * Returns paths relative to sslDir using forward slashes (e.g. "mtls/client.pem"),
+   * so certificates stored in subdirectories can be selected in the UI.
+   */
+  listSslFiles(): string[] {
+    if (!ConfigPersistence.sslDir || !ConfigPersistence.sslDir.length) return []
+    const root = ConfigPersistence.sslDir
+    const result: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name)
+        if (entry.isDirectory()) walk(full)
+        else if (entry.isFile()) result.push(path.relative(root, full).split(path.sep).join('/'))
+      }
+    }
+    walk(root)
+    return result
   }
 
   getImportMarkerPath(): string {

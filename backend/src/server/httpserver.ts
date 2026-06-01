@@ -189,7 +189,7 @@ export class HttpServer extends HttpServerBase {
 
     this.get(apiUri.sslFiles, (req: ExpressRequest, res: http.ServerResponse) => {
       if (ConfigPersistence.sslDir && ConfigPersistence.sslDir.length) {
-        const result = fs.readdirSync(ConfigPersistence.sslDir)
+        const result = new ConfigPersistence().listSslFiles()
         this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(result))
       } else {
         this.returnResult(req, res, HttpErrorsEnum.ErrNotFound, 'not found')
