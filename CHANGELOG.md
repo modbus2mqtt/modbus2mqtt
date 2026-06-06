@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.25.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.24.0...modbus2mqtt-v0.25.0) (2026-06-06)
+
+
+### Features
+
+* implement SSL file listing and reading functionality in ConfigPersistence ([0af6f1c](https://github.com/modbus2mqtt/modbus2mqtt/commit/0af6f1ce8f091e80be6ea92d738c94665ade1453))
+
+
+### Refactoring
+
+* improve Modbus client connection handling and error management ([#248](https://github.com/modbus2mqtt/modbus2mqtt/issues/248)) ([5a45cbb](https://github.com/modbus2mqtt/modbus2mqtt/commit/5a45cbb28747921c8c3d76f63232b79a8a919b1d))
+
 ## [0.24.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.23.0...modbus2mqtt-v0.24.0) (2026-05-05)
 
 
