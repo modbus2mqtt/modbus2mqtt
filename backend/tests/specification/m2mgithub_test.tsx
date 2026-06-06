@@ -28,6 +28,7 @@ vi.mock('fs', async () => {
   return {
     ...actual,
     existsSync: vi.fn(() => false),
+    readdirSync: vi.fn(() => []),
     mkdtempSync: vi.fn(() => '/tmp/m2m-commit-test'),
     copyFileSync: vi.fn(),
     mkdirSync: vi.fn(),
@@ -75,6 +76,29 @@ describe('M2mGitHub', () => {
       gh.fetchPublicFiles()
 
       expect(execSync).toHaveBeenCalledWith('git pull', expect.objectContaining({ cwd: '/tmp/public' }))
+    })
+
+    it('clones when publicRoot exists but is empty (e.g. pre-created by s6)', () => {
+      // publicRoot exists, but no .git inside, and the directory is empty
+      vi.mocked(fs.existsSync).mockImplementation((p) => !String(p).endsWith('.git'))
+      vi.mocked(fs.readdirSync).mockReturnValue([] as any)
+      vi.mocked(execSync).mockReturnValue(Buffer.from('Cloning...'))
+
+      const gh = new M2mGitHub(null, '/tmp/public')
+      gh.fetchPublicFiles()
+
+      expect(execSync).toHaveBeenCalledWith(expect.stringContaining('git clone'))
+    })
+
+    it('skips when publicRoot exists with content but no .git (test fixtures)', () => {
+      // publicRoot exists, no .git inside, but the directory has content
+      vi.mocked(fs.existsSync).mockImplementation((p) => !String(p).endsWith('.git'))
+      vi.mocked(fs.readdirSync).mockReturnValue(['specifications'] as any)
+
+      const gh = new M2mGitHub(null, '/tmp/public')
+      gh.fetchPublicFiles()
+
+      expect(execSync).not.toHaveBeenCalled()
     })
   })
 

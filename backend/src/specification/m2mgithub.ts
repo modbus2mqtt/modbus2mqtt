@@ -207,6 +207,20 @@ export class M2mGitHub {
     }
   }
 
+  private clonePublicFiles(): void {
+    log.log(
+      LogLevelEnum.info,
+      execSync(
+        'git clone https://github.com/' +
+          githubPublicNames.publicModbus2mqttOwner +
+          '/' +
+          githubPublicNames.modbus2mqttRepo +
+          '.git ' +
+          this.publicRoot
+      ).toString()
+    )
+  }
+
   fetchPublicFiles(): void {
     debug('Fetch public files')
     if (existsSync(this.publicRoot)) {
@@ -218,21 +232,18 @@ export class M2mGitHub {
           const msg = e instanceof Error ? e.message : String(e)
           log.log(LogLevelEnum.warn, 'git pull failed: ' + msg)
         }
+      } else if (fs.readdirSync(this.publicRoot).length == 0) {
+        // Empty directory (e.g. pre-created by the s6 init script so the addon can
+        // run non-root). git can clone into an existing empty directory, so do that
+        // instead of skipping the sync.
+        this.clonePublicFiles()
       } else {
-        log.log(LogLevelEnum.info, 'Public files directory exists, skipping git clone')
+        // Directory has content but no .git repo (test fixtures or manual setup):
+        // leave it untouched to avoid network access during tests.
+        log.log(LogLevelEnum.info, 'Public files directory exists with content, skipping git clone')
       }
     } else {
-      log.log(
-        LogLevelEnum.info,
-        execSync(
-          'git clone https://github.com/' +
-            githubPublicNames.publicModbus2mqttOwner +
-            '/' +
-            githubPublicNames.modbus2mqttRepo +
-            '.git ' +
-            this.publicRoot
-        ).toString()
-      )
+      this.clonePublicFiles()
     }
     new ConfigSpecification().readYaml()
   }
