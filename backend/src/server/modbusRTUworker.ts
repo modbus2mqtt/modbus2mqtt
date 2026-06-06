@@ -106,22 +106,11 @@ export class ModbusRTUWorker extends ModbusWorker {
     let maxErrors = 0
     switch (current.errorState) {
       case ModbusErrorStates.crc || ModbusErrorStates.illegaladdress:
-        if (current.errorCount >= maxErrorRetriesCrc)
-          return new Promise((resolve, _reject) => {
-            _reject(new Error('Too many retries ' + (current.errorState == ModbusErrorStates.crc ? 'crc' : 'illegal address')))
-          })
-        return new Promise<void>((resolve, _reject) => {
-          this.modbusAPI
-            .reconnectRTU('ReconnectOnError')
-            .then(() => {
-              debug('Reconnected')
-              this.executeModbusFunctionCodeRead(current).then(resolve).catch(_reject)
-            })
-            .catch((e1) => {
-              log.log(LogLevelEnum.error, 'Unable to reconnect: ' + e1.message)
-              _reject(e1)
-            })
-        })
+        // CRC/framing errors are wire-level. Reopening the (single, persistent) serial port
+        // does not fix a bad transmission and risks a second OS-level open of the same device
+        // -> "Cannot lock port". Just retry on the open port, like the timeout branch.
+        maxErrors = maxErrorRetriesCrc
+        break
       case ModbusErrorStates.timeout:
         maxErrors = maxErrorRetriesTimeout
         break
@@ -165,8 +154,9 @@ export class ModbusRTUWorker extends ModbusWorker {
     this.logErrorInCache(current, errorState)
     if (current.options.errorHandling.split && current.address.length != undefined && current.address.length > 1) {
       this.splitAddresses(current, error) // will reject if split is not possible
-      // Wait for reconnect before handling new queue entries
-      return this.modbusAPI.reconnectRTU('ReconnectOnError')
+      // Split entries are re-queued and run on the existing open port. No port reopen:
+      // a single persistent connection is the only Modbus master on the bus.
+      return new Promise((resolve) => resolve())
     } else return this.retry(current, error)
   }
 

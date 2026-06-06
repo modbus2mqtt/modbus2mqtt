@@ -275,66 +275,56 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
   }
 
   private connectMutex = new Mutex()
-  private connectRTUClient(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const resolveRelease = () => {
-        this.connectMutex.release()
-        resolve()
-      }
-      const rejectRelease = (e: unknown) => {
-        this.connectMutex.release()
-        reject(e)
-      }
-      // Make sure, this modbusClient get's initialized only once. Even if called in paralell
-      this.connectMutex.acquire().then(() => {
-        if (this.modbusClient == undefined) this.modbusClient = new ModbusRTU()
-        if (this.modbusClient.isOpen) {
-          resolveRelease()
-          return
-        }
+  // Opens the modbusClient. ASSUMES connectMutex is already held by the caller.
+  // Never call this directly without the lock - use connectRTUClient() or reconnectRTU().
+  private connectRTUClientLocked(): Promise<void> {
+    if (this.modbusClient == undefined) this.modbusClient = new ModbusRTU()
+    if (this.modbusClient.isOpen) return Promise.resolve()
 
-        // debug("connectRTUBuffered")
-        const port = (this.modbusConfiguration.getModbusConnection() as IRTUConnection).serialport
-        const baudrate = (this.modbusConfiguration.getModbusConnection() as IRTUConnection).baudrate
-        if (port && baudrate) {
-          this.modbusClient.connectRTUBuffered(port, { baudRate: baudrate }).then(resolveRelease).catch(rejectRelease)
-        } else {
-          const host = (this.modbusConfiguration.getModbusConnection() as ITCPConnection).host
-          const port = (this.modbusConfiguration.getModbusConnection() as ITCPConnection).port
-          this.modbusClient.connectTCP(host, { port: port }).then(resolveRelease).catch(rejectRelease)
-        }
-      })
+    const port = (this.modbusConfiguration.getModbusConnection() as IRTUConnection).serialport
+    const baudrate = (this.modbusConfiguration.getModbusConnection() as IRTUConnection).baudrate
+    if (port && baudrate) {
+      return this.modbusClient.connectRTUBuffered(port, { baudRate: baudrate })
+    } else {
+      const host = (this.modbusConfiguration.getModbusConnection() as ITCPConnection).host
+      const tcpport = (this.modbusConfiguration.getModbusConnection() as ITCPConnection).port
+      return this.modbusClient.connectTCP(host, { port: tcpport })
+    }
+  }
+  private connectRTUClient(): Promise<void> {
+    // Serialize so the modbusClient gets initialized/opened only once, even if called in parallel.
+    return this.connectMutex.runExclusive(() => this.connectRTUClientLocked())
+  }
+  // Closes the modbusClient if open. ASSUMES connectMutex is already held.
+  private closeLocked(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      if (this.modbusClient == undefined || !this.modbusClient.isOpen) {
+        resolve()
+        return
+      }
+      this.modbusClient.close(() => resolve())
     })
   }
   reconnectRTU(task: string): Promise<void> {
-    const rc = new Promise<void>((resolve, reject) => {
+    // Serialize the WHOLE close->reopen sequence. Two concurrent reconnects (e.g. worker +
+    // updateBus) must never interleave: an overlapping open of the same serial device leaks
+    // the still-locked fd -> "Resource temporarily unavailable Cannot lock port".
+    return this.connectMutex.runExclusive(async () => {
       if (this.modbusClientTimedOut) {
-        if (this.modbusClient == undefined || !this.modbusClient.isOpen) {
-          reject(task + ' Last read failed with TIMEOUT and modbusclient is not ready')
-          return
-        } else resolve()
-      } else if (this.modbusClient == undefined || !this.modbusClient.isOpen) {
-        this.connectRTUClient()
-          .then(resolve)
-          .catch((e) => {
-            log.log(LogLevelEnum.error, task + ' connection failed ' + e)
-            reject(e)
-          })
-      } else if (this.modbusClient!.isOpen) {
-        this.modbusClient.close(() => {
-          debug('closed')
-          if (this.modbusClient!.isOpen)
-            setTimeout(() => {
-              if (this.modbusClient!.isOpen) reject(new Error('ModbusClient is open after close'))
-              else this.reconnectRTU(task).then(resolve).catch(reject)
-            }, 10)
-          else this.reconnectRTU(task).then(resolve).catch(reject)
-        })
-      } else {
-        reject(new Error(task + ' unable to open'))
+        if (this.modbusClient == undefined || !this.modbusClient.isOpen)
+          throw new Error(task + ' Last read failed with TIMEOUT and modbusclient is not ready')
+        return
+      }
+      // Always close before reopening so the previous fd (and its flock) is fully released
+      // before connectRTUBuffered creates a new SerialPort. Single owner, no overlap.
+      await this.closeLocked()
+      try {
+        await this.connectRTUClientLocked()
+      } catch (e) {
+        log.log(LogLevelEnum.error, task + ' connection failed ' + e)
+        throw e
       }
     })
-    return rc
   }
   private connectRTU(task: string): Promise<void> {
     const rc = new Promise<void>((resolve, reject) => {
