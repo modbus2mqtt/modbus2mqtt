@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.0...modbus2mqtt-v0.25.1) (2026-06-06)
+
+
+### Bug Fixes
+
+* add cloning of public files in M2mGitHub when directory is empty ([#250](https://github.com/modbus2mqtt/modbus2mqtt/issues/250)) ([5eb4c1b](https://github.com/modbus2mqtt/modbus2mqtt/commit/5eb4c1b74be3e39ed7a2ec77af31db5a067d1f40))
+
 ## [0.25.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.24.0...modbus2mqtt-v0.25.0) (2026-06-06)
 
 
