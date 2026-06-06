@@ -98,7 +98,7 @@ describe('ModbusRTUWorker read', () => {
     })
     test.worker = new ModbusRTUWorkerForTest(new FakeBus(), queue, done, 'read')
     const worker = test.worker
-    worker.expectedReconnected = true
+    worker.expectedReconnected = false
     worker.expectedAPIcallCount = 0
     worker.run()
     await finished
@@ -129,7 +129,7 @@ describe('ModbusRTUWorker read', () => {
     worker.run()
     await finished
   })
-  it('Sequential read error processing with reconnect', async () => {
+  it('Sequential read error processing with retry (no reconnect)', async () => {
     const queue = new ModbusRTUQueue()
     const test: Itest = {}
     queue.enqueue(
@@ -150,7 +150,7 @@ describe('ModbusRTUWorker read', () => {
     })
     test.worker = new ModbusRTUWorkerForTest(new FakeBus(), queue, done, 'read')
     const worker = test.worker
-    worker.expectedReconnected = true
+    worker.expectedReconnected = false
     worker.expectedAPIcallCount = 0
     worker.run()
     await finished
@@ -176,7 +176,7 @@ describe('ModbusRTUWorker read', () => {
     })
     test.worker = new ModbusRTUWorkerForTest(new FakeBus(), queue, done, 'read')
     const worker = test.worker
-    worker.expectedReconnected = true
+    worker.expectedReconnected = false
     worker.expectedAPIcallCount = 0
     worker.run()
     await finished
