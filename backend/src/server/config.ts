@@ -83,17 +83,22 @@ export class Config {
       // Default certificate filenames (Let's Encrypt / Home Assistant convention)
       Config.config.httpsCertFile = Config.config.httpsCertFile ? Config.config.httpsCertFile : 'fullchain.pem'
       Config.config.httpsKeyFile = Config.config.httpsKeyFile ? Config.config.httpsKeyFile : 'privkey.pem'
-      // Default HTTPS port; env var takes precedence over YAML
+      // Default HTTPS port; env var takes precedence over YAML.
+      // MODBUS2MQTT_HTTPS_PORT=0 (or any non-positive value) explicitly DISABLES HTTPS,
+      // even when certificates exist in sslDir — used for local HTTP-only debugging so the
+      // HTTP port serves directly instead of redirecting to HTTPS.
       const envHttpsPort = process.env.MODBUS2MQTT_HTTPS_PORT
-      if (envHttpsPort) {
+      let httpsDisabledByEnv = false
+      if (envHttpsPort != undefined && envHttpsPort.length) {
         const parsed = parseInt(envHttpsPort, 10)
-        if (!isNaN(parsed) && parsed > 0) {
-          Config.config.httpsPort = parsed
+        if (!isNaN(parsed)) {
+          if (parsed > 0) Config.config.httpsPort = parsed
+          else httpsDisabledByEnv = true
         }
       }
       Config.config.httpsPort = Config.config.httpsPort ? Config.config.httpsPort : 3443
-      // Disable HTTPS in addon mode
-      if (Config.config.mqttusehassio) {
+      // Disable HTTPS in addon mode or when explicitly disabled via env
+      if (Config.config.mqttusehassio || httpsDisabledByEnv) {
         Config.config.httpsPort = undefined
       }
     } else {

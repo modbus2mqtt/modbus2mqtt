@@ -1,0 +1,30 @@
+{
+  "/api": {
+    "target": "http://localhost:3601",
+    "secure": false
+  },
+  "/userAuthenticationStatus": {
+    "target": "http://localhost:3601",
+    "secure": false
+  },
+  "/user/login": {
+    "target": "http://localhost:3601",
+    "secure": false
+  },
+  "/user/register": {
+    "target": "http://localhost:3601",
+    "secure": false
+  },
+  "/specifications/files": {
+    "target": "http://localhost:3601",
+    "secure": false
+  },
+  "/assets": {
+    "target": "http://localhost:3601",
+    "secure": false
+  },
+  ".*/download": {
+    "target": "http://localhost:3601",
+    "secure": false
+  }
+}

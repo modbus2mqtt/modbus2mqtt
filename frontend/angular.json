@@ -45,12 +45,20 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "proxyConfig": "proxy.conf.3000.json"
+            "proxyConfig": "proxy.conf.3000.json",
+            "host": "localhost",
+            "port": 3602
           },
           "configurations": {
             "3005": {
               "buildTarget": "modbus2mqtt:build:development",
               "proxyConfig": "proxy.conf.3005.json"
+            },
+            "debug": {
+              "buildTarget": "modbus2mqtt:build:development",
+              "proxyConfig": "proxy.conf.3601.json",
+              "host": "localhost",
+              "port": 3602
             },
             "production": { "buildTarget": "modbus2mqtt:build:production" },
             "development": { "buildTarget": "modbus2mqtt:build:development" }

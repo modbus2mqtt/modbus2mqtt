@@ -34,7 +34,7 @@
       "name": "Launch Chrome against localhost",
       "preLaunchTask": "ng serve",
       "cwd": "${workspaceFolder}",
-      "url": "http://localhost:4200",
+      "url": "http://localhost:3602",
       "webRoot": "${workspaceFolder}"
     },
     {

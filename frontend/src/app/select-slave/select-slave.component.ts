@@ -25,7 +25,7 @@ import {
 } from '@shared/specification'
 import { getCurrentLanguage } from '../utils/language'
 import { Clipboard } from '@angular/cdk/clipboard'
-import { Observable, Subject, Subscription } from 'rxjs'
+import { Observable, ReplaySubject, Subscription } from 'rxjs'
 import { ActivatedRoute, Router } from '@angular/router'
 import { SessionStorage } from '../services/SessionStorage'
 import { M2mErrorStateMatcher } from '../services/M2mErrorStateMatcher'
@@ -320,7 +320,10 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       label: this.getSlaveName(slave),
       slaveForm: fg,
     } as any
-    const sub = new Subject<IidentificationSpecification[]>()
+    // ReplaySubject(1) so the template's `| async` receives the spec list even when
+    // getIdentSpecs() resolves (microtask) before Angular subscribes via change detection.
+    // A plain Subject would drop that early emission, leaving the dropdown empty.
+    const sub = new ReplaySubject<IidentificationSpecification[]>(1)
     rc.specsObservable = sub
     this.getIdentSpecs(rc)
       .then((identSpecs) => {
