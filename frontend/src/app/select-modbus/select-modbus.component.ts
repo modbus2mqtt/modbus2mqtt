@@ -294,7 +294,7 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
       tcp: this._formBuilder.group({
         host: ['', Validators.required],
         port: [502, Validators.required],
-        timeout: [100, Validators.required],
+        timeout: [BUS_TIMEOUT_DEFAULT, Validators.required],
       }),
     })
     return fg
