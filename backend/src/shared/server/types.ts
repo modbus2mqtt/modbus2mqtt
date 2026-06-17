@@ -28,6 +28,12 @@ export enum PollModes {
   trigger = 1,
   intervallAndTrigger = 2,
   noPoll = 3,
+  intervallHttpPushNoMqtt = 4, // interval poll + HTTP push, no MQTT state publishing
+}
+export interface IhttpPush {
+  url: string // full target URL incl. serial number, e.g. https://heimvio.de/readings/<sn>
+  patEnc?: string // AES-256-GCM encrypted Bearer PAT (base64), see secureSecret.ts
+  pushEntities?: number[] // entity ids to include in the push payload
 }
 export interface ImqttClient {
   mqttserverurl?: string
@@ -166,6 +172,7 @@ export interface Islave {
   noDiscoverEntities?: number[]
   noDiscovery?: boolean
   configurationUrl?: string
+  httpPush?: IhttpPush
   modbusStatusForSlave?: ImodbusStatusForSlave
 }
 export interface IidentificationSpecification {

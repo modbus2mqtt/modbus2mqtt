@@ -54,7 +54,7 @@ import { MatIconButton } from '@angular/material/button'
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card'
 import { MatIconButtonSizesModule } from 'mat-icon-button-sizes'
 
-import { AsyncPipe } from '@angular/common';
+import { AsyncPipe } from '@angular/common'
 import { MatTooltip } from '@angular/material/tooltip'
 import { MatSlideToggle } from '@angular/material/slide-toggle'
 import { ModbusErrorComponent } from '../modbus-error/modbus-error.component'
@@ -100,8 +100,8 @@ interface IuiSlave {
     MatExpansionPanelTitle,
     MatInput,
     MatError,
-    AsyncPipe
-],
+    AsyncPipe,
+  ],
 })
 export class SelectSlaveComponent extends SessionStorage implements OnInit {
   preparedIdentSpecs: IidentificationSpecification[] | undefined
@@ -413,6 +413,9 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     fg.get('discoverEntitiesList')!.setValue(this.buildDiscoverEntityList(slave))
     if (slave.noDiscovery) fg.get('discoverEntitiesList')!.disable()
     else fg.get('discoverEntitiesList')!.enable()
+    fg.get('httpPushUrl')!.setValue(slave.httpPush?.url ?? null)
+    fg.get('httpPushPat')!.setValue(null) // never prefill the PAT into the form
+    fg.get('pushEntitiesList')!.setValue(slave.httpPush?.pushEntities ?? [])
   }
 
   initiateSlaveControl(slave: Islave, defaultValue: IidentificationSpecification | null): FormGroup {
@@ -429,6 +432,9 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         noDiscovery: [false],
         configurationUrl: [slave.configurationUrl],
         discoverEntitiesList: [[]],
+        httpPushUrl: [slave.httpPush?.url],
+        httpPushPat: [null as string | null],
+        pushEntitiesList: [[] as number[]],
       })
       this.slave2Form(slave, fg)
       return fg
@@ -530,10 +536,27 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       if (callback) callback()
     })
   }
+  hasHttpPushPat(uiSlave: IuiSlave): boolean {
+    return (uiSlave.slave.httpPush as any)?.hasPat === true
+  }
+  private applyHttpPush(uiSlave: IuiSlave) {
+    const url: string | null = uiSlave.slaveForm.get('httpPushUrl')!.value
+    const pat: string | null = uiSlave.slaveForm.get('httpPushPat')!.value
+    const pushEntities: number[] = uiSlave.slaveForm.get('pushEntitiesList')!.value ?? []
+    if (url && url.length > 0) {
+      // pat is only sent when newly entered; backend keeps the stored PAT otherwise.
+      const httpPush: any = { url, pushEntities }
+      if (pat && pat.length > 0) httpPush.pat = pat
+      uiSlave.slave.httpPush = httpPush
+    } else {
+      delete uiSlave.slave.httpPush
+    }
+  }
   saveSlave(uiSlave: IuiSlave) {
     SelectSlaveComponent.controllers.forEach((controller) => {
       SelectSlaveComponent.form2SlaveSetValue(uiSlave, controller)
     })
+    this.applyHttpPush(uiSlave)
     const spec: IidentificationSpecification = uiSlave.slaveForm.get('specificationid')!.value
     const selectedEntities: number[] = uiSlave.slaveForm.get('discoverEntitiesList')!.value
     if (spec && spec.filename) {
@@ -541,7 +564,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       this.addSpecificationToUiSlave(uiSlave, () => {
         uiSlave.slave.noDiscoverEntities = []
         if (selectedEntities && uiSlave.slave.specification) {
-          (uiSlave.slave.specification as Ispecification).entities.forEach((e: IidentEntity) => {
+          ;(uiSlave.slave.specification as Ispecification).entities.forEach((e: IidentEntity) => {
             if (!selectedEntities.includes(e.id)) uiSlave.slave.noDiscoverEntities!.push(e.id)
           })
         }

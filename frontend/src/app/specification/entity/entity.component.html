@@ -125,53 +125,55 @@
               <input #entityIcon matInput type="text" class="width150pt" formControlName="icon" (change)="form2Entity()" />
             </mat-form-field>
           </div>
-          <div class="flexrows">
-            <mat-form-field class="width100pt smallfield">
-              <mat-label>Modbus Addr.</mat-label>
-              <input
-                #entityModbusAddress
-                matInput
-                hexFormater
-                [displayHex]="displayHex"
-                type="text"
-                formControlName="modbusAddress"
-                matTooltip="Please enter decimal (0-65536) or hexadecimal (0x123a) number"
-                [errorStateMatcher]="errorStateMatcher"
-                (change)="onModbusAddressChange()"
-                (keypress)="onModbusAddressKeyPress($event)"
-              />
-              @if (entityFormGroup.get('modbusAddress')!.hasError('required')) {
-                <mat-error> This field is required </mat-error>
-              }
-              @if (
-                entityFormGroup.get('modbusAddress')!.hasError('min') ||
-                  entityFormGroup.get('modbusAddress')!.hasError('max')
-              ) {
-                <mat-error> Range is 1-65536 </mat-error>
-              }
-              @if (entityFormGroup.get('modbusAddress')!.hasError('pattern')) {
-                <mat-error> dec or hex </mat-error>
-              }
-            </mat-form-field>
-            <mat-form-field class="smallfield">
-              <mat-label>Register</mat-label>
-              <mat-select
-                #entityFunctionCode
-                matInput
-                formControlName="registerType"
-                [errorStateMatcher]="errorStateMatcher"
-                [compareWith]="compareFunctionCodes"
-                (selectionChange)="onModbusAddressChange()"
-              >
-                @for (fc of registerTypes; track $index) {
-                  <mat-option [value]="fc">{{ fc.name }}</mat-option>
+          @if (usesModbusAddress()) {
+            <div class="flexrows">
+              <mat-form-field class="width100pt smallfield">
+                <mat-label>Modbus Addr.</mat-label>
+                <input
+                  #entityModbusAddress
+                  matInput
+                  hexFormater
+                  [displayHex]="displayHex"
+                  type="text"
+                  formControlName="modbusAddress"
+                  matTooltip="Please enter decimal (0-65536) or hexadecimal (0x123a) number"
+                  [errorStateMatcher]="errorStateMatcher"
+                  (change)="onModbusAddressChange()"
+                  (keypress)="onModbusAddressKeyPress($event)"
+                />
+                @if (entityFormGroup.get('modbusAddress')!.hasError('required')) {
+                  <mat-error> This field is required </mat-error>
                 }
-              </mat-select>
-              @if (entityFormGroup.get('registerType')!.hasError('required')) {
-                <mat-error> This field is required </mat-error>
-              }
-            </mat-form-field>
-          </div>
+                @if (
+                  entityFormGroup.get('modbusAddress')!.hasError('min') ||
+                    entityFormGroup.get('modbusAddress')!.hasError('max')
+                ) {
+                  <mat-error> Range is 1-65536 </mat-error>
+                }
+                @if (entityFormGroup.get('modbusAddress')!.hasError('pattern')) {
+                  <mat-error> dec or hex </mat-error>
+                }
+              </mat-form-field>
+              <mat-form-field class="smallfield">
+                <mat-label>Register</mat-label>
+                <mat-select
+                  #entityFunctionCode
+                  matInput
+                  formControlName="registerType"
+                  [errorStateMatcher]="errorStateMatcher"
+                  [compareWith]="compareFunctionCodes"
+                  (selectionChange)="onModbusAddressChange()"
+                >
+                  @for (fc of registerTypes; track $index) {
+                    <mat-option [value]="fc">{{ fc.name }}</mat-option>
+                  }
+                </mat-select>
+                @if (entityFormGroup.get('registerType')!.hasError('required')) {
+                  <mat-error> This field is required </mat-error>
+                }
+              </mat-form-field>
+            </div>
+          }
           <mat-form-field class="smallfield">
             <mat-label>Converter</mat-label>
             <mat-select matInput formControlName="converter" (selectionChange)="onModbusAddressChange()">
@@ -421,6 +423,31 @@
         </div>
       </form>
     </mat-expansion-panel>
+    }
+    @if (isConverterSelected() && entity && getParameterTypeFromConverterFormControl() == 'Ivalue') {
+      <mat-expansion-panel [expanded]="true">
+        <mat-expansion-panel-header [matTooltip]="valuePropertiesFormGroup.valid ? '' : 'This panel has errors'">
+          <mat-panel-title>
+            <p [ngClass]="{ errorText: !valuePropertiesFormGroup.valid }">Static Value</p>
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+        <form [formGroup]="valuePropertiesFormGroup">
+          <mat-form-field class="smallfield">
+            <mat-label>Value</mat-label>
+            <input
+              #propValue
+              matInput
+              type="text"
+              matTooltip="A fixed value that is published as-is (e.g. an OBIS code like 1-0:1.0.8)"
+              formControlName="value"
+              (change)="onConverterValueChange()"
+            />
+            @if (valuePropertiesFormGroup.get('value')!.hasError('required')) {
+              <mat-error> This field is required </mat-error>
+            }
+          </mat-form-field>
+        </form>
+      </mat-expansion-panel>
     }
     @if (isConverterSelected() && entity && getParameterTypeFromConverterFormControl() == 'Iselect') {
     <mat-expansion-panel>

@@ -2,12 +2,14 @@ import { Converter } from './converter.js'
 import { Converters, Ispecification, Ivalue, ModbusRegisterType } from '../shared/specification/index.js'
 
 export class ValueConverter extends Converter {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   override mqtt2modbus(_spec: Ispecification, _entityid: number, _value: string | number): number[] {
     throw new Error('fixed value has no modbus value.')
   }
   override getModbusRegisterTypes(): ModbusRegisterType[] {
     return [ModbusRegisterType.AnalogInputs, ModbusRegisterType.HoldingRegister]
+  }
+  override usesModbusAddress(): boolean {
+    return false
   }
   constructor(component?: Converters) {
     if (!component) component = 'value'

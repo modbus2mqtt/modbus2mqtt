@@ -18,6 +18,7 @@ import {
 } from '../shared/specification/index.js'
 import { join } from 'path'
 import { Bus } from './bus.js'
+import { encryptSecret } from './secureSecret.js'
 import { Subject } from 'rxjs'
 import * as fs from 'fs'
 import { LogLevelEnum, Logger } from '../specification/index.js'
@@ -40,6 +41,17 @@ const log = new Logger('httpserver')
 export class HttpServer extends HttpServerBase {
   constructor(angulardir: string = '.') {
     super(angulardir)
+  }
+
+  // Never expose the encrypted PAT to the frontend; signal its presence via hasPat instead.
+  static maskHttpPushSecret(slave: Islave): Islave {
+    if (!slave.httpPush) return slave
+    const masked = structuredClone(slave) as Islave & { httpPush?: { patEnc?: string; hasPat?: boolean } }
+    if (masked.httpPush) {
+      masked.httpPush.hasPat = masked.httpPush.patEnc != undefined && masked.httpPush.patEnc.length > 0
+      delete masked.httpPush.patEnc
+    }
+    return masked
   }
 
   override returnResult(
@@ -274,7 +286,7 @@ export class HttpServer extends HttpServerBase {
         const busid = Number.parseInt(String(req.query['busid']))
         const bus = Bus.getBus(busid)
         if (bus) {
-          const slaves = bus.getSlaves()
+          const slaves = bus.getSlaves().map((s) => HttpServer.maskHttpPushSecret(s))
           this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(slaves))
           return
         } else invParam()
@@ -285,7 +297,7 @@ export class HttpServer extends HttpServerBase {
         const busid = Number.parseInt(String(req.query['busid']))
         const slaveid = Number.parseInt(String(req.query['slaveid']))
         const slave = Bus.getBus(busid)?.getSlaveBySlaveId(slaveid)
-        this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(slave))
+        this.returnResult(req, res, HttpErrorsEnum.OK, JSON.stringify(slave ? HttpServer.maskHttpPushSecret(slave) : slave))
       } else {
         this.returnResult(req, res, HttpErrorsEnum.ErrInvalidParameter, 'Invalid parameter')
       }
@@ -398,12 +410,7 @@ export class HttpServer extends HttpServerBase {
               super.returnResult(req, res, HttpErrorsEnum.OK, undefined)
             })
             .catch((e) => {
-              this.returnResult(
-                req,
-                res,
-                HttpErrorsEnum.SrvErrInternalServerError,
-                JSON.stringify('download local: ' + e.message)
-              )
+              this.returnResult(req, res, HttpErrorsEnum.SrvErrInternalServerError, JSON.stringify('download local: ' + e.message))
             })
         } else {
           // Spec download as JSON
@@ -717,7 +724,21 @@ export class HttpServer extends HttpServerBase {
       res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-access-token')
       res.setHeader('Access-Control-Allow-Credentials', 'true')
       res.setHeader('Content-Type', 'application/json')
-      const rc: Islave = bus.writeSlave(req.body)
+      const incoming = req.body as Islave & { httpPush?: { pat?: string; hasPat?: boolean } }
+      if (incoming.httpPush) {
+        const existing = bus.getSlaveBySlaveId(incoming.slaveid)
+        const pat = incoming.httpPush.pat
+        if (typeof pat === 'string' && pat.length > 0) {
+          // New/changed plaintext PAT: encrypt at rest.
+          incoming.httpPush.patEnc = encryptSecret(pat)
+        } else if (existing?.httpPush?.patEnc) {
+          // Unchanged: keep the previously stored encrypted PAT.
+          incoming.httpPush.patEnc = existing.httpPush.patEnc
+        }
+        delete incoming.httpPush.pat
+        delete incoming.httpPush.hasPat
+      }
+      const rc: Islave = HttpServer.maskHttpPushSecret(bus.writeSlave(incoming))
       this.returnResult(req, res, HttpErrorsEnum.OkCreated, JSON.stringify(rc))
     })
     this.post(apiUri.uploadSpec, (req: ExpressRequest, res: http.ServerResponse) => {

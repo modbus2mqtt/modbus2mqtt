@@ -6,6 +6,7 @@ import { Config } from './config.js'
 import { Modbus } from './modbus.js'
 import { ItopicAndPayloads, MqttDiscover } from './mqttdiscover.js'
 import { MqttConnector } from './mqttconnector.js'
+import { HttpPush } from './httpPush.js'
 
 const debug = Debug('mqttpoller')
 const defaultPollCount = 50 // 5 seconds
@@ -63,7 +64,10 @@ export class MqttPoller {
         needPolls.forEach((bs) => {
           // Trigger state only if it's configured to do so
           const spMode = bs.getPollMode()
-          if (spMode == undefined || [PollModes.intervall, PollModes.intervallAndTrigger].includes(spMode)) {
+          if (
+            spMode == undefined ||
+            [PollModes.intervall, PollModes.intervallAndTrigger, PollModes.intervallHttpPushNoMqtt].includes(spMode)
+          ) {
             if (bus) {
               devicesToPoll++
               const slave = bus.getSlaveBySlaveId(bs.getSlaveId())!
@@ -80,8 +84,16 @@ export class MqttPoller {
                 }
               }).subscribe({
                 next: (spec) => {
-                  tAndP.push({ topic: bs.getStateTopic(), payload: bs.getStatePayload(spec.entities), entityid: 0 })
-                  tAndP.push({ topic: bs.getAvailabilityTopic(), payload: 'online', entityid: 0 })
+                  if (bs.shouldPublishMqtt()) {
+                    tAndP.push({ topic: bs.getStateTopic(), payload: bs.getStatePayload(spec.entities), entityid: 0 })
+                    tAndP.push({ topic: bs.getAvailabilityTopic(), payload: 'online', entityid: 0 })
+                  }
+                  // HTTP push (runs alongside MQTT, or standalone in HTTP-push-only mode)
+                  if (bs.hasHttpPush()) {
+                    HttpPush.pushState(bs, spec).catch((e) =>
+                      debug('httpPush failed: ' + (e instanceof Error ? e.message : String(e)))
+                    )
+                  }
                   // Device-variable entities (serial_number, sw_version, hw_version, UoM)
                   // only have mqttValue after the Modbus read — republish discovery if it
                   // changed so HA sees the real values instead of empty device fields.

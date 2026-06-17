@@ -29,6 +29,7 @@ import {
   Iselect,
   IselectOption,
   Itext,
+  Ivalue,
   ModbusRegisterType,
   VariableTargetParameters,
   getFileNameFromName,
@@ -48,7 +49,7 @@ import { EntityValueControlComponent } from '../entity-value-control/entity-valu
 import { MatIcon } from '@angular/material/icon'
 import { MatTooltip } from '@angular/material/tooltip'
 import { MatIconButton } from '@angular/material/button'
-import { NgClass, AsyncPipe } from '@angular/common';
+import { NgClass, AsyncPipe } from '@angular/common'
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card'
 
 const nameFormControlName = 'name'
@@ -105,8 +106,8 @@ const newEntity: ImodbusEntityWithName = {
     MatOption,
     CdkDropList,
     CdkDrag,
-    AsyncPipe
-],
+    AsyncPipe,
+  ],
 })
 export class EntityComponent extends SessionStorage implements AfterViewInit, OnChanges, OnDestroy {
   onMqttValueChange(_event: any, _entity: ImodbusEntity) {
@@ -160,6 +161,7 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
   selectPropertiesFormGroup: FormGroup
   numberPropertiesFormGroup: FormGroup
   stringPropertiesFormGroup: FormGroup
+  valuePropertiesFormGroup: FormGroup
   registerTypes: IRegisterType[] = [
     {
       registerType: ModbusRegisterType.HoldingRegister,
@@ -228,7 +230,38 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
         optionModbus: [null as number | null, Validators.compose([Validators.required, this.uniqueKeyValidator.bind(this)])],
         optionMqtt: [null as string | null, Validators.compose([Validators.required, this.uniqueNameValidator.bind(this)])],
         deviceClass: [null as string | null],
+      })),
+      (this.valuePropertiesFormGroup = this.fb.group({
+        value: [null as string | null, Validators.required],
       })))
+  }
+
+  // Static entities (e.g. a fixed OBIS code via the 'value' converter) have no modbus address.
+  usesModbusAddress(): boolean {
+    return this.entityFormGroup.get('converter')!.value !== 'value'
+  }
+
+  // Toggle the modbusAddress/registerType validators depending on whether the selected
+  // converter is modbus-backed. Called whenever the converter changes.
+  private updateModbusAddressValidators(): void {
+    const modbusAddressFormControl = this.entityFormGroup.get('modbusAddress')!
+    const registerTypeFormControl = this.entityFormGroup.get('registerType')!
+    if (this.usesModbusAddress()) {
+      modbusAddressFormControl.setValidators(
+        Validators.compose([
+          Validators.required,
+          Validators.min(0),
+          Validators.max(65536),
+          Validators.pattern('^0[xX][0-9a-fA-F]+$|^[0-9]+$'),
+        ])
+      )
+      registerTypeFormControl.setValidators(Validators.required)
+    } else {
+      modbusAddressFormControl.clearValidators()
+      registerTypeFormControl.clearValidators()
+    }
+    modbusAddressFormControl.updateValueAndValidity()
+    registerTypeFormControl.updateValueAndValidity()
   }
 
   ngOnInit(): void {
@@ -422,7 +455,13 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
             break
           default:
         }
+        break
+      case 'Ivalue':
+        this.allFormGroups.setControl('properties', this.valuePropertiesFormGroup)
+        this.valuePropertiesFormGroup.get('value')!.setValue((converterParameters as Ivalue).value ?? null)
+        break
     }
+    this.updateModbusAddressValidators()
     this.entity.valid = this.canSaveEntity()
   }
 
@@ -518,8 +557,16 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
   onModbusAddressChange() {
     if (!this.entity || !this.specificationMethods) return
     this.specificationMethods.setEntitiesTouched()
+    this.updateModbusAddressValidators()
     const modbusAddressFormControl = this.entityFormGroup.get('modbusAddress')!
     const converterFormControl = this.entityFormGroup.get('converter')!
+
+    // Static entity (e.g. 'value' converter for a fixed OBIS code): no modbus address to read.
+    if (!this.usesModbusAddress()) {
+      if (converterFormControl.value != null) this.entity.converter = converterFormControl.value as Converters
+      delete this.entity.modbusAddress
+      return
+    }
 
     if (
       (modbusAddressFormControl.value != null && modbusAddressFormControl.value !== this.entity.modbusAddress) ||
@@ -665,6 +712,13 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
         this.allFormGroups.setControl('properties', this.selectPropertiesFormGroup)
         if (!this.entity.converterParameters) this.entity.converterParameters = { options: [] }
         break
+      case 'Ivalue':
+        this.allFormGroups.setControl('properties', this.valuePropertiesFormGroup)
+        this.entity.converterParameters = {}
+        ;(this.entity.converterParameters as Ivalue).value = this.valuePropertiesFormGroup.get('value')!.value
+        // Static entity: no modbus address / register type.
+        delete this.entity.modbusAddress
+        break
     }
   }
 
@@ -690,6 +744,9 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
         break
       case 'Itext':
         parameterValid = this.stringPropertiesFormGroup.valid
+        break
+      case 'Ivalue':
+        parameterValid = this.valuePropertiesFormGroup.valid
         break
       default:
         parameterValid = true

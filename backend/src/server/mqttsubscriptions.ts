@@ -5,6 +5,7 @@ import { Bus } from './bus.js'
 import { Modbus } from './modbus.js'
 import { MqttDiscover } from './mqttdiscover.js'
 import { MqttConnector } from './mqttconnector.js'
+import { HttpPush } from './httpPush.js'
 import { Ientity, ImodbusSpecification } from '../shared/specification/index.js'
 import { Converter } from '../specification/index.js'
 import { Observable } from 'rxjs'
@@ -138,8 +139,11 @@ export class MqttSubscriptions {
     const options: IClientPublishOptions = { qos: MqttDiscover.generateQos(slave, spec) }
     try {
       debug('PublishState')
-      await this.publishAsync(mqttClient, topic, slave.getStatePayload(spec.entities), options)
-      await this.publishAsync(mqttClient, slave.getAvailabilityTopic(), 'online', options)
+      if (slave.shouldPublishMqtt()) {
+        await this.publishAsync(mqttClient, topic, slave.getStatePayload(spec.entities), options)
+        await this.publishAsync(mqttClient, slave.getAvailabilityTopic(), 'online', options)
+      }
+      if (slave.hasHttpPush()) await HttpPush.pushState(slave, spec)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       log.log(LogLevelEnum.error, 'publishState failed: ' + msg)

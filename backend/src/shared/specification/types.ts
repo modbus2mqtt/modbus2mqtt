@@ -139,7 +139,7 @@ export interface Ientity extends IidentEntity {
   }
   value_template?: string
   registerType: ModbusRegisterType
-  modbusAddress: number
+  modbusAddress?: number
   icon?: string
   forceUpdate?: boolean
   entityCategory?: string
@@ -210,7 +210,7 @@ export interface ImodbusData {
   mqttValue: string | number
   identified: IdentifiedStates
 }
-export interface ImodbusEntity extends ImodbusData, Ientity { }
+export interface ImodbusEntity extends ImodbusData, Ientity {}
 
 export function instanceOfIentity(object: unknown): object is Ientity {
   return (

@@ -298,9 +298,7 @@ export class M2mSpecification implements IspecificationValidator {
   }
   static async closeContribution(spec: IfileSpecification): Promise<IpullRequest> {
     if (undefined == ConfigSpecification.githubPersonalToken) {
-      this.throwCloseContributionError(
-        'No Github Personal Access Token configured. Unable to close contribution ' + spec.filename
-      )
+      this.throwCloseContributionError('No Github Personal Access Token configured. Unable to close contribution ' + spec.filename)
     }
     if (spec.pullNumber == undefined) {
       this.throwCloseContributionError('No Pull Number in specification. Unable to close contribution ' + spec.filename)
@@ -404,7 +402,10 @@ export class M2mSpecification implements IspecificationValidator {
     const rc: ImodbusSpecification = Object.assign(inSpec)
     for (let entityIndex = 0; entityIndex < inSpec.entities.length; entityIndex++) {
       const entity = rc.entities[entityIndex]
-      if (entity.modbusAddress != undefined && entity.registerType) {
+      const converter = ConverterMap.getConverter(entity)
+      // Process modbus-backed entities (address + registerType) as well as static entities
+      // (e.g. a fixed OBIS code) whose converter has no modbus address.
+      if ((entity.modbusAddress != undefined && entity.registerType) || (converter && !converter.usesModbusAddress())) {
         const sm = M2mSpecification.copyModbusDataToEntity(rc, entity.id, valuesLocal)
         if (sm) {
           rc.entities[entityIndex] = sm
@@ -499,6 +500,13 @@ export class M2mSpecification implements IspecificationValidator {
           } catch (error) {
             log.log(LogLevelEnum.error, error)
           }
+        } else if (!converter.usesModbusAddress()) {
+          // Static entity (e.g. a fixed OBIS code via the 'value' converter): the value does
+          // not come from modbus, so compute it directly from the converter parameters.
+          const mqtt = converter.modbus2mqtt(spec, entity.id, [])
+          rc.mqttValue = mqtt
+          rc.modbusValue = []
+          rc.identified = mqtt != null && mqtt.toString().length > 0 ? IdentifiedStates.identified : IdentifiedStates.notIdentified
         } else {
           log.log(LogLevelEnum.error, 'entity has no modbusaddress: entity id:' + entity.id + ' converter:' + entity.converter)
           // It remains an Ientity

@@ -75,8 +75,7 @@ export class ConfigSpecification {
         const published = publishedSpecifications.find((obj) => obj.filename === specification.filename)
         if (published) {
           specification.publicSpecification = published
-          if (specification.files.length == 0 && published.files.length > 0)
-            specification.files = structuredClone(published.files)
+          if (specification.files.length == 0 && published.files.length > 0) specification.files = structuredClone(published.files)
         }
         if (specification.status === SpecificationStatus.contributed && specification.pullNumber == undefined)
           log.log(LogLevelEnum.error, 'Contributed Specification w/o pull request number: ' + specification.filename)
@@ -110,7 +109,7 @@ export class ConfigSpecification {
     delete fileSpec['identification']
 
     modbusSpec.entities.forEach((entity) => {
-      if (entity.modbusValue)
+      if (entity.modbusValue && entity.modbusAddress != undefined)
         for (let idx = 0; idx < entity.modbusValue.length; idx++) {
           switch (entity.registerType) {
             case ModbusRegisterType.AnalogInputs:

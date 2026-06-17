@@ -136,7 +136,7 @@
                     <mat-error> Must be unique </mat-error>
                   }
                 </mat-form-field>
-                @if ([0, 2].includes(uislave.slaveForm.get('pollMode')!.value)) {
+                @if ([0, 2, 4].includes(uislave.slaveForm.get('pollMode')!.value)) {
                   <mat-form-field class="width150pt">
                     <mat-label>Poll Interval [ms]</mat-label>
                     <input matInput formControlName="pollInterval" type="number" placeholder="1000" />
@@ -149,6 +149,7 @@
                     <mat-option [value]="2">Interval and Triggger</mat-option>
                     <mat-option [value]="1">Trigger only</mat-option>
                     <mat-option [value]="3">No polling</mat-option>
+                    <mat-option [value]="4">HTTP Push (no MQTT)</mat-option>
                   </mat-select>
                 </mat-form-field>
               </mat-expansion-panel>
@@ -299,6 +300,43 @@
                   >
                   <h2>Deselect to exclude from Discovery</h2>
                   <mat-selection-list #noDiscovery formControlName="discoverEntitiesList">
+                    @for (selected of uislave.selectedEntitites; track $index) {
+                      <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
+                    }
+                  </mat-selection-list>
+                </mat-expansion-panel>
+              }
+              @if (uislave.slave.specificationid; as specid) {
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title> HTTP Push </mat-panel-title>
+                  </mat-expansion-panel-header>
+                  <p>
+                    Push selected entity values to an external URL via HTTP POST. The URL is slave specific (e.g. it contains the
+                    device serial number). Set the poll mode to "HTTP Push (no MQTT)" to disable MQTT publishing for this slave.
+                  </p>
+                  <mat-form-field class="width550">
+                    <mat-label>URL</mat-label>
+                    <input
+                      matInput
+                      formControlName="httpPushUrl"
+                      placeholder="https://heimvio.de/readings/<serialnumber>"
+                      matTooltip="Full target URL incl. serial number"
+                    />
+                  </mat-form-field>
+                  <mat-form-field class="width550">
+                    <mat-label>Bearer PAT</mat-label>
+                    <input
+                      matInput
+                      type="password"
+                      formControlName="httpPushPat"
+                      autocomplete="new-password"
+                      [placeholder]="hasHttpPushPat(uislave) ? '•••••••• (stored, leave empty to keep)' : 'Personal Access Token'"
+                      matTooltip="Stored encrypted. Leave empty to keep the currently stored token."
+                    />
+                  </mat-form-field>
+                  <h2>Select entities to push</h2>
+                  <mat-selection-list formControlName="pushEntitiesList">
                     @for (selected of uislave.selectedEntitites; track $index) {
                       <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
                     }

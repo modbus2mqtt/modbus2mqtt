@@ -1,5 +1,5 @@
 import { Ientity, IidentEntity, ImodbusEntity, ImodbusSpecification, Ispecification } from '../specification/index.js'
-import { Islave, PollModes } from './types.js'
+import { IhttpPush, Islave, PollModes } from './types.js'
 export interface IEntityCommandTopics {
   entityId: number
   commandTopic: string
@@ -112,6 +112,28 @@ export class Slave {
   }
   getPollMode(): PollModes | undefined {
     return this.slave.pollMode
+  }
+  getHttpPush(): IhttpPush | undefined {
+    return this.slave.httpPush
+  }
+  hasHttpPush(): boolean {
+    return this.slave.httpPush != undefined && this.slave.httpPush.url != undefined && this.slave.httpPush.url.length > 0
+  }
+  // Whether the slave's state should be published to MQTT. False in HTTP-push-only mode.
+  shouldPublishMqtt(): boolean {
+    return this.slave.pollMode !== PollModes.intervallHttpPushNoMqtt
+  }
+  // Builds the HTTP push payload containing only the selected push entities,
+  // e.g. { "obis": "1-0:1.0.8", "obis_value": 234 }.
+  getHttpPushPayload(entities: ImodbusEntity[]): string {
+    const pushEntities = this.slave.httpPush?.pushEntities ?? []
+    const o: { [key: string]: unknown } = {}
+    for (const e of entities) {
+      if (e.mqttname != undefined && e.mqttname.length > 0 && e.variableConfiguration == undefined && pushEntities.includes(e.id)) {
+        o[e.mqttname] = e.mqttValue
+      }
+    }
+    return JSON.stringify(o)
   }
   static compareSlaves(s1: Slave, s2: Slave): number {
     let rc = s1.busid - s2.busid

@@ -7,9 +7,14 @@ export interface ReadRegisterResult {
 // Base class for all converters
 export abstract class Converter {
   constructor(protected component: Converters) {}
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   getModbusLength(_dummy: Ientity): number {
     return 1
+  }
+  // Static converters (e.g. a fixed OBIS code) have no modbus address.
+  // Override to return false for those.
+  usesModbusAddress(): boolean {
+    return true
   }
 
   abstract modbus2mqtt(spec: Ispecification, entityid: number, value: number[]): number | string
@@ -26,7 +31,7 @@ export abstract class Converter {
   }
 
   abstract getModbusRegisterTypes(): ModbusRegisterType[]
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   getParameterType(_entity: Ientity): string | undefined {
     return undefined
   }
