@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.2](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.1...modbus2mqtt-v0.25.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* OIDC CORS origin + harden MQTT publishState ([#252](https://github.com/modbus2mqtt/modbus2mqtt/issues/252)) ([aba1e83](https://github.com/modbus2mqtt/modbus2mqtt/commit/aba1e837e8dc4a81e3c9e4b41757f5093fab62bc))
+
 ## [0.25.1](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.0...modbus2mqtt-v0.25.1) (2026-06-06)
 
 
