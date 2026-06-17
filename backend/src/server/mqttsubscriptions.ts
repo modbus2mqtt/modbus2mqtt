@@ -8,7 +8,7 @@ import { MqttConnector } from './mqttconnector.js'
 import { Ientity, ImodbusSpecification } from '../shared/specification/index.js'
 import { Converter } from '../specification/index.js'
 import { Observable } from 'rxjs'
-import { MqttClient } from 'mqtt'
+import { IClientPublishOptions, MqttClient } from 'mqtt'
 
 const debug = Debug('mqttsubscription')
 const log = new Logger('mqttsubscription')
@@ -113,37 +113,44 @@ export class MqttSubscriptions {
     }
     return undefined
   }
-  private publishStateLocal(slave: Slave, spec: ImodbusSpecification): Promise<void> {
-    return new Promise<void>((resolve) => {
-      debug('publish State aquire mqttClient')
-      this.connector.getMqttClient((mqttClient) => {
-        debug('publish State executing')
-        const topic = slave.getStateTopic()
-        const bus = Bus.getBus(slave.getBusId())
-        if (mqttClient && bus && spec) {
-          try {
-            debug('PublishState')
-            mqttClient.publish(topic, slave.getStatePayload(spec.entities), { qos: MqttDiscover.generateQos(slave, spec) })
-            mqttClient.publish(slave.getAvailabilityTopic(), 'online', { qos: MqttDiscover.generateQos(slave, spec) })
-            resolve()
-          } catch (e: unknown) {
-            try {
-              mqttClient.publish(slave.getAvailabilityTopic(), 'offline', { qos: MqttDiscover.generateQos(slave, spec) })
-            } catch (e2: unknown) {
-              // ignore the error
-              if (e instanceof Error) debug('Error ' + e.message)
-              else debug('Error ' + String(e))
-              if (e2 instanceof Error) debug('Error ' + e2.message)
-              else debug('Error ' + String(e2))
-            }
-          }
-        } else {
-          if (!mqttClient) log.log(LogLevelEnum.error, 'No MQTT Client available')
-          if (!bus) log.log(LogLevelEnum.error, 'No Bus available')
-          if (!spec) log.log(LogLevelEnum.error, 'No Spec available')
-        }
-      })
+  private getMqttClientAsync(): Promise<MqttClient> {
+    return new Promise<MqttClient>((resolve) => {
+      this.connector.getMqttClient((mqttClient) => resolve(mqttClient))
     })
+  }
+  private publishAsync(client: MqttClient, topic: string, payload: string, options: IClientPublishOptions): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      client.publish(topic, payload, options, (err) => (err ? reject(err) : resolve()))
+    })
+  }
+  private async publishStateLocal(slave: Slave, spec: ImodbusSpecification): Promise<void> {
+    debug('publish State aquire mqttClient')
+    const mqttClient = await this.getMqttClientAsync()
+    debug('publish State executing')
+    const bus = Bus.getBus(slave.getBusId())
+    if (!mqttClient || !bus || !spec) {
+      if (!mqttClient) log.log(LogLevelEnum.error, 'No MQTT Client available')
+      if (!bus) log.log(LogLevelEnum.error, 'No Bus available')
+      if (!spec) log.log(LogLevelEnum.error, 'No Spec available')
+      throw new Error('publishState: missing mqttClient, bus or spec')
+    }
+    const topic = slave.getStateTopic()
+    const options: IClientPublishOptions = { qos: MqttDiscover.generateQos(slave, spec) }
+    try {
+      debug('PublishState')
+      await this.publishAsync(mqttClient, topic, slave.getStatePayload(spec.entities), options)
+      await this.publishAsync(mqttClient, slave.getAvailabilityTopic(), 'online', options)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      log.log(LogLevelEnum.error, 'publishState failed: ' + msg)
+      try {
+        await this.publishAsync(mqttClient, slave.getAvailabilityTopic(), 'offline', options)
+      } catch (e2: unknown) {
+        // ignore the error while trying to flag the slave offline
+        debug('Error ' + (e2 instanceof Error ? e2.message : String(e2)))
+      }
+      throw e instanceof Error ? e : new Error(msg)
+    }
   }
   private getEntityFromSlave(slave: Slave, mqttname: string): Ientity | undefined {
     const spec = slave.getSpecification()

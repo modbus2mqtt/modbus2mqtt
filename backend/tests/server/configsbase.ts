@@ -49,7 +49,7 @@ export class FakeMqtt {
   public unsubscribe(topic: string | string[]): void {
     debug('unsubscribe: ' + topic)
   }
-  public publish(topic: string, message: Buffer): void {
+  public publish(topic: string, message: Buffer, opts?: unknown, callback?: (err?: Error) => void): void {
     if (topic.startsWith(Config.getConfiguration().mqttdiscoveryprefix)) {
       debug('publish Discovery ' + topic + '\n' + message.toString())
       this.md['onMqttMessage'](topic, message)
@@ -67,6 +67,8 @@ export class FakeMqtt {
         }
       debug('publish: ' + topic + '\n' + message)
     }
+    const cb = typeof opts === 'function' ? (opts as (err?: Error) => void) : callback
+    if (cb) cb()
   }
   public end(endFunc: () => void) {
     endFunc()

@@ -54,14 +54,16 @@ describe('HTTPS configuration', () => {
     expect(cfg.httpsPort).toBe(3443)
   })
 
-  it('should use default port when MODBUS2MQTT_HTTPS_PORT is zero or negative', () => {
+  it('should disable httpsPort when MODBUS2MQTT_HTTPS_PORT is zero or negative', () => {
+    // A non-positive port explicitly disables HTTPS (local HTTP-only debugging),
+    // see config.ts. It is NOT treated as "use the default port".
     process.env.MODBUS2MQTT_HTTPS_PORT = '0'
     const cfg = Config.getConfiguration()
-    expect(cfg.httpsPort).toBe(3443)
+    expect(cfg.httpsPort).toBeUndefined()
 
     process.env.MODBUS2MQTT_HTTPS_PORT = '-1'
     const cfg2 = Config.getConfiguration()
-    expect(cfg2.httpsPort).toBe(3443)
+    expect(cfg2.httpsPort).toBeUndefined()
   })
 
   it('should disable httpsPort in addon mode (HASSIO_TOKEN set)', () => {

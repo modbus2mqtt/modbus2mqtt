@@ -22,7 +22,7 @@ import { TempConfigDirHelper } from './testhelper.js'
 const debug = Debug('mqttdiscover_test')
 
 class MdFakeMqtt extends FakeMqtt {
-  public override publish(topic: string, message: Buffer): void {
+  public override publish(topic: string, message: Buffer, opts?: unknown, callback?: (err?: Error) => void): void {
     if (topic.endsWith('/availabitlity/')) {
       debug('publish ' + topic + '\n' + message)
     } else if (topic.endsWith('/state/')) {
@@ -35,6 +35,8 @@ class MdFakeMqtt extends FakeMqtt {
       }
     }
     debug('publish: ' + topic + '\n' + message)
+    const cb = typeof opts === 'function' ? (opts as (err?: Error) => void) : callback
+    if (cb) cb()
   }
 }
 
@@ -285,12 +287,14 @@ test('onMessage TriggerPollTopic from this app', async () => {
 })
 
 class FakeMqttSendCommandTopic extends FakeMqtt {
-  public override publish(topic: string, message: Buffer): void {
+  public override publish(topic: string, message: Buffer, opts?: unknown, callback?: (err?: Error) => void): void {
     if (topic.endsWith('/state/')) {
       expect(message.length).not.toBe(0)
       this.isAsExpected = true
     }
     debug('publish: ' + topic + '\n' + message)
+    const cb = typeof opts === 'function' ? (opts as (err?: Error) => void) : callback
+    if (cb) cb()
   }
 }
 function copySubscribedSlaves(toA: Slave[], fromA: Slave[]) {

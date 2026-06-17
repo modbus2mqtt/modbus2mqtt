@@ -270,11 +270,16 @@ export class HttpServerBase {
     //this.app.use(cors);
     this.app.use(express.json({ limit: '50mb' }))
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }))
-    this.app.use(function (_undefined: unknown, res: http.ServerResponse, next: NextFunction) {
+    this.app.use(function (req: Request, res: http.ServerResponse, next: NextFunction) {
       //            res.setHeader('charset', 'utf-8')
       debug('Authenticate')
+      // Echo the request Origin instead of '*': a wildcard origin is rejected by
+      // browsers when Access-Control-Allow-Credentials is 'true' (OIDC sends the
+      // session cookie via withCredentials), which surfaces as a CORS error.
+      const origin = req.headers.origin
       res.setHeader('Access-Control-Allow-Methods', 'POST, PUT, OPTIONS, DELETE, GET')
-      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Origin', origin || '*')
+      res.setHeader('Vary', 'Origin')
       res.setHeader(
         'Access-Control-Allow-Headers',
         'Origin, X-Requested-With, Content-Type, X-Accel-Buffering, Accept,Connection,Cache-Control,x-access-token'
