@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.3](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.2...modbus2mqtt-v0.25.3) (2026-06-17)
+
+
+### Bug Fixes
+
+* default modbus bus timeout to 1000ms (TCP defaulted to 100ms) ([#255](https://github.com/modbus2mqtt/modbus2mqtt/issues/255)) ([ae8cbfd](https://github.com/modbus2mqtt/modbus2mqtt/commit/ae8cbfd67d09fb2ce8f7b4fee0b6d59241eec5ef))
+
 ## [0.25.2](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.1...modbus2mqtt-v0.25.2) (2026-06-17)
 
 
