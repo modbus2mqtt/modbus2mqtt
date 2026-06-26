@@ -59,14 +59,20 @@
         "type": "shell",
         "command": "pnpm",
         "args": ["run", "build"],
-        "options": { "cwd": "${workspaceFolder:modbus2mqtt}" },
+        "options": {
+          "cwd": "${workspaceFolder:modbus2mqtt}",
+          "env": { "PATH": "${env:HOME}/.nvm/versions/node/v22.12.0/bin:${env:PATH}" },
+        },
         "problemMatcher": [],
       },
       {
         "label": "ng serve debug",
         "type": "shell",
         "command": "npx ng serve --configuration debug --host localhost --port 3602",
-        "options": { "cwd": "${workspaceFolder:frontend}" },
+        "options": {
+          "cwd": "${workspaceFolder:frontend}",
+          "env": { "PATH": "${env:HOME}/.nvm/versions/node/v22.12.0/bin:${env:PATH}" },
+        },
         "isBackground": true,
         "detail": "Angular dev server on http://localhost:3602 (proxies API to backend :3601)",
         "presentation": { "reveal": "always", "panel": "dedicated" },
@@ -127,6 +133,7 @@
       {
         "name": "Run Modbus2mqtt Server (OIDC)",
         "preLaunchTask": "build modbus2mqtt",
+        "runtimeVersion": "22.12",
         "timeout": 10000,
         "program": "${workspaceFolder:modbus2mqtt}/dist/server/modbus2mqtt.js",
         "args": ["-s", "../certs", "-c", "../config-dir", "-d", "../data-dir"],
@@ -142,6 +149,7 @@
       {
         "name": "Debug Backend (HTTP :3601)",
         "preLaunchTask": "build modbus2mqtt",
+        "runtimeVersion": "22.12",
         "timeout": 10000,
         "program": "${workspaceFolder:modbus2mqtt}/dist/server/modbus2mqtt.js",
         "args": ["-c", "../config-dir", "-d", "../data-dir", "-s", "../certs"],

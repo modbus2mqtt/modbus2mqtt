@@ -1,4 +1,4 @@
-import { OnChanges, Component, Input, ViewChild, Output, EventEmitter, OnInit } from '@angular/core'
+import { OnChanges, Component, Input, ViewChild, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core'
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms'
 import { GalleryItem, ImageItem, GalleryComponent } from 'ng-gallery'
 import {
@@ -46,7 +46,7 @@ import {
     GalleryComponent
 ],
 })
-export class UploadFilesComponent implements OnInit, OnChanges {
+export class UploadFilesComponent implements OnInit, OnChanges, OnDestroy {
   constructor(
     private fb: FormBuilder
   ) {
@@ -180,11 +180,36 @@ export class UploadFilesComponent implements OnInit, OnChanges {
     btn.disabled = !event.target || (event.target as any).value == null || (event.target as any).value == ''
   }
 
+  // Object URLs created from embedded base64 data, cached per file. They are created in the
+  // generate* methods (not in the template-bound getter), so the getter returns a stable value
+  // during change detection. Revoked on destroy.
+  private blobUrlCache = new Map<IimageAndDocumentUrl, string>()
+
+  // Pure read used by the template: never creates a URL during change detection.
   getFileDisplayUrl(file: IimageAndDocumentUrl): string {
-    if (file.fileLocation === FileLocation.Local && file.data) {
-      return `data:${file.mimeType || 'application/octet-stream'};base64,${file.data}`
+    return this.blobUrlCache.get(file) ?? file.url
+  }
+
+  // A data: URL cannot be used as an <a href> target: browsers block top-level navigation to
+  // data: URLs, so opening a document (e.g. a PDF) in a new tab does nothing. A blob: object URL
+  // is navigable and works for both <a href> and <img src>. Created once per file and cached.
+  private ensureBlobUrl(file: IimageAndDocumentUrl): void {
+    if (file.fileLocation === FileLocation.Local && file.data && !this.blobUrlCache.has(file)) {
+      const blob = this.base64ToBlob(file.data, file.mimeType || 'application/octet-stream')
+      this.blobUrlCache.set(file, URL.createObjectURL(blob))
     }
-    return file.url
+  }
+
+  private base64ToBlob(base64: string, mimeType: string): Blob {
+    const binary = atob(base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return new Blob([bytes], { type: mimeType })
+  }
+
+  ngOnDestroy(): void {
+    for (const url of this.blobUrlCache.values()) URL.revokeObjectURL(url)
+    this.blobUrlCache.clear()
   }
 
   generateDocumentUrls() {
@@ -192,15 +217,22 @@ export class UploadFilesComponent implements OnInit, OnChanges {
     if (this.currentSpecification && this.currentSpecification.files)
       for (let i = 0; i < this.currentSpecification.files.length; i++) {
         const doc = this.currentSpecification.files[i]
-        if (doc.usage == SpecificationFileUsage.documentation) rc.push(doc)
+        if (doc.usage == SpecificationFileUsage.documentation) {
+          this.ensureBlobUrl(doc)
+          rc.push(doc)
+        }
       }
-    if (rc.length != this.documentUrls.length) this.documentUrls = rc
+    // Always reassign (like generateImageGalleryItems). Comparing only by length kept a
+    // stale document when switching between two specs that each have the same number of
+    // documents, so the new spec's document was never shown.
+    this.documentUrls = rc
   }
   generateImageGalleryItems(): void {
     const rc: GalleryItem[] = []
     const rd: IimageAndDocumentUrl[] = []
     this.currentSpecification?.files.forEach((img) => {
       if (img.usage == SpecificationFileUsage.img) {
+        this.ensureBlobUrl(img)
         const displayUrl = this.getFileDisplayUrl(img)
         rc.push(new ImageItem({ src: displayUrl, thumb: displayUrl }))
         rd.push(img)
