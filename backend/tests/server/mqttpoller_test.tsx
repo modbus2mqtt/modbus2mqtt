@@ -4,7 +4,7 @@ import { MqttClient } from 'mqtt'
 import { FakeModes, FakeMqtt, initBussesForTest, setConfigsDirsForTest } from './configsbase.js'
 import { Bus } from '../../src/server/bus.js'
 import { expect, test, beforeAll, afterAll } from 'vitest'
-import { Slave } from '../../src/shared/server/index.js'
+import { Slave, PollModes } from '../../src/shared/server/index.js'
 import { ConfigBus } from '../../src/server/configbus.js'
 import { MqttConnector } from '../../src/server/mqttconnector.js'
 import { MqttPoller } from '../../src/server/mqttpoller.js'
@@ -119,6 +119,67 @@ test('poll with processing= true for first Slave', async () => {
   await fd.mdl!['poll']!(Bus.getBus(0)!)
   expect(fd.mdl!['slavePollInfo'].get(1)!.processing).toBeTruthy()
   expect(fd.fake.isAsExpected).toBeTruthy()
+})
+
+test('cron pollSchedule bypasses the tick counter and fires once per minute', async () => {
+  const fd = getFakeDiscovery()
+  copySubscribedSlaves(fd.msub['subscribedSlaves'], fakeDiscovery.msub['subscribedSlaves'])
+
+  const slaves = Bus.getBus(0)!.getSlaves()
+  const target = slaves.find(
+    (s) => s.pollMode != undefined && ![PollModes.noPoll, PollModes.trigger].includes(s.pollMode) && s.specification != undefined
+  )
+  expect(target).toBeDefined()
+  const saved = target!.pollSchedule
+  target!.pollSchedule = '* * * * *' // matches every minute
+
+  try {
+    fd.fake.isAsExpected = false
+    fd.fake.fakeMode = FakeModes.Poll
+    await fd.mdl['poll']!(Bus.getBus(0)!)
+
+    const info = fd.mdl!['slavePollInfo'].get(target!.slaveid)
+    expect(info).toBeDefined()
+    expect(info!.count).toBe(0) // cron path used, fixed-interval counter untouched
+    expect(info!.lastFiredMinute).toBeDefined()
+    const firstMinute = info!.lastFiredMinute
+
+    // Second poll within the same minute must not fire again (deduplicated).
+    await fd.mdl['poll']!(Bus.getBus(0)!)
+    const info2 = fd.mdl!['slavePollInfo'].get(target!.slaveid)
+    expect(info2!.lastFiredMinute).toBe(firstMinute)
+    expect(info2!.count).toBe(0)
+  } finally {
+    if (saved == undefined) delete target!.pollSchedule
+    else target!.pollSchedule = saved
+  }
+})
+
+test('invalid pollSchedule skips polling (does not fall back to the interval)', async () => {
+  const fd = getFakeDiscovery()
+  copySubscribedSlaves(fd.msub['subscribedSlaves'], fakeDiscovery.msub['subscribedSlaves'])
+
+  const slaves = Bus.getBus(0)!.getSlaves()
+  const target = slaves.find(
+    (s) => s.pollMode != undefined && ![PollModes.noPoll, PollModes.trigger].includes(s.pollMode) && s.specification != undefined
+  )
+  expect(target).toBeDefined()
+  const saved = target!.pollSchedule
+  target!.pollSchedule = 'not a cron'
+
+  try {
+    fd.fake.isAsExpected = false
+    fd.fake.fakeMode = FakeModes.Poll
+    await fd.mdl['poll']!(Bus.getBus(0)!)
+    const info = fd.mdl!['slavePollInfo'].get(target!.slaveid)
+    expect(info).toBeDefined()
+    expect(info!.count).toBe(0) // not polled via counter
+    expect(info!.lastFiredMinute).toBeUndefined() // not polled via cron
+    expect(info!.processing).toBe(false)
+  } finally {
+    if (saved == undefined) delete target!.pollSchedule
+    else target!.pollSchedule = saved
+  }
 })
 
 test('poll counter resets at threshold and allows re-polling', async () => {

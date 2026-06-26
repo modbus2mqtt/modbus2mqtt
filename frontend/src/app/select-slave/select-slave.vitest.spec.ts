@@ -118,8 +118,9 @@ describe('Select Slave tests (vitest)', () => {
     )
     safeDetectChanges()
 
-    // Set pollMode to "Interval" (0)
+    // Set pollMode to "Interval" (0) and a cron poll schedule
     uiSlave.slaveForm.get('pollMode')!.setValue(0)
+    uiSlave.slaveForm.get('pollSchedule')!.setValue('0 * * * *')
     safeDetectChanges()
 
     // Call saveSlave directly (button might not render in jsdom due to @if timing)
@@ -134,6 +135,7 @@ describe('Select Slave tests (vitest)', () => {
     const postReq = httpMock.expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave'))
     expect(postReq.request.body.slaveid).toBe(1)
     expect(postReq.request.body.pollMode).toBe(0)
+    expect(postReq.request.body.pollSchedule).toBe('0 * * * *')
     expect(postReq.request.body.specificationid).toBe('second')
     postReq.flush(postReq.request.body)
     safeDetectChanges()
@@ -143,6 +145,39 @@ describe('Select Slave tests (vitest)', () => {
     safeDetectChanges()
 
     // Flush any remaining requests
+    httpMock.match(() => true).forEach((r) => r.flush([]))
+  })
+
+  it('schedule presets, custom and human-readable description', async () => {
+    await mount()
+    const c = fixture.componentInstance
+
+    // describeCron translations
+    expect(c.describeCron('0 * * * *')).toBe('Every full hour (at :00)')
+    expect(c.describeCron('*/15 * * * *')).toBe('Every 15 minutes (at :00, :15, :30, :45)')
+    expect(c.describeCron('*/5 * * * *')).toBe('Every 5 minutes (at :00, :05, :10, :15, …)')
+    expect(c.describeCron('0 */6 * * *')).toBe('Every 6 hours (at 00:00, 06:00, 12:00, 18:00)')
+    expect(c.describeCron('30 6 * * *')).toBe('Every day at 06:30')
+    expect(c.describeCron('0 8 * * mon')).toBe('Mondays at 08:00')
+    expect(c.describeCron('')).toBe('')
+    expect(c.describeCron('5 4 3 2 1')).toBe('') // no confident translation
+
+    // preset selection writes the cron into pollSchedule
+    const fg = c.uiSlaves[0].slaveForm
+    fg.get('pollSchedulePreset')!.setValue('*/15 * * * *')
+    c.onPollSchedulePresetChange(fg)
+    expect(fg.get('pollSchedule')!.value).toBe('*/15 * * * *')
+
+    // "Custom cron…" keeps the current expression for manual editing
+    fg.get('pollSchedulePreset')!.setValue(c.pollScheduleCustom)
+    c.onPollSchedulePresetChange(fg)
+    expect(fg.get('pollSchedule')!.value).toBe('*/15 * * * *')
+
+    // "No schedule" clears it (the interval is used again)
+    fg.get('pollSchedulePreset')!.setValue('')
+    c.onPollSchedulePresetChange(fg)
+    expect(fg.get('pollSchedule')!.value).toBeNull()
+
     httpMock.match(() => true).forEach((r) => r.flush([]))
   })
 

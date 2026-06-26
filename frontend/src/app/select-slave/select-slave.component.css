@@ -23,3 +23,9 @@ dd {
   padding-top: 2px;
   padding-bottom: 2px;
 }
+
+.poll-schedule-hint {
+  margin: -4px 0 8px 4px;
+  font-size: 0.85em;
+  opacity: 0.75;
+}

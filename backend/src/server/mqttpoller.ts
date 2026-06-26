@@ -7,6 +7,7 @@ import { Modbus } from './modbus.js'
 import { ItopicAndPayloads, MqttDiscover } from './mqttdiscover.js'
 import { MqttConnector } from './mqttconnector.js'
 import { HttpPush } from './httpPush.js'
+import { CronSchedule } from './cronSchedule.js'
 
 const debug = Debug('mqttpoller')
 const defaultPollCount = 50 // 5 seconds
@@ -14,12 +15,14 @@ const log = new Logger('mqttpoller')
 interface IslavePollInfo {
   count: number
   processing: boolean
+  lastFiredMinute?: number // epoch minute of the last cron-triggered poll (cron-scheduled slaves only)
 }
 export class MqttPoller {
   interval: NodeJS.Timeout | undefined
   private lastMessage: string = ''
   private slavePollInfo: Map<number, IslavePollInfo> = new Map<number, IslavePollInfo>()
   private warnedNoSpecSlaves: Set<number> = new Set<number>()
+  private warnedBadCron: Set<number> = new Set<number>()
 
   constructor(private connector: MqttConnector) {}
 
@@ -32,14 +35,35 @@ export class MqttPoller {
         return
       }
       const needPolls: Slave[] = []
+      const now = new Date()
 
       bus.getSlaves().forEach((slave) => {
         if (slave.pollMode != undefined && ![PollModes.noPoll, PollModes.trigger].includes(slave.pollMode)) {
           const sl = new Slave(bus.getId(), slave, Config.getConfiguration().mqttbasetopic)
           let pc: IslavePollInfo | undefined = this.slavePollInfo.get(sl.getSlaveId())
           if (pc == undefined) pc = { count: 0, processing: false }
-          if (pc.count >= (slave.pollInterval != undefined ? slave.pollInterval / 100 : defaultPollCount)) pc.count = 0
-          if (pc.count == 0 && !pc.processing) {
+
+          // A cron schedule (e.g. "0 * * * *" = every full hour) takes precedence over pollInterval.
+          // It fires once per matching minute (deduplicated via lastFiredMinute); otherwise the slave
+          // is polled on the fixed 100ms tick counter.
+          let triggerNow = false
+          const schedule = slave.pollSchedule
+          if (schedule != undefined && schedule.trim().length > 0) {
+            // An invalid expression is logged once and the slave is NOT polled (rather than falling
+            // back to the short default interval, which would e.g. spam an HTTP push endpoint).
+            const cron = this.getCronSchedule(schedule, sl.getSlaveId())
+            if (cron) {
+              const minute = Math.floor(now.getTime() / 60000)
+              triggerNow = pc.lastFiredMinute !== minute && cron.matches(now)
+              if (triggerNow) pc.lastFiredMinute = minute
+            }
+          } else {
+            if (pc.count >= (slave.pollInterval != undefined ? slave.pollInterval / 100 : defaultPollCount)) pc.count = 0
+            triggerNow = pc.count == 0
+            pc.count = pc.count + 1
+          }
+
+          if (triggerNow && !pc.processing) {
             const s = new Slave(bus.getId(), slave, Config.getConfiguration().mqttbasetopic)
             if (slave.specification) {
               pc.processing = true
@@ -54,7 +78,7 @@ export class MqttPoller {
               }
             }
           }
-          this.slavePollInfo.set(sl.getSlaveId(), { count: ++pc.count, processing: pc.processing })
+          this.slavePollInfo.set(sl.getSlaveId(), pc)
         }
       })
       if (needPolls.length > 0) {
@@ -77,7 +101,7 @@ export class MqttPoller {
                   log.log(LogLevelEnum.error, 'reading spec failed' + msg)
                 }
                 const si = this.slavePollInfo.get(bs.getSlaveId())
-                if (si) this.slavePollInfo.set(bs.getSlaveId(), { count: si.count, processing: false })
+                if (si) this.slavePollInfo.set(bs.getSlaveId(), { ...si, processing: false })
                 pollDeviceCount++
                 if (pollDeviceCount == devicesToPoll) {
                   resolve()
@@ -104,7 +128,7 @@ export class MqttPoller {
                   }
                   // Reset processing flag immediately for this device
                   const si = this.slavePollInfo.get(bs.getSlaveId())
-                  if (si) this.slavePollInfo.set(bs.getSlaveId(), { count: si.count, processing: false })
+                  if (si) this.slavePollInfo.set(bs.getSlaveId(), { ...si, processing: false })
                   pollDeviceCount++
                   if (pollDeviceCount == devicesToPoll) {
                     this.connector.getMqttClient((mqttClient) => {
@@ -119,7 +143,7 @@ export class MqttPoller {
                 error: (err) => {
                   log.log(LogLevelEnum.error, 'subscribe error: ' + err.message)
                   const si = this.slavePollInfo.get(bs.getSlaveId())
-                  if (si) this.slavePollInfo.set(bs.getSlaveId(), { count: si.count, processing: false })
+                  if (si) this.slavePollInfo.set(bs.getSlaveId(), { ...si, processing: false })
                   pollDeviceCount++
                   if (pollDeviceCount == devicesToPoll) {
                     resolve()
@@ -130,7 +154,7 @@ export class MqttPoller {
           } else {
             // Device doesn't match poll mode, reset processing flag
             const si = this.slavePollInfo.get(bs.getSlaveId())
-            if (si) this.slavePollInfo.set(bs.getSlaveId(), { count: si.count, processing: false })
+            if (si) this.slavePollInfo.set(bs.getSlaveId(), { ...si, processing: false })
           }
         })
         // If no devices actually need polling after mode check, resolve immediately
@@ -139,6 +163,23 @@ export class MqttPoller {
         }
       } else resolve()
     })
+  }
+
+  // Parses a slave's cron expression, or returns undefined when it is invalid (logged once per
+  // slave). The caller skips polling on undefined so a typo does not trigger unintended polls.
+  private getCronSchedule(expression: string, slaveId: number): CronSchedule | undefined {
+    try {
+      const cron = CronSchedule.parse(expression)
+      this.warnedBadCron.delete(slaveId)
+      return cron
+    } catch (e) {
+      if (!this.warnedBadCron.has(slaveId)) {
+        const msg = e instanceof Error ? e.message : String(e)
+        log.log(LogLevelEnum.error, 'Invalid pollSchedule for slave ' + slaveId + ', skipping poll: ' + msg)
+        this.warnedBadCron.add(slaveId)
+      }
+      return undefined
+    }
   }
 
   startPolling(bus: Bus) {

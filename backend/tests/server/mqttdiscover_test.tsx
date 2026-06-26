@@ -670,6 +670,78 @@ test('issue #228: configuration_url is omitted when slave has no configurationUr
   expect(payload.device.configuration_url).toBeUndefined()
 })
 
+test('array entity: value_template uses the raw json path, object_id is sanitized', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const arrEntity: ImodbusEntity = {
+    id: 20,
+    mqttname: 'meters[0].obis',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: '5',
+    identified: 1,
+    converterParameters: { uom: 'W' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 20,
+  }
+  const flatEntity: ImodbusEntity = {
+    id: 21,
+    mqttname: 'battery_in',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: '1',
+    identified: 1,
+    converterParameters: { uom: 'W' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 21,
+  }
+  const s = {
+    filename: 'arrtest',
+    manufacturer: 'Acme',
+    model: 'X',
+    i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'Arr' }] }],
+    entities: [arrEntity, flatEntity],
+  } as any as ImodbusSpecification
+  const sl = new Slave(0, { slaveid: 50, specificationid: 'arrtest', specification: s as any } as Islave, Config.getConfiguration().mqttbasetopic)
+  const payloads = disc['generateDiscoveryPayloads'](sl, s).map((p) => JSON.parse(p.payload as string))
+  const arr = payloads.find((p) => (p.value_template as string).includes('meters'))
+  const flat = payloads.find((p) => p.object_id === 'battery_in')
+  expect(arr.value_template).toBe('{{ value_json.meters[0].obis }}')
+  expect(arr.object_id).toBe('meters_0_obis')
+  // flat entity behaves exactly as before
+  expect(flat.value_template).toBe('{{ value_json.battery_in }}')
+})
+
+test('root array entity: value_template has no leading dot', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const rootArr: ImodbusEntity = {
+    id: 22,
+    mqttname: '[0].obis',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: '5',
+    identified: 1,
+    converterParameters: { uom: 'W' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 22,
+  }
+  const s = {
+    filename: 'rootarrtest',
+    manufacturer: 'Acme',
+    model: 'X',
+    i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'RootArr' }] }],
+    entities: [rootArr],
+  } as any as ImodbusSpecification
+  const sl = new Slave(0, { slaveid: 51, specificationid: 'rootarrtest', specification: s as any } as Islave, Config.getConfiguration().mqttbasetopic)
+  const payload = JSON.parse(disc['generateDiscoveryPayloads'](sl, s)[0].payload as string)
+  expect(payload.value_template).toBe('{{ value_json[0].obis }}')
+  expect(payload.object_id).toBe('0_obis')
+})
+
 test('issue #228: republishDiscoveryIfChanged is a no-op when nothing changed', () => {
   const conn = new MqttConnector()
   const disc = new MqttDiscover(conn, msub1)

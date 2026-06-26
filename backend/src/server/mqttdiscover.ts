@@ -208,11 +208,15 @@ export class MqttDiscover {
                 const name = getSpecificationI18nEntityName(spec, language, e.id)
                 const filename = Config.getFileNameFromSlaveId(slave.getSlaveId())
                 if (!obj.name && name) obj.name = name
-                if (!obj.object_id && e.mqttname) obj.object_id = e.mqttname
-                if (!obj.unique_id) obj.unique_id = 'M2M' + slave.getBusId() + filename + e.mqttname
+                // object_id/unique_id must be a slug (no '[', ']', '.'); the value_template keeps the
+                // raw mqttname as the literal JSON path so arrays/nested values resolve in Home Assistant.
+                if (!obj.object_id && e.mqttname) obj.object_id = Slave.mqttNameToObjectId(e.mqttname)
+                if (!obj.unique_id) obj.unique_id = 'M2M' + slave.getBusId() + filename + Slave.mqttNameToObjectId(e.mqttname ?? '')
 
                 if (!obj.value_template)
-                  obj.value_template = e.value_template ? e.value_template : '{{ value_json.' + obj.object_id + ' }}'
+                  obj.value_template = e.value_template
+                    ? e.value_template
+                    : '{{ value_json' + (e.mqttname && e.mqttname.startsWith('[') ? '' : '.') + e.mqttname + ' }}'
                 if (!obj.state_topic) obj.state_topic = slave.getStateTopic()
                 if (!obj.availability && !obj.availability_topic) obj.availability_topic = slave.getAvailabilityTopic()
                 const cmdTopic = slave.getEntityCommandTopic(ent)

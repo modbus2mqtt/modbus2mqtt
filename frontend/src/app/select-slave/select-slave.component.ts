@@ -106,6 +106,98 @@ interface IuiSlave {
 export class SelectSlaveComponent extends SessionStorage implements OnInit {
   preparedIdentSpecs: IidentificationSpecification[] | undefined
   preparedSpecs: IspecificationSummary[] | undefined
+  // Literal strings (contain {{ }}) kept out of the template to avoid Angular interpolation.
+  readonly httpPushUrlPlaceholder = 'https://heimvio.de/readings/{{ serialnumber }}'
+  readonly httpPushUrlTooltip =
+    'Full target URL. Use {{ path }} placeholders to insert entity values, e.g. {{ serialnumber }}.'
+  readonly pollScheduleTooltip =
+    'Optional Unix cron expression. When set it overrides Poll Interval.\n' +
+    '5 fields: minute hour day-of-month month day-of-week.\n' +
+    'Examples:  "0 * * * *" = every full hour    "*/15 * * * *" = every 15 min    "0 6 * * mon" = Mondays 06:00'
+  // Lightweight client-side check (5 fields, allowed characters). The backend does the full
+  // validation and skips polling on an invalid expression.
+  static cronFormatValidator(control: AbstractControl): ValidationErrors | null {
+    const value = control.value as string | null
+    if (value == null || value.trim().length === 0) return null
+    const fields = value.trim().split(/\s+/)
+    if (fields.length !== 5) return { cron: true }
+    return fields.every((f) => /^[*\d,/\-a-zA-Z]+$/.test(f)) ? null : { cron: true }
+  }
+
+  // Common schedules offered in the preset dropdown ('' = no schedule, use the interval).
+  readonly pollScheduleCustom = '__custom__'
+  readonly pollSchedulePresets: { label: string; value: string }[] = [
+    { label: 'No schedule (use interval)', value: '' },
+    { label: 'Every 5 min (:00, :05, …)', value: '*/5 * * * *' },
+    { label: 'Every 15 min (:00, :15, :30, :45)', value: '*/15 * * * *' },
+    { label: 'Every 30 min (:00, :30)', value: '*/30 * * * *' },
+    { label: 'Every full hour (:00)', value: '0 * * * *' },
+    { label: 'Every 6 h (00, 06, 12, 18:00)', value: '0 */6 * * *' },
+    { label: 'Every day at 06:00', value: '0 6 * * *' },
+    { label: 'Every day at midnight', value: '0 0 * * *' },
+  ]
+
+  // Maps a cron string to the matching preset value, or the "custom" sentinel for anything else.
+  private presetForSchedule(schedule: string | undefined | null): string {
+    if (schedule == undefined || schedule.trim().length === 0) return ''
+    const match = this.pollSchedulePresets.find((p) => p.value === schedule.trim())
+    return match ? match.value : this.pollScheduleCustom
+  }
+
+  // Selecting a preset writes its cron into pollSchedule; "Custom cron…" keeps the current value
+  // and reveals the raw input for editing.
+  onPollSchedulePresetChange(fg: FormGroup): void {
+    const preset = fg.get('pollSchedulePreset')!.value as string
+    if (preset !== this.pollScheduleCustom) fg.get('pollSchedule')!.setValue(preset.length > 0 ? preset : null)
+  }
+
+  // Human-readable description of common cron shapes; '' when there is no confident translation
+  // (the raw expression stays visible in the input). Used to give live feedback under the field.
+  describeCron(expression: string | null | undefined): string {
+    if (expression == undefined || expression.trim().length === 0) return ''
+    const f = expression.trim().split(/\s+/)
+    if (f.length !== 5) return ''
+    const [min, hr, dom, mon, dow] = f
+    const allDate = dom === '*' && mon === '*'
+    // Step minutes fire on the clock (e.g. */15 → :00, :15, :30, :45), so spell out the marks.
+    const everyMin = min.match(/^\*\/(\d+)$/)
+    if (everyMin && hr === '*' && allDate && dow === '*') {
+      const n = Number(everyMin[1])
+      const marks: string[] = []
+      for (let m = 0; m < 60; m += n) marks.push(':' + String(m).padStart(2, '0'))
+      return `Every ${n} minutes (at ${this.formatMarks(marks)})`
+    }
+    const everyHr = hr.match(/^\*\/(\d+)$/)
+    if (min === '0' && everyHr && allDate && dow === '*') {
+      const n = Number(everyHr[1])
+      const marks: string[] = []
+      for (let h = 0; h < 24; h += n) marks.push(String(h).padStart(2, '0') + ':00')
+      return `Every ${n} hours (at ${this.formatMarks(marks)})`
+    }
+    if (/^\d+$/.test(min) && hr === '*' && allDate && dow === '*')
+      return min === '0' ? 'Every full hour (at :00)' : `Every hour at :${min.padStart(2, '0')}`
+    if (/^\d+$/.test(min) && /^\d+$/.test(hr) && allDate) {
+      const time = hr.padStart(2, '0') + ':' + min.padStart(2, '0')
+      if (dow === '*') return `Every day at ${time}`
+      const days = this.describeDow(dow)
+      if (days) return `${days} at ${time}`
+    }
+    return ''
+  }
+
+  // Joins clock marks, truncating long lists (e.g. */5 yields 12 minute marks).
+  private formatMarks(marks: string[]): string {
+    return marks.length <= 4 ? marks.join(', ') : marks.slice(0, 4).join(', ') + ', …'
+  }
+
+  private describeDow(dow: string): string {
+    const names = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays']
+    const aliases: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
+    if (!/^[a-z0-9]+$/i.test(dow)) return '' // lists/ranges → no simple description
+    const n = aliases[dow.toLowerCase()] ?? Number(dow)
+    if (!Number.isInteger(n) || n < 0 || n > 7) return ''
+    return names[n === 7 ? 0 : n]
+  }
   getDetectSpecToolTip(): string {
     return this.slaveNewForm.get('detectSpec')?.value == true
       ? 'If there is exactly one specification matching to the modbus data for this slave, ' +
@@ -406,6 +498,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     fg.get('name')!.setValue((slave.name ? slave.name : null) as string | null)
     fg.get('specificationid')!.setValue({ filename: slave.specificationid })
     fg.get('pollInterval')!.setValue(slave.pollInterval ? slave.pollInterval : 1000)
+    fg.get('pollSchedule')!.setValue(slave.pollSchedule ?? null)
+    fg.get('pollSchedulePreset')!.setValue(this.presetForSchedule(slave.pollSchedule))
     fg.get('pollMode')!.setValue(slave.pollMode == undefined ? PollModes.intervall : slave.pollMode)
     fg.get('qos')!.setValue(slave.qos ? slave.qos : -1)
     fg.get('noDiscovery')!.setValue(slave.noDiscovery ? slave.noDiscovery : false)
@@ -415,6 +509,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     else fg.get('discoverEntitiesList')!.enable()
     fg.get('httpPushUrl')!.setValue(slave.httpPush?.url ?? null)
     fg.get('httpPushPat')!.setValue(null) // never prefill the PAT into the form
+    fg.get('httpPushRoot')!.setValue(slave.httpPush?.root ?? null)
     fg.get('pushEntitiesList')!.setValue(slave.httpPush?.pushEntities ?? [])
   }
 
@@ -425,6 +520,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         specificationid: [defaultValue],
         name: [slave.name],
         pollInterval: [slave.pollInterval],
+        pollSchedule: [slave.pollSchedule, SelectSlaveComponent.cronFormatValidator],
+        pollSchedulePreset: [this.presetForSchedule(slave.pollSchedule)],
         pollMode: [slave.pollMode],
         qos: [slave.qos],
         rootTopic: [slave.rootTopic],
@@ -434,6 +531,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         discoverEntitiesList: [[]],
         httpPushUrl: [slave.httpPush?.url],
         httpPushPat: [null as string | null],
+        httpPushRoot: [slave.httpPush?.root],
         pushEntitiesList: [[] as number[]],
       })
       this.slave2Form(slave, fg)
@@ -542,11 +640,13 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   private applyHttpPush(uiSlave: IuiSlave) {
     const url: string | null = uiSlave.slaveForm.get('httpPushUrl')!.value
     const pat: string | null = uiSlave.slaveForm.get('httpPushPat')!.value
+    const root: string | null = uiSlave.slaveForm.get('httpPushRoot')!.value
     const pushEntities: number[] = uiSlave.slaveForm.get('pushEntitiesList')!.value ?? []
     if (url && url.length > 0) {
       // pat is only sent when newly entered; backend keeps the stored PAT otherwise.
       const httpPush: any = { url, pushEntities }
       if (pat && pat.length > 0) httpPush.pat = pat
+      if (root && root.length > 0) httpPush.root = root
       uiSlave.slave.httpPush = httpPush
     } else {
       delete uiSlave.slave.httpPush
@@ -557,6 +657,9 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       SelectSlaveComponent.form2SlaveSetValue(uiSlave, controller)
     })
     this.applyHttpPush(uiSlave)
+    // pollSchedule (cron) overrides pollInterval on the backend; store undefined when left empty.
+    const pollSchedule: string | null = uiSlave.slaveForm.get('pollSchedule')!.value
+    uiSlave.slave.pollSchedule = pollSchedule && pollSchedule.trim().length > 0 ? pollSchedule.trim() : undefined
     const spec: IidentificationSpecification = uiSlave.slaveForm.get('specificationid')!.value
     const selectedEntities: number[] = uiSlave.slaveForm.get('discoverEntitiesList')!.value
     if (spec && spec.filename) {

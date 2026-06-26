@@ -14,13 +14,22 @@ export class HttpPush {
     const httpPush = slave.getHttpPush()
     if (!slave.hasHttpPush() || !httpPush) return
     try {
+      const url = slave.getResolvedHttpPushUrl(spec.entities)
+      if (url == null) {
+        log.log(LogLevelEnum.warn, 'HTTP push skipped: URL placeholder not resolvable url: ' + httpPush.url)
+        return
+      }
       const body = slave.getHttpPushPayload(spec.entities)
+      if (body == null) {
+        log.log(LogLevelEnum.warn, 'HTTP push skipped: root path "' + httpPush.root + '" not found url: ' + httpPush.url)
+        return
+      }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (httpPush.patEnc && httpPush.patEnc.length > 0) {
         headers['Authorization'] = 'Bearer ' + decryptSecret(httpPush.patEnc)
       }
-      debug('HTTP push to ' + httpPush.url + ' body: ' + body)
-      const resp = await fetch(httpPush.url, { method: 'POST', headers, body })
+      debug('HTTP push to ' + url + ' body: ' + body)
+      const resp = await fetch(url, { method: 'POST', headers, body })
       if (!resp.ok) {
         log.log(LogLevelEnum.error, 'HTTP push failed: ' + resp.status + ' ' + resp.statusText + ' url: ' + httpPush.url)
       }
