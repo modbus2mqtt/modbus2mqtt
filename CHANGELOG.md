@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.4](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.3...modbus2mqtt-v0.25.4) (2026-06-26)
+
+
+### Bug Fixes
+
+* display specification documents (PDF) via blob URL ([#257](https://github.com/modbus2mqtt/modbus2mqtt/issues/257)) ([887f8d1](https://github.com/modbus2mqtt/modbus2mqtt/commit/887f8d16ffcc1153e98a4c135899887c539a3d2d))
+
 ## [0.25.3](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.2...modbus2mqtt-v0.25.3) (2026-06-17)
 
 
