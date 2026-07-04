@@ -25,6 +25,7 @@ import {
 import { getMessageString, messages2Text } from './specMessages.js'
 import { closeContribution, contribute, getSpecificationsFilesList } from './contribution.js'
 import { getNextCheck, ghContributions, msToTime, startPolling } from './contributionPoller.js'
+import { getEntityFromId, getMultiplier, getOffset, getPropertyFromVariable } from './entityAccessors.js'
 import { compareSpecifications, isEqualValue } from './specDiff.js'
 import { validateBaseSpecification, validateFiles, validateSpecification, validateUniqueName } from './specValidator.js'
 import { Observable } from 'rxjs'
@@ -145,22 +146,6 @@ export class M2mSpecification implements IspecificationValidator {
     if (!rc) return false
     return this.allNullDataMatch(spec.testdata.coils, values.coils)
   }
-  private getPropertyFromVariable(entityId: number, targetParameter: VariableTargetParameters): string | number | undefined {
-    const ent = (this.settings as ImodbusSpecification).entities.find(
-      (e) =>
-        e.variableConfiguration &&
-        e.variableConfiguration.targetParameter == targetParameter &&
-        e.variableConfiguration.entityId &&
-        e.variableConfiguration.entityId == entityId
-    )
-    if (ent) return ent.mqttValue
-    return undefined
-  }
-  private getEntityFromId(entityId: number): ImodbusEntity | undefined {
-    const ent = (this.settings as ImodbusSpecification).entities.find((e) => e.id == entityId)
-    if (!ent) return undefined
-    return ent
-  }
   static getFileUsage(url: string): SpecificationFileUsage {
     const name = url.toLowerCase()
     if (name.endsWith('.pdf')) return SpecificationFileUsage.documentation
@@ -169,35 +154,17 @@ export class M2mSpecification implements IspecificationValidator {
     return SpecificationFileUsage.documentation
   }
   getUom(entityId: number): string | undefined {
-    const rc = this.getPropertyFromVariable(entityId, VariableTargetParameters.entityUom)
+    const rc = getPropertyFromVariable((this.settings as ImodbusSpecification).entities, entityId, VariableTargetParameters.entityUom)
     if (rc) return rc as string | undefined
-    const ent = this.getEntityFromId(entityId)
-    if (!ent || !ent.converterParameters || !(ent.converterParameters as Inumber)!.uom) return undefined
-
-    return (ent.converterParameters as Inumber)!.uom
+    const ent = getEntityFromId((this.settings as ImodbusSpecification).entities, entityId)
+    if (!ent || !ent.converterParameters || !(ent.converterParameters as Inumber).uom) return undefined
+    return (ent.converterParameters as Inumber).uom
   }
   getMultiplier(entityId: number): number | undefined {
-    const rc = this.getPropertyFromVariable(entityId, VariableTargetParameters.entityMultiplier)
-    if (rc) return rc as number | undefined
-    const ent = this.getEntityFromId(entityId)
-    if (!ent || !ent.converterParameters || undefined == (ent.converterParameters as Inumber)!.multiplier) return undefined
-
-    return (ent.converterParameters as Inumber)!.multiplier
-  }
-  getDecimals(entityId: number): number | undefined {
-    //    let rc = this.getPropertyFromVariable(entityId, VariableTargetParameters.entityMultiplier)
-    //    if (rc) return rc as number | undefined
-    const ent = this.getEntityFromId(entityId)
-    if (!ent || !ent.converterParameters || undefined == (ent.converterParameters as Inumber)!.decimals) return undefined
-
-    return (ent.converterParameters as Inumber)!.decimals
+    return getMultiplier((this.settings as ImodbusSpecification).entities, entityId)
   }
   getOffset(entityId: number): number | undefined {
-    const rc = this.getPropertyFromVariable(entityId, VariableTargetParameters.entityOffset)
-    if (rc) return rc as number | undefined
-    const ent = this.getEntityFromId(entityId)
-    if (!ent || !ent.converterParameters || (ent.converterParameters as Inumber)!.offset == undefined) return undefined
-    return (ent.converterParameters as Inumber)!.offset
+    return getOffset((this.settings as ImodbusSpecification).entities, entityId)
   }
   isVariable(checkParameter: VariableTargetParameters): boolean {
     const ent = (this.settings as ImodbusSpecification).entities.find(
