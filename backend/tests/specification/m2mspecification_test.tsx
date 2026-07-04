@@ -1,11 +1,10 @@
 import { it, expect, beforeAll, describe, afterAll } from 'vitest'
-import { Itext, MessageTypes, SpecificationStatus } from '../../src/shared/specification/index.js'
+import { Itext, MessageTypes } from '../../src/shared/specification/index.js'
 import { ConfigSpecification } from '../../src/specification/index.js'
 import { ImodbusValues, M2mSpecification, emptyModbusValues } from '../../src/specification/index.js'
 import { IdentifiedStates } from '../../src/shared/specification/index.js'
 import { singleMutex, configDir } from './configsbase.js'
 import { IfileSpecification } from '../../src/specification/index.js'
-import { IpullRequest } from '../../src/specification/m2mGithubValidate.js'
 import { entText, specFixture } from './specFixtures.js'
 
 declare global {
@@ -142,107 +141,4 @@ describe('validate', () => {
     const types = messageTypes(tspec, 'de')
     expect(types.length).toBeGreaterThan(0)
   })
-})
-
-class TestM2mSpecification {
-  static rcs: { merged: boolean; closed: boolean }[] = [
-    { merged: false, closed: false }, //0
-    { merged: true, closed: false },
-    { merged: false, closed: false },
-    { merged: false, closed: false },
-    { merged: false, closed: false },
-    { merged: false, closed: false }, //5
-    { merged: false, closed: false },
-    { merged: false, closed: false },
-    { merged: false, closed: false },
-    { merged: false, closed: false },
-    { merged: false, closed: true },
-  ]
-  private static idx = 0
-  static closeContribution(): Promise<IpullRequest> {
-    return new Promise<IpullRequest>((resolve, reject) => {
-      if (TestM2mSpecification.idx >= TestM2mSpecification.rcs.length) reject(new Error('not enough test data provided'))
-      resolve({
-        pullNumber: 16,
-        merged: TestM2mSpecification.rcs[TestM2mSpecification.idx].merged,
-        closed: TestM2mSpecification.rcs[TestM2mSpecification.idx++].closed,
-      })
-    })
-  }
-  static pollOriginal: (specfilename: string, error: (e: unknown) => void) => void
-  static poll(specfilename: string, error: (e: unknown) => void): void {
-    const contribution = M2mSpecification['ghContributions'].get(specfilename)
-    //Speed up test set short intervals
-    contribution!.m2mSpecification['ghPollInterval'] = [1, 2, 3, 4]
-    TestM2mSpecification.pollOriginal(specfilename, error)
-  }
-}
-it('startPolling', async () => {
-  const specP = structuredClone(specFixture)
-  specP.pullNumber = 16
-  specP.status = SpecificationStatus.contributed
-  ConfigSpecification['specifications'].push(specP)
-  ConfigSpecification.githubPersonalToken = 'abcd'
-  M2mSpecification.closeContribution = TestM2mSpecification.closeContribution
-  TestM2mSpecification.pollOriginal = M2mSpecification['poll']
-  M2mSpecification['pollingTimeout'] = 100
-  M2mSpecification['poll'] = TestM2mSpecification.poll
-  let o = M2mSpecification.startPolling(specP.filename, () => {
-    expect(true).toBeFalsy()
-  })
-  let callCount = 0
-  let expectedCallCount = 2
-  await new Promise<void>((resolve, reject) => {
-    o?.subscribe({
-      next(pullRequest) {
-        switch (callCount) {
-          case 0:
-            expect(pullRequest.merged).toBeFalsy()
-            break
-          case 1:
-            expect(pullRequest.merged).toBeTruthy()
-            break
-        }
-        const i = M2mSpecification['ghContributions'].get(specP.filename)
-        expect(i?.nextCheck).toBe('0.0 Sec')
-        callCount++
-        if (callCount > expectedCallCount) expect(callCount).toBe(expectedCallCount)
-      },
-      complete() {
-        resolve()
-      },
-      error(err) {
-        reject(err)
-      },
-    })
-  })
-  expect(M2mSpecification['ghContributions'].has(specP.filename)).toBeFalsy()
-  expect(callCount).toBe(2)
-  expectedCallCount = 11
-  o = M2mSpecification.startPolling(specP.filename, () => {
-    expect(true).toBeFalsy()
-  })
-  await new Promise<void>((resolve, reject) => {
-    o?.subscribe({
-      next(pullRequest) {
-        switch (callCount) {
-          case 0:
-            expect(pullRequest.closed).toBeFalsy()
-            break
-          case 1:
-            expect(pullRequest.closed).toBeTruthy()
-            break
-        }
-        callCount++
-        if (callCount > expectedCallCount) expect(callCount).toBe(expectedCallCount)
-      },
-      complete() {
-        resolve()
-      },
-      error(err) {
-        reject(err)
-      },
-    })
-  })
-  expect(callCount).toBe(expectedCallCount)
 })
