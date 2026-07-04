@@ -1,7 +1,7 @@
 import { expect, it, describe, beforeAll, afterAll, afterEach } from 'vitest'
 import { Config } from '../../src/server/config.js'
 import { ConfigPersistence } from '../../src/server/persistence/configPersistence.js'
-import { HttpServerBase } from '../../src/server/httpServerBase.js'
+import { HttpServerBase } from '../../src/server/http/httpServerBase.js'
 import { setConfigsDirsForTest } from './configsbase.js'
 import { getAvailablePort, TempConfigDirHelper } from './testhelper.js'
 import * as fs from 'fs'

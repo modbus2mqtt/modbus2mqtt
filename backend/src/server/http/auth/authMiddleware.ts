@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express'
 import { AddressInfo } from 'net'
-import { LogLevelEnum, Logger } from '../../specification/index.js'
-import { apiUri } from '../../shared/server/index.js'
-import { MqttSubscriptions } from '../mqttsubscriptions.js'
+import { LogLevelEnum, Logger } from '../../../specification/index.js'
+import { apiUri } from '../../../shared/server/index.js'
+import { MqttSubscriptions } from '../../mqttsubscriptions.js'
 import type { AuthSession, OidcConfig } from './oidc.js'
 
 const log = new Logger('authMiddleware')

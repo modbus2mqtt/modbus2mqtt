@@ -1,6 +1,6 @@
 import { Config } from './config.js'
 import { ConfigPersistence } from './persistence/configPersistence.js'
-import { HttpServer } from './httpserver.js'
+import { HttpServer } from './http/httpServer.js'
 import { Bus } from './bus.js'
 import { Command } from 'commander'
 import { LogLevelEnum, Logger, M2mGitHub, M2mSpecification } from '../specification/index.js'

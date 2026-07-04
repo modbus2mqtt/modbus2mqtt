@@ -3,11 +3,11 @@ import * as http from 'http'
 import os from 'os'
 import { Request as ExpressRequest } from 'express'
 import * as express from 'express'
-import { ConverterMap, filesUrlPrefix, M2mGitHub } from '../specification/index.js'
-import { Config } from './config.js'
+import { ConverterMap, filesUrlPrefix, M2mGitHub } from '../../specification/index.js'
+import { Config } from '../config.js'
 import type { AuthSession } from './auth/oidc.js'
-import { ConfigPersistence } from './persistence/configPersistence.js'
-import { Modbus } from './modbus.js'
+import { ConfigPersistence } from '../persistence/configPersistence.js'
+import { Modbus } from '../modbus.js'
 import {
   ImodbusSpecification,
   HttpErrorsEnum,
@@ -15,23 +15,23 @@ import {
   IspecificationSummary,
   SpecificationStatus,
   IimportMessages,
-} from '../shared/specification/index.js'
+} from '../../shared/specification/index.js'
 import { join } from 'path'
-import { Bus } from './bus.js'
+import { Bus } from '../bus.js'
 import { Subject } from 'rxjs'
 import * as fs from 'fs'
-import { LogLevelEnum, Logger } from '../specification/index.js'
+import { LogLevelEnum, Logger } from '../../specification/index.js'
 
 //import { TranslationServiceClient } from '@google-cloud/translate'
-import { M2mSpecification as M2mSpecification } from '../specification/index.js'
-import { IUserAuthenticationStatus, IBus, Islave, apiUri, PollModes, ModbusTasks } from '../shared/server/index.js'
-import { ConfigSpecification } from '../specification/index.js'
+import { M2mSpecification as M2mSpecification } from '../../specification/index.js'
+import { IUserAuthenticationStatus, IBus, Islave, apiUri, PollModes, ModbusTasks } from '../../shared/server/index.js'
+import { ConfigSpecification } from '../../specification/index.js'
 import { HttpServerBase } from './httpServerBase.js'
 import { Writable } from 'stream'
-import { ConfigBus } from './configbus.js'
-import { MqttConnector } from './mqttconnector.js'
-import { MqttDiscover } from './mqttdiscover.js'
-import { MqttSubscriptions } from './mqttsubscriptions.js'
+import { ConfigBus } from '../configbus.js'
+import { MqttConnector } from '../mqttconnector.js'
+import { MqttDiscover } from '../mqttdiscover.js'
+import { MqttSubscriptions } from '../mqttsubscriptions.js'
 const debug = Debug('httpserver')
 const log = new Logger('httpserver')
 // import cors from 'cors';
