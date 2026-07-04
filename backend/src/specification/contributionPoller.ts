@@ -84,8 +84,19 @@ export function stopAllPolling(): void {
 function poll(specfilename: string, error: (e: unknown) => void): void {
   const contribution = ghContributions.get(specfilename)
   const spec = contribution?.spec as IfileSpecification
-  if (ConfigSpecification.githubPersonalToken == undefined || spec.status != SpecificationStatus.contributed || spec.pullNumber == undefined)
+  if (
+    ConfigSpecification.githubPersonalToken == undefined ||
+    spec.status != SpecificationStatus.contributed ||
+    spec.pullNumber == undefined
+  ) {
+    // polling can never succeed anymore: stop the interval instead of ticking forever
+    if (contribution) {
+      if (contribution.interval) clearInterval(contribution.interval)
+      ghContributions.delete(specfilename)
+      contribution.monitor.complete()
+    }
     return
+  }
 
   if (contribution == undefined) {
     const msg = 'Unexpected undefined contribution'

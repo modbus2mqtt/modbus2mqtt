@@ -88,7 +88,19 @@ describe('startPolling', () => {
     expect(results.length).toBe(1)
   })
 
-  it('persistent closeContribution errors keep the interval alive (pinned leak, fixed later)', async () => {
+  it('stops polling and completes when the token disappears', async () => {
+    storeContributedSpec('poll-j', 11)
+    const close = vi.spyOn(M2mSpecification, 'closeContribution').mockResolvedValue(openPr(11))
+    let completed = false
+    M2mSpecification.startPolling('poll-j', () => {})!.subscribe({ complete: () => (completed = true) })
+    ConfigSpecification.githubPersonalToken = undefined as unknown as string
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(contributions().has('poll-j')).toBeFalsy()
+    expect(completed).toBeTruthy()
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('persistent closeContribution errors keep retrying (transient failures should recover)', async () => {
     storeContributedSpec('poll-f', 7)
     const close = vi.spyOn(M2mSpecification, 'closeContribution').mockRejectedValue(new Error('network down'))
     const errors: unknown[] = []
