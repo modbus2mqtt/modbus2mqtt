@@ -68,10 +68,9 @@ describe('getMessageString', () => {
     expect(M2mSpecification.getMessageString(spec, msg(type, { additionalInformation: 'extra info' }))).toBe(text + ' extra info')
   })
 
-  it('localized message WITHOUT referencedEntity/additionalInformation returns compatibility warning instead of the text', () => {
-    // BUG (fixed in Phase B): should return the message text itself
+  it('localized message WITHOUT referencedEntity/additionalInformation returns the message text', () => {
     expect(M2mSpecification.getMessageString(spec, msg(MessageTypes.noMqttDiscoveryLanguage))).toBe(
-      ' This will break compatibilty with previous version'
+      'MQTT Discovery Langauge is not configured'
     )
   })
 

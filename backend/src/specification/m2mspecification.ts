@@ -41,6 +41,7 @@ import {
   fileToModbusSpecification,
   setIdentifiedByEntities,
 } from './modbusValues.js'
+import { getMessageString, messages2Text } from './specMessages.js'
 import { Observable, Subject } from 'rxjs'
 import { IpullRequest } from './m2mGithubValidate.js'
 
@@ -77,11 +78,7 @@ export class M2mSpecification implements IspecificationValidator {
     }
   }
   static messages2Text(spec: IbaseSpecification, msgs: Imessage[]): string {
-    let errors: string = ''
-    msgs.forEach((msg) => {
-      if (msg.type != MessageTypes.identifiedByOthers) errors += M2mSpecification.getMessageString(spec, msg) + '\n'
-    })
-    return errors
+    return messages2Text(spec, msgs)
   }
   async contribute(note: string | undefined): Promise<number> {
     const language = ConfigSpecification.mqttdiscoverylanguage
@@ -187,98 +184,7 @@ export class M2mSpecification implements IspecificationValidator {
     return rcmessage
   }
   static getMessageString(spec: IbaseSpecification, message: Imessage): string {
-    switch (message.type) {
-      case MessageTypes.noDocumentation:
-        return `No documenation file or URL`
-      case MessageTypes.nameTextMissing:
-        return `The specification has no Name`
-      case MessageTypes.entityTextMissing:
-        return `entity has no name`
-      case MessageTypes.translationMissing: {
-        const info = message.additionalInformation
-        const text = Array.isArray(info) ? info.join(', ') : (info ?? '')
-        return `A translation is missing: ` + text
-      }
-      case MessageTypes.noEntity:
-        return `No entity defined for this specification`
-      // duplicate removed: MessageTypes.noDocumentation handled above
-      case MessageTypes.noImage:
-        return `No image file or URL`
-      case MessageTypes.nonUniqueName:
-        return `Specification name is not unique`
-      case MessageTypes.identifiedByOthers: {
-        const info = message.additionalInformation
-        const names = Array.isArray(info) ? info : []
-        const specNames = names.join(' ')
-        return `Test data of this specification matches to the following other public specifications ${specNames}`
-      }
-      // duplicate removed: MessageTypes.nonUniqueName handled above
-      case MessageTypes.notIdentified:
-        return ` The specification can not be identified with it's test data`
-      case MessageTypes.differentFilename:
-        return M2mSpecification.getMessageLocal(
-          spec,
-          message,
-          'Filename has been changed. A new public specification will be created'
-        )
-      case MessageTypes.missingEntity:
-        return M2mSpecification.getMessageLocal(spec, message, 'Entity has been removed')
-      case MessageTypes.differentConverter:
-        return M2mSpecification.getMessageLocal(spec, message, 'Converter has been changed')
-      case MessageTypes.addedEntity:
-        return M2mSpecification.getMessageLocal(spec, message, 'Entity has been added')
-      case MessageTypes.differentModbusAddress:
-        return M2mSpecification.getMessageLocal(spec, message, 'Modbus address has been changed')
-      case MessageTypes.differentFunctionCode:
-        return M2mSpecification.getMessageLocal(spec, message, 'Function code has been changed')
-      case MessageTypes.differentIcon:
-        return M2mSpecification.getMessageLocal(spec, message, 'Icon has been changed')
-      case MessageTypes.differentTargetParameter:
-        return M2mSpecification.getMessageLocal(spec, message, 'Variable configuration: Target parameter has been changed')
-      case MessageTypes.differentVariableEntityId:
-        return M2mSpecification.getMessageLocal(spec, message, 'Variable configuration: Referenced entity has been changed')
-      case MessageTypes.differentVariableConfiguration:
-        return M2mSpecification.getMessageLocal(spec, message, 'Variable configuration has been changed')
-      case MessageTypes.differentDeviceClass:
-        return M2mSpecification.getMessageLocal(spec, message, 'Device class has been changed')
-      case MessageTypes.differentIdentificationMax:
-        return M2mSpecification.getMessageLocal(spec, message, 'Max value has been changed')
-      case MessageTypes.differentIdentificationMin:
-        return M2mSpecification.getMessageLocal(spec, message, 'Min value has been changed')
-      case MessageTypes.differentIdentification:
-        return M2mSpecification.getMessageLocal(spec, message, 'Identification has been changed')
-      case MessageTypes.differentMultiplier:
-        return M2mSpecification.getMessageLocal(spec, message, 'Multiplier has been changed')
-      case MessageTypes.differentOffset:
-        return M2mSpecification.getMessageLocal(spec, message, 'Offset has been changed')
-      case MessageTypes.differentOptionTable:
-        return M2mSpecification.getMessageLocal(spec, message, 'Options have been changed')
-      case MessageTypes.differentStringlength:
-        return M2mSpecification.getMessageLocal(spec, message, 'String length has been changed')
-      case MessageTypes.differentManufacturer:
-        return M2mSpecification.getMessageLocal(spec, message, 'Manufacturer has been changed')
-      case MessageTypes.differentModel:
-        return M2mSpecification.getMessageLocal(spec, message, 'Model has been changed')
-      case MessageTypes.differentTranslation:
-        return M2mSpecification.getMessageLocal(spec, message, 'Translation has been changed')
-
-      case MessageTypes.noMqttDiscoveryLanguage:
-        return M2mSpecification.getMessageLocal(spec, message, 'MQTT Discovery Langauge is not configured')
-    }
-    return 'unknown MessageType : ' + message.type
-  }
-  private static getMessageLocal(
-    spec: IbaseSpecification,
-    message: Imessage,
-    messageText: string,
-    notBackwardCompatible?: boolean
-  ): string {
-    const msg = structuredClone(messageText)
-    if (message.referencedEntity != undefined)
-      return msg + ' ' + getSpecificationI18nEntityName(spec as IbaseSpecification, 'en', message.referencedEntity)
-    if (message.additionalInformation != undefined) return msg + ' ' + message.additionalInformation
-    if (!notBackwardCompatible) return ' This will break compatibilty with previous version'
-    return msg
+    return getMessageString(spec, message)
   }
   private static throwCloseContributionError(msg: string): never {
     log.log(LogLevelEnum.error, msg)
