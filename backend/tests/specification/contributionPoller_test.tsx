@@ -1,17 +1,12 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { SpecificationStatus } from '../../src/shared/specification/index.js'
 import { ConfigSpecification, IfileSpecification, M2mSpecification } from '../../src/specification/index.js'
+import { ghContributions, stopAllPolling } from '../../src/specification/contributionPoller.js'
 import { IpullRequest } from '../../src/specification/m2mGithubValidate.js'
 import { configDir } from './configsbase.js'
 import { specFixture } from './specFixtures.js'
 
-interface IcontributionInternal {
-  interval?: NodeJS.Timeout
-  nextCheck?: string
-  pollCount: number
-}
-
-const contributions = () => M2mSpecification['ghContributions'] as Map<string, IcontributionInternal>
+const contributions = () => ghContributions
 
 function storeContributedSpec(filename: string, pullNumber?: number): IfileSpecification {
   const s = structuredClone(specFixture)
@@ -38,11 +33,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  contributions().forEach((c) => {
-    if (c.interval) clearInterval(c.interval)
-  })
-  contributions().clear()
-  M2mSpecification['inCloseContribution'] = false
+  stopAllPolling()
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
@@ -127,13 +118,13 @@ describe('startPolling', () => {
     const spec = storeContributedSpec('poll-i', 10)
     vi.spyOn(M2mSpecification, 'closeContribution').mockResolvedValue(openPr(10))
     M2mSpecification.startPolling('poll-i', () => {})
-    const contribution = contributions().get('poll-i') as unknown as { m2mSpecification: M2mSpecification }
+    const contribution = contributions().get('poll-i')!
     // shorten the escalation thresholds so rounds wrap quickly (same trick as the old test)
-    contribution.m2mSpecification['ghPollInterval'] = [100, 200, 300]
-    expect(contribution.m2mSpecification['ghPollIntervalIndex']).toBe(0)
+    contribution.pollIntervals = [100, 200, 300]
+    expect(contribution.pollIntervalIndex).toBe(0)
     // threshold interval[0]/100 = 1 -> every other tick is a closeContribution round
     for (let i = 0; i < 25; i++) await vi.advanceTimersByTimeAsync(15000)
-    expect(contribution.m2mSpecification['ghPollIntervalIndex']).toBeGreaterThan(0)
+    expect(contribution.pollIntervalIndex).toBeGreaterThan(0)
     expect(spec.status).toBe(SpecificationStatus.contributed)
   })
 })

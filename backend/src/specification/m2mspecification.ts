@@ -1,5 +1,4 @@
 import { IspecificationValidator, IvalidateIdentificationResult } from './ispecificationvalidator.js'
-import Debug from 'debug'
 import { Idata, IfileSpecification } from './ifilespecification.js'
 import { Imessage, VariableTargetParameters } from '../shared/specification/index.js'
 import {
@@ -25,28 +24,16 @@ import {
 } from './modbusValues.js'
 import { getMessageString, messages2Text } from './specMessages.js'
 import { closeContribution, contribute, getSpecificationsFilesList } from './contribution.js'
+import { getNextCheck, ghContributions, msToTime, startPolling } from './contributionPoller.js'
 import { compareSpecifications, isEqualValue } from './specDiff.js'
 import { validateBaseSpecification, validateFiles, validateSpecification, validateUniqueName } from './specValidator.js'
-import { Observable, Subject } from 'rxjs'
+import { Observable } from 'rxjs'
 import { IpullRequest } from './m2mGithubValidate.js'
 
 const log = new Logger('m2mSpecification')
-const debug = Debug('m2mspecification')
-interface Icontribution {
-  pullRequest: number
-  monitor: Subject<IpullRequest>
-  pollCount: number
-  interval?: NodeJS.Timeout
-  m2mSpecification: M2mSpecification
-  nextCheck?: string
-}
 export class M2mSpecification implements IspecificationValidator {
   private differentFilename = false
   private notBackwardCompatible = false
-  private ghPollInterval: number[] = [5000, 30000, 30000, 60000, 60000, 60000, 5000 * 60, 5000 * 60 * 60, 1000 * 60 * 60 * 24]
-  private ghPollIntervalIndex: number = 0
-  private ghPollIntervalIndexCount: number = 0
-  private static ghContributions = new Map<string, Icontribution>()
 
   constructor(private settings: Ispecification | ImodbusEntity[]) {
     {
@@ -237,108 +224,16 @@ export class M2mSpecification implements IspecificationValidator {
     if (idx >= 0) return filename.substring(idx + 1)
     return filename
   }
-  private static pollingTimeout = 15 * 1000
+  /** kept as static alias so tests and routes can keep using M2mSpecification['ghContributions'] */
+  private static ghContributions = ghContributions
+
   static startPolling(specfilename: string, error: (e: unknown) => void): Observable<IpullRequest> | undefined {
-    debug('startPolling')
-    const spec = ConfigSpecification.getSpecificationByFilename(specfilename)
-    const contribution = M2mSpecification.ghContributions.get(specfilename)
-    if (contribution == undefined && spec && spec.pullNumber) {
-      log.log(LogLevelEnum.info, 'startPolling for pull Number ' + spec.pullNumber)
-      const mspec = new M2mSpecification(spec as Ispecification)
-      const c: Icontribution = {
-        pullRequest: spec.pullNumber,
-        monitor: new Subject<IpullRequest>(),
-        pollCount: 0,
-        m2mSpecification: mspec,
-        interval: setInterval(() => {
-          M2mSpecification.poll(spec!.filename, error)
-        }, M2mSpecification.pollingTimeout),
-      }
-      M2mSpecification.ghContributions.set(spec.filename, c)
-      return c.monitor
-    }
-    return undefined
+    return startPolling(specfilename, error)
   }
   static getNextCheck(specfilename: string): string {
-    const c = M2mSpecification.ghContributions.get(specfilename)
-    if (c && c.nextCheck) return c.nextCheck
-    return ''
+    return getNextCheck(specfilename)
   }
-  static triggerPoll(specfilename: string): void {
-    const c = M2mSpecification.ghContributions.get(specfilename)
-    if (c && c.m2mSpecification) {
-      c.pollCount = 0
-      c.m2mSpecification.ghPollIntervalIndexCount = 0
-    }
-  }
-  static msToTime(ms: number) {
-    const seconds: number = ms / 1000
-    const minutes: number = ms / (1000 * 60)
-    const hours: number = ms / (1000 * 60 * 60)
-    const days: number = ms / (1000 * 60 * 60 * 24)
-    if (seconds < 60) return seconds.toFixed(1) + ' Sec'
-    else if (minutes < 60) return minutes.toFixed(1) + ' Min'
-    else if (hours < 24) return hours.toFixed(1) + ' Hrs'
-    else return days.toFixed(1) + ' Days'
-  }
-
-  private static inCloseContribution: boolean = false
-  private static poll(specfilename: string, error: (e: unknown) => void) {
-    const contribution = M2mSpecification.ghContributions.get(specfilename)
-    const spec = contribution?.m2mSpecification.settings as IfileSpecification
-    if (
-      ConfigSpecification.githubPersonalToken == undefined ||
-      spec.status != SpecificationStatus.contributed ||
-      spec.pullNumber == undefined
-    )
-      return
-
-    if (contribution == undefined) {
-      const msg = 'Unexpected undefined contribution'
-      log.log(LogLevelEnum.error, msg)
-      error(new Error(msg))
-    } else {
-      if (
-        contribution.pollCount >
-        contribution.m2mSpecification.ghPollInterval[contribution.m2mSpecification.ghPollIntervalIndex] / 100
-      )
-        contribution.pollCount = 0
-      else {
-        const interval = contribution.m2mSpecification.ghPollInterval[contribution.m2mSpecification.ghPollIntervalIndex] / 100
-        const nextCheckTotalMs = (interval - contribution.pollCount) * 100
-        contribution.nextCheck = M2mSpecification.msToTime(nextCheckTotalMs)
-      }
-      if (contribution.pollCount == 0) {
-        // Set ghPollIntervalIndex (Intervall duration)
-        // 10 * every 5 second, 10 * every 5 minutes, 10 * every 5 hours, then once a day
-        if (
-          contribution.m2mSpecification.ghPollIntervalIndexCount++ >= 10 &&
-          contribution.m2mSpecification.ghPollIntervalIndex < contribution.m2mSpecification.ghPollInterval.length - 1
-        ) {
-          contribution.m2mSpecification.ghPollIntervalIndex++
-          contribution.m2mSpecification.ghPollIntervalIndexCount = 0
-        }
-        if (!M2mSpecification.inCloseContribution) {
-          M2mSpecification.inCloseContribution = true
-          M2mSpecification.closeContribution(spec)
-            .then((pullStatus) => {
-              debug('contribution closed for pull Number ' + spec.pullNumber)
-              if (contribution) {
-                contribution.monitor.next(pullStatus)
-                if (pullStatus.closed || pullStatus.merged) {
-                  clearInterval(contribution.interval)
-                  M2mSpecification.ghContributions.delete(spec.filename)
-                  contribution.monitor.complete()
-                }
-              }
-            })
-            .catch(error)
-            .finally(() => {
-              M2mSpecification.inCloseContribution = false
-            })
-        }
-      }
-      contribution.pollCount++
-    }
+  static msToTime(ms: number): string {
+    return msToTime(ms)
   }
 }
