@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.6](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.5...modbus2mqtt-v0.25.6) (2026-07-04)
+
+
+### Refactoring
+
+* decompose m2mspecification.ts into single-concern modules ([#262](https://github.com/modbus2mqtt/modbus2mqtt/issues/262)) ([22e35a1](https://github.com/modbus2mqtt/modbus2mqtt/commit/22e35a1eb542ba1c6143e0058b29d7c8e795aa3b))
+
 ## [0.25.5](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.4...modbus2mqtt-v0.25.5) (2026-07-04)
 
 
