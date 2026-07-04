@@ -3,7 +3,7 @@ import { apiUri, IUserAuthenticationStatus } from '../../src/shared/server/index
 import { Converters, HttpErrorsEnum } from '../../src/shared/specification/index.js'
 import { Config } from '../../src/server/config.js'
 import { ConfigPersistence } from '../../src/server/persistence/configPersistence.js'
-import { createTestServer, TestServer } from './httpTestHelper.js'
+import { createTestServer, rawText, TestServer } from './httpTestHelper.js'
 
 let ts: TestServer
 beforeAll(async () => {
@@ -109,7 +109,7 @@ describe('POST ' + apiUri.validateMqtt, () => {
 })
 
 test('POST ' + apiUri.translate + ' is not implemented', async () => {
-  await ts.request().post(apiUri.translate).send({ contents: ['test'] }).expect(HttpErrorsEnum.ErrNotAcceptable)
+  await ts.request().post(apiUri.translate).send({ contents: ['test'] }).parse(rawText).expect(HttpErrorsEnum.ErrNotAcceptable)
 })
 
 test('GET ' + apiUri.serialDevices + ' returns a device list', async () => {

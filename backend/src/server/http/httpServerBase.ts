@@ -1,21 +1,19 @@
 import Debug from 'debug'
 import * as http from 'http'
 import * as https from 'https'
-import { Application, NextFunction, Request } from 'express'
-import type { ParamsDictionary } from 'express-serve-static-core'
-import type { ParsedQs } from 'qs'
+import { Application, Request } from 'express'
 import express from 'express'
 import { Config } from '../config.js'
 import { HttpErrorsEnum } from '../../shared/specification/index.js'
-import { join, basename } from 'path'
-import { parse } from 'node-html-parser'
-import * as fs from 'fs'
 import { LogLevelEnum, Logger } from '../../specification/index.js'
 
 import { apiUri } from '../../shared/server/index.js'
 import { ConfigPersistence } from '../persistence/configPersistence.js'
 import { createAuthMiddleware } from './auth/authMiddleware.js'
 import { initOidc, registerOidcRoutes, setupSession, type OidcConfig } from './auth/oidc.js'
+import { sendResult } from './sendResult.js'
+import { AngularStatics } from './angularStatics.js'
+import { corsMiddleware } from './corsMiddleware.js'
 
 interface IAddonInfo {
   slug: string
@@ -29,20 +27,17 @@ interface IAddonInfo {
 const debug = Debug('HttpServerBase')
 const debugUrl = Debug('HttpServerBaseUrl')
 const log = new Logger('HttpServerBase')
-// import cors from 'cors';
-//import { IfileSpecification } from './ispecification.js';
 
 export class HttpServerBase {
   protected app: Application
-  languages = ['en']
   server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse>
   httpsServer?: https.Server
   protected oidcConfig: OidcConfig | null = null
+  private angularStatics: AngularStatics
   constructor(private angulardir: string = '.') {
     this.app = express()
+    this.angularStatics = new AngularStatics(angulardir)
   }
-  private statics = new Map<string, string>()
-  private ingressUrl: string = '/'
   /** Node-level request listener; lets tests (supertest) drive the server without framework internals */
   get requestListener(): http.RequestListener {
     return this.app
@@ -54,20 +49,7 @@ export class HttpServerBase {
     message: unknown,
     object: unknown = undefined
   ) {
-    debugUrl('end: ' + req.path)
-    if (code >= 299) {
-      log.log(LogLevelEnum.error, '%s: Http Result: %d %s', req.url, code, message)
-    } else debug(req.url + ' :' + HttpErrorsEnum[code])
-    if (object != undefined) debug('Info: ' + object)
-    try {
-      res.statusCode = code
-      res.end(message)
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        log.log(LogLevelEnum.error, e.message)
-      }
-      JSON.stringify(e)
-    }
+    sendResult(req, res, code, message, object)
   }
   listen(listenFunction: () => void) {
     const config = Config.getConfiguration()
@@ -113,70 +95,6 @@ export class HttpServerBase {
     if (this.httpsServer) this.httpsServer.close()
     if (this.server) this.server.close()
   }
-  private getDirectoryForLanguage(req: Request): string {
-    let lang = req.acceptsLanguages(['en'])
-    if (!lang) lang = 'en'
-    return this.statics.get(lang)!
-  }
-
-  private initStatics() {
-    fs.readdirSync(this.angulardir).forEach((langDir) => {
-      const lang = langDir.replace(/-.*/g, '')
-      const dir = langDir
-      this.statics.set(lang, dir)
-    })
-    if (this.statics.size > 0) this.languages = Array.from(this.statics.keys())
-  }
-  get<
-    P extends ParamsDictionary = ParamsDictionary,
-    ResBody = unknown,
-    ReqBody = unknown,
-    ReqQuery extends ParsedQs = ParsedQs,
-    Locals extends Record<string, unknown> = Record<string, unknown>,
-  >(
-    url: apiUri,
-    func: (req: express.Request<P, ResBody, ReqBody, ReqQuery, Locals>, response: express.Response<ResBody, Locals>) => void
-  ): void {
-    debugUrl('start get' + url)
-    this.app.get<P, ResBody, ReqBody, ReqQuery, Locals>(url, (req, response) => {
-      debug(req.method + ': ' + req.originalUrl)
-      func(req, response)
-    })
-  }
-  post<
-    P extends ParamsDictionary = ParamsDictionary,
-    ResBody = unknown,
-    ReqBody = unknown,
-    ReqQuery extends ParsedQs = ParsedQs,
-    Locals extends Record<string, unknown> = Record<string, unknown>,
-  >(
-    url: apiUri,
-    func: (req: express.Request<P, ResBody, ReqBody, ReqQuery, Locals>, response: express.Response<ResBody, Locals>) => void
-  ): void {
-    debugUrl('start post' + url)
-    this.app.post<P, ResBody, ReqBody, ReqQuery, Locals>(url, (req, response) => {
-      debug(req.method + ': ' + req.originalUrl)
-      func(req, response)
-    })
-  }
-  delete<
-    P extends ParamsDictionary = ParamsDictionary,
-    ResBody = unknown,
-    ReqBody = unknown,
-    ReqQuery extends ParsedQs = ParsedQs,
-    Locals extends Record<string, unknown> = Record<string, unknown>,
-  >(
-    url: apiUri,
-    func: (req: express.Request<P, ResBody, ReqBody, ReqQuery, Locals>, response: express.Response<ResBody, Locals>) => void
-  ): void {
-    debugUrl('start delete' + url)
-    this.app.delete<P, ResBody, ReqBody, ReqQuery, Locals>(url, (req, response) => {
-      debug(req.method + ': ' + req.originalUrl)
-      func(req, response)
-    })
-  }
-  validate() {}
-
   initApp() {}
   init(): Promise<void> {
     return initOidc().then(
@@ -187,9 +105,9 @@ export class HttpServerBase {
             Config.executeHassioGetRequest<{ data: IAddonInfo }>(
               '/addons/self/info',
               (info) => {
-                this.ingressUrl = info.data.ingress_entry
+                this.angularStatics.setIngressUrl(info.data.ingress_entry)
                 const port = Config.getConfiguration().httpport
-                log.log(LogLevelEnum.info, 'Hassio authentication prefix:' + this.ingressUrl + ' modbus2mqtt: ' + port)
+                log.log(LogLevelEnum.info, 'Hassio authentication prefix:' + info.data.ingress_entry + ' modbus2mqtt: ' + port)
                 this.initBase()
                 resolve()
               },
@@ -207,90 +125,16 @@ export class HttpServerBase {
         })
     )
   }
-  private compareIngressUrl(req: Request) {
-    const h = req.header('X-Ingress-Path')
-    if (h && h != this.ingressUrl) {
-      log.log(LogLevelEnum.error, 'Invalid X-Ingress-Path in header expected: ' + this.ingressUrl + 'got: ' + h)
-    }
-  }
-
-  private sendIndexFile(req: Request, res: express.Response) {
-    this.compareIngressUrl(req)
-    if (req.url.endsWith('.js')) {
-      log.log(LogLevelEnum.info, 'sendIndexfile is serving js file directly: ' + req.url)
-    }
-    const dir = this.getDirectoryForLanguage(req)
-    const file = join(this.angulardir, dir, 'index.html')
-    let content = fs.readFileSync(file).toString()
-    const htmlDom = parse(content.toString())
-    if (this.ingressUrl && content && htmlDom) {
-      const base = htmlDom.querySelector('base')
-      base?.setAttribute('href', join('/', this.ingressUrl, '/'))
-      content = htmlDom.toString()
-      res.status(200).setHeader('Content-Type', 'text/html').send(htmlDom.toString())
-    } else res.status(401).setHeader('Content-Type', 'text/html').send('Invalid index.html file ')
-  }
-
-  /*
-   * All angular files are language specific.
-   * This method checks if the url is available in a language dependant angular directory
-   * E.g. "/en-US/index.html". In this case it returns the files
-   * If it's the index file, the base href will be replaced
-   */
-  private processStaticAngularFiles(req: Request, res: express.Response, next: NextFunction) {
-    try {
-      const dir = this.getDirectoryForLanguage(req)
-      if (dir) {
-        res.removeHeader('Content-Type')
-        const file = join(this.angulardir, dir, req.url)
-        if (fs.existsSync(file) && !fs.lstatSync(file).isDirectory()) {
-          if (req.url.indexOf('index.html') >= 0) {
-            this.sendIndexFile(req, res)
-            return
-          } else {
-            res.contentType(basename(req.url))
-            const content = fs.readFileSync(file)
-            log.log(LogLevelEnum.info, 'url' + req.url + ' ct:' + res.getHeader('Content-Type'))
-            res.setHeader('Content-Length', content.byteLength)
-            res.status(200)
-            res.send(content)
-            return
-          }
-        }
-      }
-      next()
-      return
-    } catch {
-      res.status(401).setHeader('Content-Type', 'text/html').send('No or invalid index.html file ')
-    }
-  }
 
   processAll(req: Request, res: express.Response) {
-    this.sendIndexFile(req, res)
+    this.angularStatics.sendIndexFile(req, res)
   }
   initBase() {
-    this.initStatics()
+    this.angularStatics.init()
 
-    //this.app.use(cors);
     this.app.use(express.json({ limit: '50mb' }))
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }))
-    this.app.use(function (req: Request, res: http.ServerResponse, next: NextFunction) {
-      //            res.setHeader('charset', 'utf-8')
-      debug('Authenticate')
-      // Echo the request Origin instead of '*': a wildcard origin is rejected by
-      // browsers when Access-Control-Allow-Credentials is 'true' (OIDC sends the
-      // session cookie via withCredentials), which surfaces as a CORS error.
-      const origin = req.headers.origin
-      res.setHeader('Access-Control-Allow-Methods', 'POST, PUT, OPTIONS, DELETE, GET')
-      res.setHeader('Access-Control-Allow-Origin', origin || '*')
-      res.setHeader('Vary', 'Origin')
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Origin, X-Requested-With, Content-Type, X-Accel-Buffering, Accept,Connection,Cache-Control,x-access-token'
-      )
-      res.setHeader('Access-Control-Allow-Credentials', 'true')
-      next()
-    })
+    this.app.use(corsMiddleware)
     // Session + OIDC routes (only active if OIDC is configured)
     if (this.oidcConfig) {
       setupSession(this.app)
@@ -298,7 +142,7 @@ export class HttpServerBase {
     }
     // angular files have full path including language e.G. /en-US/polyfill.js
     this.app.use(createAuthMiddleware(this.oidcConfig))
-    this.app.use(this.processStaticAngularFiles.bind(this))
+    this.app.use(this.angularStatics.middleware())
     this.app.use(express.static(this.angulardir))
     this.app.get('/', (req: Request, res: express.Response) => {
       res.redirect('index.html')
