@@ -13,7 +13,8 @@
     "test:watch": "vitest --config vitest.config.mts",
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "lint": "eslint \"src/**/*.{ts,mts,cts,tsx}\" \"tests/**/*.{ts,mts,cts,tsx}\"",
-    "lint:fix": "eslint --fix \"src/**/*.{ts,mts,cts,tsx}\" \"tests/**/*.{ts,mts,cts,tsx}\""
+    "lint:fix": "eslint --fix \"src/**/*.{ts,mts,cts,tsx}\" \"tests/**/*.{ts,mts,cts,tsx}\"",
+    "test:coverage": "vitest run --config vitest.config.mts --coverage --coverage.include=src/specification/**"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
@@ -51,6 +52,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.0.1",
     "@typescript-eslint/parser": "^8.0.1",
+    "@vitest/coverage-v8": "^1.6.1",
     "cypress": "^15.6.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
