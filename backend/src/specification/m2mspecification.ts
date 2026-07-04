@@ -43,6 +43,7 @@ import {
 } from './modbusValues.js'
 import { getMessageString, messages2Text } from './specMessages.js'
 import { compareSpecifications, isEqualValue } from './specDiff.js'
+import { validateBaseSpecification, validateFiles, validateSpecification, validateUniqueName } from './specValidator.js'
 import { Observable, Subject } from 'rxjs'
 import { IpullRequest } from './m2mGithubValidate.js'
 
@@ -233,32 +234,11 @@ export class M2mSpecification implements IspecificationValidator {
   }
 
   validate(language: string): Imessage[] {
-    const rc = this.validateSpecification(language, true)
-    if ((this.settings as ImodbusSpecification).entities.length > 0) {
-      let mSpec = this.settings as ImodbusSpecification
-      if (mSpec.identified == undefined) mSpec = M2mSpecification.fileToModbusSpecification(this.settings as IfileSpecification)
-      else setIdentifiedByEntities(mSpec)
-
-      if (mSpec.identified != IdentifiedStates.identified)
-        rc.push({ type: MessageTypes.notIdentified, category: MessageCategories.validateSpecification })
-    }
-
-    if (!this.validateUniqueName(language))
-      rc.push({ type: MessageTypes.nonUniqueName, category: MessageCategories.validateSpecification })
-    return rc
+    return validateSpecification(this.settings as Ispecification, language)
   }
 
   validateUniqueName(language: string): boolean {
-    const name = getSpecificationI18nName(this.settings as IbaseSpecification, language)
-    let rc = true
-    new ConfigSpecification().filterAllSpecifications((spec) => {
-      if (rc && (this.settings as IbaseSpecification).filename != spec.filename) {
-        const texts = spec.i18n.find((lang) => lang.lang == language)
-        if (texts && texts.texts)
-          if ((texts.texts as ISpecificationText[]).find((text) => text.textId == 'name' && text.text == name)) rc = false
-      }
-    })
-    return rc
+    return validateUniqueName(this.settings as IbaseSpecification, language)
   }
   static fileToModbusSpecification(inSpec: IfileSpecification, values?: ImodbusValues): ImodbusSpecification {
     return fileToModbusSpecification(inSpec, values)
@@ -401,25 +381,10 @@ export class M2mSpecification implements IspecificationValidator {
   }
 
   validateFiles(msgs: Imessage[]) {
-    const category = MessageCategories.validateFiles
-    const spec = this.settings as ImodbusSpecification
-    let hasDocumentation = false
-    let hasImage = false
-    spec.files.forEach((f) => {
-      if (f.usage == SpecificationFileUsage.documentation) hasDocumentation = true
-      if (f.usage == SpecificationFileUsage.img) hasImage = true
-    })
-    if (!hasDocumentation) msgs.push({ type: MessageTypes.noDocumentation, category: category })
-    if (!hasImage) msgs.push({ type: MessageTypes.noImage, category: category })
+    validateFiles(this.settings as IbaseSpecification, msgs)
   }
   validateSpecification(language: string, forContribution: boolean = false): Imessage[] {
-    const msgs: Imessage[] = []
-    const spec = this.settings as ImodbusSpecification
-    this.validateFiles(msgs)
-    if (spec.entities.length == 0) msgs.push({ type: MessageTypes.noEntity, category: MessageCategories.validateEntity })
-    validateTranslation(spec, language, msgs)
-    if (forContribution) validateTranslation(spec, 'en', msgs)
-    return msgs
+    return validateBaseSpecification(this.settings as ImodbusSpecification, language, forContribution)
   }
   getBaseFilename(filename: string): string {
     const idx = filename.lastIndexOf('/')
