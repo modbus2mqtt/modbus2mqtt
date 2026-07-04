@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.5](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.4...modbus2mqtt-v0.25.5) (2026-07-04)
+
+
+### Refactoring
+
+* modular HTTP layer with full route test coverage ([#259](https://github.com/modbus2mqtt/modbus2mqtt/issues/259)) ([f8c2f7f](https://github.com/modbus2mqtt/modbus2mqtt/commit/f8c2f7fba3c4fc6e90ae64d44e68a0f9a45c89f9))
+
 ## [0.25.4](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.3...modbus2mqtt-v0.25.4) (2026-06-26)
 
 
