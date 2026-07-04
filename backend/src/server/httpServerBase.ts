@@ -43,6 +43,10 @@ export class HttpServerBase {
   }
   private statics = new Map<string, string>()
   private ingressUrl: string = '/'
+  /** Node-level request listener; lets tests (supertest) drive the server without framework internals */
+  get requestListener(): http.RequestListener {
+    return this.app
+  }
   returnResult(
     req: express.Request,
     res: http.ServerResponse,

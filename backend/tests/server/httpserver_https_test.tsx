@@ -35,6 +35,15 @@ afterEach(() => {
   if (fs.existsSync(keyPath)) fs.unlinkSync(keyPath)
 })
 
+/** Test server exposing a probe route without reaching into framework internals */
+class ProbeServer extends HttpServerBase {
+  registerProbe(): void {
+    this.app.get('/', (_req, res) => {
+      res.status(200).send('OK')
+    })
+  }
+}
+
 /**
  * Generate self-signed certificates for testing.
  */
@@ -77,10 +86,8 @@ describe('HTTPS server', () => {
       cfg.httpport = httpPort
       new Config().writeConfiguration(cfg)
 
-      const server = new HttpServerBase()
-      server['app'].get('/', (_req, res) => {
-        res.status(200).send('OK')
-      })
+      const server = new ProbeServer()
+      server.registerProbe()
 
       await new Promise<void>((resolve) => {
         server.listen(() => {
@@ -112,10 +119,8 @@ describe('HTTPS server', () => {
     cfg.httpport = httpPort
     new Config().writeConfiguration(cfg)
 
-    const server = new HttpServerBase()
-    server['app'].get('/', (_req, res) => {
-      res.status(200).send('OK')
-    })
+    const server = new ProbeServer()
+    server.registerProbe()
 
     await new Promise<void>((resolve, reject) => {
       server.listen(() => {
@@ -160,10 +165,8 @@ describe('HTTPS server', () => {
     expect(cfg.httpsPort).toBeUndefined()
     new Config().writeConfiguration(cfg)
 
-    const server = new HttpServerBase()
-    server['app'].get('/', (_req, res) => {
-      res.status(200).send('OK')
-    })
+    const server = new ProbeServer()
+    server.registerProbe()
 
     await new Promise<void>((resolve) => {
       server.listen(() => {
