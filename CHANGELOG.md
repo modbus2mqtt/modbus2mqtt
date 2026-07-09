@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.7](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.6...modbus2mqtt-v0.25.7) (2026-07-09)
+
+
+### Bug Fixes
+
+* show error when new slave uses an existing slave id ([#264](https://github.com/modbus2mqtt/modbus2mqtt/issues/264)) ([ee849cb](https://github.com/modbus2mqtt/modbus2mqtt/commit/ee849cb61412ea19733bfa54d85b730edb01c0b3))
+
 ## [0.25.6](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.5...modbus2mqtt-v0.25.6) (2026-07-04)
 
 
