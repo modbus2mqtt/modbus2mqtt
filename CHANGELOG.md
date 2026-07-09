@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.8](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.7...modbus2mqtt-v0.25.8) (2026-07-09)
+
+
+### Performance
+
+* decouple slaves from specifications in the HTTP API ([#267](https://github.com/modbus2mqtt/modbus2mqtt/issues/267)) ([6b8f976](https://github.com/modbus2mqtt/modbus2mqtt/commit/6b8f9763c7d6704baecb75a0257835ce8981f449))
+
 ## [0.25.7](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.6...modbus2mqtt-v0.25.7) (2026-07-09)
 
 
