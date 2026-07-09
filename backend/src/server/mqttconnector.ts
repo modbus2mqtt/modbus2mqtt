@@ -9,11 +9,18 @@ import Debug from 'debug'
 const log = new Logger('mqttconnector')
 const debugMqttClient = Debug('mqttclient')
 const debug = Debug('mqttconnector')
+// Minimum time between repeats of the SAME MQTT connection error in the log. A broker that
+// keeps rejecting every reconnectPeriod (e.g. missing client certificate) would otherwise
+// flood the log once per second; a changed error is still logged immediately.
+const mqttErrorLogIntervalMs = 60000
 
 export class MqttConnector {
   private client?: MqttClient
   private subscribedSlaves: Slave[] = []
   private isSubscribed: boolean
+  // The last connection error we logged and when, used to throttle identical repeats.
+  private lastErrorMessage: string | undefined
+  private lastErrorLoggedAt: number = 0
   private onMqttMessageListeners: ((topic: string, payload: Buffer) => Promise<void>)[] = []
   private onConnectListener: ((mqttClient: MqttClient) => void)[] = []
   onConnectCallbacks: ((connection: MqttClient) => void)[]
@@ -52,7 +59,17 @@ export class MqttConnector {
     }
   }
   private handleErrors(e: Error) {
-    log.log(LogLevelEnum.error, 'MQTT error: ' + e.message)
+    const message = 'MQTT error: ' + e.message
+    const now = Date.now()
+    // Throttle identical errors: the mqtt client re-emits the same error on every reconnect
+    // attempt (once per reconnectPeriod). Log it at most once per mqttErrorLogIntervalMs, but
+    // log a changed error immediately so real state changes are never hidden. Time-based on
+    // purpose: the 'connect'/'reconnect' events flap during such an outage, so they can't be
+    // used to reliably detect recovery.
+    if (message === this.lastErrorMessage && now - this.lastErrorLoggedAt < mqttErrorLogIntervalMs) return
+    this.lastErrorMessage = message
+    this.lastErrorLoggedAt = now
+    log.log(LogLevelEnum.error, message)
   }
   private onConnect(mqttClient: MqttClient) {
     debug('reconnecting MQTT')
@@ -139,7 +156,16 @@ export class MqttConnector {
         this.client.removeAllListeners('connect')
         this.client.on('error', this.handleErrors.bind(this))
         this.onMqttMessageListeners.forEach((listener) => {
-          this.client!.on('message', listener)
+          // The mqtt 'message' event ignores the promise a listener returns. Await it here so
+          // a handler that rejects (e.g. a publish issued while the client is disconnecting)
+          // is logged instead of surfacing as an unhandled promise rejection.
+          this.client!.on('message', async (topic: string, payload: Buffer) => {
+            try {
+              await listener(topic, payload)
+            } catch (e) {
+              log.log(LogLevelEnum.error, 'MQTT message handler failed: ' + (e instanceof Error ? e.message : String(e)))
+            }
+          })
         })
         this.client.on('connect', this.onConnect.bind(this, this.client))
         this.client.on('reconnect', this.onConnect.bind(this, this.client))

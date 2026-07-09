@@ -74,7 +74,10 @@ export class HttpServerBase {
         redirectApp.all(/.*/, (req: Request, res: express.Response) => {
           const host = req.hostname
           const httpsUrl = `https://${host}:${httpsPort}${req.originalUrl}`
-          res.redirect(301, httpsUrl)
+          // 302 (temporary), never 301: the same HTTP port serves the app directly in
+          // HTTP-only/debug mode, and browsers cache a 301 permanently — a cached 301 would
+          // keep redirecting to an HTTPS port that is no longer listening.
+          res.redirect(302, httpsUrl)
         })
         this.server = redirectApp.listen(config.httpport, () => {
           log.log(LogLevelEnum.info, `HTTP redirecting to HTTPS on port ${config.httpport}`)

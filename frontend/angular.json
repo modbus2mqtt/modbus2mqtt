@@ -38,6 +38,12 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "debug": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "baseHref": "/"
             }
           },
           "defaultConfiguration": "production"
@@ -55,7 +61,7 @@
               "proxyConfig": "proxy.conf.3005.json"
             },
             "debug": {
-              "buildTarget": "modbus2mqtt:build:development",
+              "buildTarget": "modbus2mqtt:build:debug",
               "proxyConfig": "proxy.conf.3601.json",
               "host": "localhost",
               "port": 3602

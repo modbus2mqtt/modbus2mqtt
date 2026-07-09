@@ -235,25 +235,20 @@ export class MqttSubscriptions {
     return this.subscribedSlaves.filter((s) => s.getBusId() == busid)
   }
   // returns a promise for testing
-  private onMqttMessage(topic: string, payload: Buffer): Promise<void> {
-    if (topic) {
-      debug('onMqttMessage: ' + topic)
-      const s = this.subscribedSlaves.find((s) => topic.startsWith(s.getBaseTopic()!))
-      if (s) {
-        if (s.getTriggerPollTopic() == topic) {
-          debug('Triggering Poll')
-          return this.publishState(s).then(() => undefined)
-        } else if (payload != undefined && payload != null) {
-          if (topic == s.getCommandTopic()) return this.sendCommand(s, payload.toString('utf-8')).then(() => undefined)
-          else if (topic.startsWith(s.getBaseTopic()) && topic.indexOf('/set/') != -1) {
-            return this.sendEntityCommandWithPublish(s, topic, payload.toString('utf-8')).then(() => undefined)
-          }
-        }
+  private async onMqttMessage(topic: string, payload: Buffer): Promise<void> {
+    if (!topic) return
+    debug('onMqttMessage: ' + topic)
+    const s = this.subscribedSlaves.find((s) => topic.startsWith(s.getBaseTopic()!))
+    if (!s) return
+    if (s.getTriggerPollTopic() == topic) {
+      debug('Triggering Poll')
+      await this.publishState(s)
+    } else if (payload != undefined && payload != null) {
+      if (topic == s.getCommandTopic()) await this.sendCommand(s, payload.toString('utf-8'))
+      else if (topic.startsWith(s.getBaseTopic()) && topic.indexOf('/set/') != -1) {
+        await this.sendEntityCommandWithPublish(s, topic, payload.toString('utf-8'))
       }
     }
-    return new Promise<void>((resolve) => {
-      resolve()
-    })
   }
 
   // Expose command handling for tests invoking this method dynamically
