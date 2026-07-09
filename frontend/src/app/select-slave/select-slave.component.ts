@@ -131,7 +131,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   ) {
     super()
     this.slaveNewForm = this._formBuilder.group({
-      slaveId: [null],
+      slaveId: [null, this.duplicateSlaveIdValidator],
       detectSpec: [false],
     })
   }
@@ -462,6 +462,15 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   uniqueNameValidator: any = (slaveId: number, control: AbstractControl): ValidationErrors | null => {
     if (this.hasDuplicateName(slaveId, control.value)) return { duplicates: control.value }
     else return null
+  }
+
+  duplicateSlaveIdValidator: any = (control: AbstractControl): ValidationErrors | null => {
+    const value = control.value
+    if (value === null || value === undefined || value === '') return null
+    const slaveId = parseInt(value)
+    if (isNaN(slaveId) || slaveId < 0) return null
+    const exists = this.uiSlaves.find((uis) => uis != null && uis.slave.slaveid != null && uis.slave.slaveid == slaveId)
+    return exists ? { duplicate: slaveId } : null
   }
 
   deleteSlave(slave: Islave | null) {
