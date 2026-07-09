@@ -15,7 +15,7 @@ import {
 } from '../../../shared/specification/index.js'
 import { Islave, PollModes, apiUri } from '../../../shared/server/index.js'
 import { sendResult } from '../sendResult.js'
-import { ApiError, Registrar, created, ok, requireBusSlave, requireQuery } from '../routeHelpers.js'
+import { ApiError, Registrar, created, ok, requireBusSlave, requireQuery, stripSpecFileData } from '../routeHelpers.js'
 
 const debug = Debug('httpserver')
 const log = new Logger('httpserver')
@@ -25,7 +25,11 @@ export function registerSpecificationRoutes(r: Registrar): void {
     const spec = ctx.query['spec']
     const specName = spec !== undefined ? String(spec) : ''
     if (specName.length > 0) {
-      return ok(ConfigSpecification.getSpecificationByFilename(specName))
+      const rc = ConfigSpecification.getSpecificationByFilename(specName)
+      // default: file references only; the editor passes filedata=true for the full,
+      // transactional form (base64 file contents included). rc is a structuredClone.
+      if (rc && ctx.query['filedata'] !== 'true') stripSpecFileData(rc)
+      return ok(rc)
     }
     throw new ApiError(HttpErrorsEnum.ErrNotFound, 'not found')
   })
@@ -73,7 +77,8 @@ export function registerSpecificationRoutes(r: Registrar): void {
     const bus: Bus | undefined = Bus.getBus(ids.busid)
     const slave: Islave | undefined = bus ? bus.getSlaveBySlaveId(ids.slaveid) : undefined
 
-    const originalFilename: string | null = ctx.query['originalFilename'] !== undefined ? String(ctx.query['originalFilename']) : null
+    const originalFilename: string | null =
+      ctx.query['originalFilename'] !== undefined ? String(ctx.query['originalFilename']) : null
     const rc = rd.writeSpecification(
       ctx.body as ImodbusSpecification,
       (filename: string) => {
@@ -194,8 +199,7 @@ export function registerSpecificationRoutes(r: Registrar): void {
             else if (pullRequest.closed) log.log(LogLevelEnum.info, 'Closed ' + pullRequest.pullNumber)
             else debug('Polled pullrequest ' + pullRequest.pullNumber)
 
-            if (pullRequest.merged || pullRequest.closed)
-              sendResult(req, res, HttpErrorsEnum.OkCreated, JSON.stringify(response))
+            if (pullRequest.merged || pullRequest.closed) sendResult(req, res, HttpErrorsEnum.OkCreated, JSON.stringify(response))
           })
         })
         .catch((err) => {

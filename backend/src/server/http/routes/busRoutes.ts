@@ -2,7 +2,7 @@ import Debug from 'debug'
 import { Bus } from '../../bus.js'
 import { HttpErrorsEnum } from '../../../shared/specification/index.js'
 import { IBus, apiUri } from '../../../shared/server/index.js'
-import { ApiError, Registrar, created, ok } from '../routeHelpers.js'
+import { ApiError, Registrar, created, ok, toApiBus } from '../routeHelpers.js'
 
 const debug = Debug('httpserver')
 
@@ -11,7 +11,7 @@ export function registerBusRoutes(r: Registrar): void {
     const busses = Bus.getBusses()
     const ibs: IBus[] = []
     busses.forEach((bus) => {
-      ibs.push(bus.properties)
+      ibs.push(toApiBus(bus.properties))
     })
     return ok(ibs)
   })
@@ -21,7 +21,7 @@ export function registerBusRoutes(r: Registrar): void {
     if (busidStr.length) {
       const bus = Bus.getBus(Number.parseInt(busidStr))
       if (bus && bus.properties) {
-        return ok(bus.properties)
+        return ok(toApiBus(bus.properties))
       }
     }
     throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'invalid Parameter')

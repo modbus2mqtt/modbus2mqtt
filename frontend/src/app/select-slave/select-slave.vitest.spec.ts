@@ -98,6 +98,10 @@ describe('Select Slave tests (vitest)', () => {
     expect(component.uiSlaves.length).toBe(1)
     expect(component.uiSlaves[0].slave.slaveid).toBe(1)
 
+    // Slaves arrive without an embedded specification (decoupled API); the
+    // discover-entities list must be recomputed once the spec fetch resolved.
+    expect(component.uiSlaves[0].slaveForm.get('discoverEntitiesList')!.value).toEqual([1])
+
     const uiSlave = component.uiSlaves[0]
 
     // Set specificationid to the correct IidentificationSpecification object

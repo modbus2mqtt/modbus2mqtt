@@ -81,6 +81,31 @@ describe('GET ' + apiUri.specfication, () => {
     expect(response.body.filename).toBe('waterleveltransmitter')
     expect(response.body).toHaveProperty('entities')
   })
+  it('strips base64 file contents by default, keeping the file references', async () => {
+    // spec 'c' embeds ~1.4 MB of base64 file data in the persisted JSON
+    const response = await ts.request().get(apiUri.specfication + '?spec=c').expect(200)
+    expect(response.body.files.length).toBe(2)
+    response.body.files.forEach((f: { url?: string; usage?: unknown; fileLocation?: unknown; data?: string }) => {
+      expect(f).not.toHaveProperty('data')
+      expect(f.url).toBeDefined()
+      expect(f.usage).toBeDefined()
+      expect(f.fileLocation).toBeDefined()
+    })
+    expect(JSON.stringify(response.body).length).toBeLessThan(100000)
+  })
+  it('returns the full form including file data with filedata=true (editor save transaction)', async () => {
+    const response = await ts.request().get(apiUri.specfication + '?spec=c&filedata=true').expect(200)
+    expect(response.body.files.length).toBe(2)
+    response.body.files.forEach((f: { data?: string }) => {
+      expect(f.data).toBeDefined()
+      expect(f.data!.length).toBeGreaterThan(0)
+    })
+  })
+  it('does not remove file data from the in-memory specification store', async () => {
+    await ts.request().get(apiUri.specfication + '?spec=c').expect(200)
+    const stored = ConfigSpecification.getSpecificationByFilename('c')
+    expect(stored?.files.every((f) => f.data && f.data.length > 0)).toBe(true)
+  })
   it('returns 404 without spec parameter', async () => {
     await ts.request().get(apiUri.specfication).parse(rawText).expect(HttpErrorsEnum.ErrNotFound)
   })
@@ -169,6 +194,12 @@ describe('GET ' + apiUri.download.replace('/:what', ''), () => {
     expect(response.headers['content-disposition']).toContain('waterleveltransmitter.json')
     const downloaded = JSON.parse(response.text)
     expect(downloaded.filename).toBe('waterleveltransmitter')
+  })
+  it('keeps the base64 file contents in the download (self-contained export)', async () => {
+    const response = await ts.request().get('/download/c').expect(200)
+    const downloaded = JSON.parse(response.text)
+    expect(downloaded.files.length).toBe(2)
+    downloaded.files.forEach((f: { data?: string }) => expect(f.data && f.data.length > 0).toBe(true))
   })
   it('returns 404 for an unknown specification', async () => {
     await ts.request().get('/download/unknown-spec').parse(rawText).expect(HttpErrorsEnum.ErrNotFound)

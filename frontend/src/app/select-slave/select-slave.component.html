@@ -82,6 +82,7 @@
                   matInput
                   formControlName="specificationid"
                   (selectionChange)="onSpecificationChange(uislave)"
+                  (openedChange)="$event && loadIdentSpecs(uislave)"
                   [compareWith]="compareSpecificationIdentification"
                 >
                   @if (uislave.specsObservable | async; as identSpecs) {
@@ -106,7 +107,6 @@
                         <mat-icon [matTooltip]="statusTooltip(ispec ? ispec.status : 3)">{{
                           statusIcon(ispec ? ispec.status : 3)
                         }}</mat-icon>
-                        {{ ispec !== null ? ispec.name : 'unknown' }}
                         {{ ispec !== null ? ispec.name : 'unknown' }}
                       </mat-option>
                     }
@@ -337,16 +337,7 @@
           <mat-card-content>
             <mat-form-field class="field width150pt">
               <mat-label>Slave Id</mat-label>
-              <input
-                matInput
-                name="slaveId"
-                formControlName="slaveId"
-                type="number"
-                [errorStateMatcher]="errorStateMatcher"
-              />
-              @if (slaveNewForm.get('slaveId')!.hasError('duplicate')) {
-                <mat-error> Slave Id already exists </mat-error>
-              }
+              <input matInput name="slaveId" formControlName="slaveId" type="number" />
             </mat-form-field>
             <mat-slide-toggle class="width50" formControlName="detectSpec" [matTooltip]="getDetectSpecToolTip()"
               >Enable Specification matching.</mat-slide-toggle

@@ -28,6 +28,15 @@ describe('GET ' + apiUri.bus, () => {
     expect(bus.busId).toBe(0)
     expect(bus.connectionData).toBeDefined()
   })
+  it('returns bus slaves without embedded specification, leaving the in-memory slaves intact', async () => {
+    const response = await ts.request().get(apiUri.bus + '?busid=0').expect(200)
+    const bus: IBus = response.body
+    const withSpecId = bus.slaves.find((s) => s.specificationid != undefined)
+    expect(withSpecId).toBeDefined()
+    bus.slaves.forEach((s) => expect(s).not.toHaveProperty('specification'))
+    // in-memory slaves keep the specification (poller/discovery depend on it)
+    expect(Bus.getBus(0)!.getSlaveBySlaveId(withSpecId!.slaveid)!.specification).toBeDefined()
+  })
   it('fails without busid', async () => {
     await ts.request().get(apiUri.bus).parse(rawText).expect(HttpErrorsEnum.ErrBadRequest)
   })
@@ -88,6 +97,17 @@ describe('GET ' + apiUri.slaves, () => {
     expect(response.body.length).toBeGreaterThan(0)
     expect(response.body[0]).toHaveProperty('slaveid')
   })
+  it('decouples slaves from specifications: no embedded specification in the payload', async () => {
+    const response = await ts.request().get(apiUri.slaves + '?busid=0').expect(200)
+    const withSpecId = response.body.find((s: Islave) => s.specificationid != undefined)
+    expect(withSpecId).toBeDefined()
+    response.body.forEach((s: Islave) => expect(s).not.toHaveProperty('specification'))
+    // the in-memory slave keeps its specification — poller and discovery depend on it
+    const inMemory = Bus.getBus(0)!
+      .getSlaves()
+      .find((s) => s.slaveid == withSpecId.slaveid)
+    expect(inMemory?.specification).toBeDefined()
+  })
   it('fails without busid', async () => {
     await ts.request().get(apiUri.slaves).parse(rawText).expect(HttpErrorsEnum.ErrInvalidParameter)
   })
@@ -99,6 +119,12 @@ describe('GET ' + apiUri.slave, () => {
     const slave: Islave = response.body
     expect(slave.slaveid).toBe(1)
   })
+  it('returns the slave without embedded specification, leaving the in-memory slave intact', async () => {
+    const response = await ts.request().get(apiUri.slave + '?busid=0&slaveid=1').expect(200)
+    expect(response.body.specificationid).toBeDefined()
+    expect(response.body).not.toHaveProperty('specification')
+    expect(Bus.getBus(0)!.getSlaveBySlaveId(1)!.specification).toBeDefined()
+  })
   it('fails without slaveid', async () => {
     await ts.request().get(apiUri.slave + '?busid=0').parse(rawText).expect(HttpErrorsEnum.ErrInvalidParameter)
   })
@@ -106,10 +132,13 @@ describe('GET ' + apiUri.slave, () => {
 
 describe('POST/DELETE ' + apiUri.slave, () => {
   it('creates and deletes a slave', async () => {
-    const newSlave: Islave = { slaveid: 21, name: 'http-test-slave' } as Islave
+    const newSlave: Islave = { slaveid: 21, name: 'http-test-slave', specificationid: 'waterleveltransmitter' } as Islave
     const postResponse = await ts.request().post(apiUri.slave + '?busid=0').send(newSlave).expect(HttpErrorsEnum.OkCreated)
     expect(postResponse.body.slaveid).toBe(21)
+    // response is decoupled from the specification, the in-memory slave is not
+    expect(postResponse.body).not.toHaveProperty('specification')
     expect(Bus.getBus(0)!.getSlaveBySlaveId(21)).toBeDefined()
+    expect(Bus.getBus(0)!.getSlaveBySlaveId(21)!.specification).toBeDefined()
 
     await ts.request().delete(apiUri.slave + '?busid=0&slaveid=21').expect(200)
     expect(Bus.getBus(0)!.getSlaveBySlaveId(21)).toBeUndefined()

@@ -25,7 +25,7 @@ import {
 } from '@shared/specification'
 import { getCurrentLanguage } from '../utils/language'
 import { Clipboard } from '@angular/cdk/clipboard'
-import { Observable, ReplaySubject, Subscription } from 'rxjs'
+import { ReplaySubject, Subscription } from 'rxjs'
 import { ActivatedRoute, Router } from '@angular/router'
 import { SessionStorage } from '../services/SessionStorage'
 import { M2mErrorStateMatcher } from '../services/M2mErrorStateMatcher'
@@ -62,11 +62,14 @@ import { ModbusErrorComponent } from '../modbus-error/modbus-error.component'
 interface IuiSlave {
   slave: Islave
   label: string
-  specsObservable?: Observable<IidentificationSpecification[]>
+  specsObservable?: ReplaySubject<IidentificationSpecification[]>
   specification?: Ispecification
   slaveForm: FormGroup
   commandEntities?: ImodbusEntity[]
   selectedEntitites?: any
+  // Set once the per-slave modbus identification has been fetched lazily
+  // (on first dropdown open). Keeps the initial page load free of N device reads.
+  identSpecsLoaded?: boolean
 }
 
 @Component({
@@ -131,7 +134,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   ) {
     super()
     this.slaveNewForm = this._formBuilder.group({
-      slaveId: [null, this.duplicateSlaveIdValidator],
+      slaveId: [null],
       detectSpec: [false],
     })
   }
@@ -153,32 +156,35 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   @ViewChild('slavesBody') slavesBody: ElementRef | undefined
   @Output() slaveidEventEmitter = new EventEmitter<number | undefined>()
   ngOnInit(): void {
+    this.currentLanguage = getCurrentLanguage()
+    // Fire the independent requests in parallel instead of chaining config -> bus -> slaves.
+    // The slave cards only need the (small) slaves list, so they can render as soon as it
+    // arrives; config/specs/bus fill in the labels, dropdown options and header a moment later.
     this.entityApiService.getConfiguration().subscribe((config) => {
       this.config = config
-      this.currentLanguage = getCurrentLanguage()
-      this.entityApiService.getSpecifications().subscribe((specs) => {
-        this.preparedSpecs = specs
-      })
-      this.paramsSubscription = this.route.params.subscribe((params) => {
-        const busId = +params['busid']
-        this.entityApiService.getBus(busId).subscribe((bus) => {
-          this.bus = bus
-          if (this.bus) {
-            this.busname = getConnectionName(this.bus.connectionData)
-            this.getIdentSpecs(undefined).then((identSpecs) => {
-              this.preparedIdentSpecs = identSpecs
-            })
-            this.updateSlaves()
-          }
-        })
+      this.refreshSpecDerivedState()
+      this.refreshLoadedSlaveDetails()
+    })
+    this.entityApiService.getSpecifications().subscribe((specs) => {
+      this.preparedSpecs = specs
+      this.refreshSpecDerivedState()
+    })
+    this.paramsSubscription = this.route.params.subscribe((params) => {
+      const busId = +params['busid']
+      // Render the slave cards ASAP; getBus is only needed for the header and command topics.
+      this.updateSlaves(busId)
+      this.entityApiService.getBus(busId).subscribe((bus) => {
+        this.bus = bus
+        if (this.bus) {
+          this.busname = getConnectionName(this.bus.connectionData)
+          this.refreshLoadedSlaveDetails()
+        }
       })
     })
   }
 
-  private updateSlaves(detectSpec?: boolean) {
-    if (!this.bus) return
-    this.entityApiService.getSlaves(this.bus.busId).subscribe((slaves) => {
-      console.log(JSON.stringify(slaves))
+  private updateSlaves(busId: number, detectSpec?: boolean) {
+    this.entityApiService.getSlaves(busId).subscribe((slaves) => {
       this.uiSlaves = []
       slaves.forEach((s) => {
         this.uiSlaves.push(this.getUiSlave(s, detectSpec))
@@ -282,36 +288,61 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   // }
   private getIdentSpecs(uiSlave: IuiSlave | undefined): Promise<IidentificationSpecification[]> {
     return new Promise<IidentificationSpecification[]>((resolve, _reject) => {
-      if (!this.bus) {
-        resolve([])
-        return
-      }
-      const fct = (specModbus: ImodbusSpecification | undefined) => {
-        const rci: IidentificationSpecification[] = []
-        if (!this.preparedSpecs || !this.config || !this.bus) {
-          resolve(rci)
-          return
-        }
-        this.preparedSpecs!.forEach((spec) => {
-          const name = getSpecificationI18nName(spec, this.config!.mqttdiscoverylanguage)
-          rci.push({
-            name: name,
-            identified: specModbus && spec.filename == specModbus.filename ? specModbus.identified : IdentifiedStates.unknown,
-            filename: spec.filename,
-            status: spec.status,
-          } as IidentificationSpecification)
-        })
-        resolve(rci)
-      }
-      if (uiSlave && uiSlave.slave.specificationid)
+      if (uiSlave && uiSlave.slave.specificationid && this.bus)
         this.entityApiService
           .getModbusSpecification(this.bus.busId, uiSlave.slave.slaveid, uiSlave.slave.specificationid, false)
           .subscribe((spec) => {
-            console.log('DSSSS')
-            fct(spec)
+            resolve(this.buildIdentSpecsList(spec))
           })
-      else fct(undefined)
+      else resolve(this.buildIdentSpecsList(undefined))
     })
+  }
+  // Builds the specification dropdown list from the cheap, already-loaded preparedSpecs.
+  // Needs no bus and does no network call; the optional specModbus only flags which entry
+  // matched the device (the "identified" state) for the per-slave lazy load.
+  private buildIdentSpecsList(specModbus: ImodbusSpecification | undefined): IidentificationSpecification[] {
+    const rci: IidentificationSpecification[] = []
+    if (!this.preparedSpecs || !this.config) return rci
+    this.preparedSpecs.forEach((spec) => {
+      const name = getSpecificationI18nName(spec, this.config!.mqttdiscoverylanguage)
+      rci.push({
+        name: name,
+        identified: specModbus && spec.filename == specModbus.filename ? specModbus.identified : IdentifiedStates.unknown,
+        filename: spec.filename,
+        status: spec.status,
+      } as IidentificationSpecification)
+    })
+    return rci
+  }
+  // Recompute the shared dropdown fallback list and the per-card labels once the pieces they
+  // depend on (config, preparedSpecs) have arrived. Called from the parallel load callbacks so
+  // slave cards can render immediately and get their real names/options filled in a moment later.
+  private refreshSpecDerivedState(): void {
+    if (this.preparedSpecs && this.config) this.preparedIdentSpecs = this.buildIdentSpecsList(undefined)
+    this.uiSlaves.forEach((u) => (u.label = this.getSlaveName(u.slave)))
+  }
+  // Command topics and selected entities need config + bus + the slave's loaded specification.
+  // Because the cards now render before getBus/getConfiguration resolve, fill them here too so a
+  // slave whose specification loaded before bus/config still gets its command topics (the
+  // addSpecificationToUiSlave callback covers the opposite ordering).
+  private refreshLoadedSlaveDetails(): void {
+    if (!this.config || !this.bus) return
+    this.uiSlaves.forEach((u) => {
+      if (u.slave.specification) {
+        u.selectedEntitites = this.getSelectedEntites(u.slave)
+        this.fillCommandTopics(u)
+      }
+    })
+  }
+  // Lazily fetch the per-slave modbus identification (one device read) the first time the
+  // specification dropdown is opened. Until then the dropdown renders the cheap, shared
+  // preparedIdentSpecs fallback, so the initial page load stays fast with many slaves.
+  loadIdentSpecs(uiSlave: IuiSlave): void {
+    if (uiSlave.identSpecsLoaded || !uiSlave.specsObservable) return
+    uiSlave.identSpecsLoaded = true
+    this.getIdentSpecs(uiSlave)
+      .then((identSpecs) => uiSlave.specsObservable!.next(identSpecs))
+      .catch((e) => console.log(e.message))
   }
   private getUiSlave(slave: Islave, _detectSpec: boolean | undefined): IuiSlave {
     const fg = this.initiateSlaveControl(slave, null)
@@ -321,20 +352,18 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       slaveForm: fg,
     } as any
     // ReplaySubject(1) so the template's `| async` receives the spec list even when
-    // getIdentSpecs() resolves (microtask) before Angular subscribes via change detection.
+    // loadIdentSpecs() resolves (microtask) before Angular subscribes via change detection.
     // A plain Subject would drop that early emission, leaving the dropdown empty.
-    const sub = new ReplaySubject<IidentificationSpecification[]>(1)
-    rc.specsObservable = sub
-    this.getIdentSpecs(rc)
-      .then((identSpecs) => {
-        sub.next(identSpecs)
-      })
-      .catch((e) => {
-        console.log(e.message)
-      }) // getDetectedSpecs is disabled, because of performance issues
+    // The subject stays empty on load so the template falls back to the cheap, network-free
+    // preparedIdentSpecs list. The per-slave modbus identification is fetched lazily on first
+    // dropdown open (loadIdentSpecs) to keep the initial page load free of N device reads.
+    rc.specsObservable = new ReplaySubject<IidentificationSpecification[]>(1)
     this.addSpecificationToUiSlave(rc, () => {
       rc.selectedEntitites = this.getSelectedEntites(slave)
       this.fillCommandTopics(rc)
+      // slave2Form computed this synchronously before the specification was fetched
+      // (slaves arrive without an embedded specification) — recompute now that it's here.
+      fg.get('discoverEntitiesList')!.setValue(this.buildDiscoverEntityList(slave))
     })
     return rc
   }
@@ -357,7 +386,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
 
   showUnmatched() {
     this.showAllPublicSpecs.value
-    this.updateSlaves(false)
+    if (this.bus) this.updateSlaves(this.bus.busId)
   }
   compareSpecificationIdentification(o1: IidentificationSpecification, o2: IidentificationSpecification) {
     return o1 && o2 && o1.filename == o2.filename
@@ -464,22 +493,13 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     else return null
   }
 
-  duplicateSlaveIdValidator: any = (control: AbstractControl): ValidationErrors | null => {
-    const value = control.value
-    if (value === null || value === undefined || value === '') return null
-    const slaveId = parseInt(value)
-    if (isNaN(slaveId) || slaveId < 0) return null
-    const exists = this.uiSlaves.find((uis) => uis != null && uis.slave.slaveid != null && uis.slave.slaveid == slaveId)
-    return exists ? { duplicate: slaveId } : null
-  }
-
   deleteSlave(slave: Islave | null) {
     if (slave != null && this.bus)
       this.entityApiService.deleteSlave(this.bus.busId, slave.slaveid).subscribe(() => {
         const dIdx = this.uiSlaves.findIndex((uis) => uis.slave.slaveid == slave.slaveid)
         if (dIdx >= 0) {
           this.uiSlaves.splice(dIdx, 1)
-          this.updateSlaves(false)
+          if (this.bus) this.updateSlaves(this.bus.busId)
         }
       })
   }
@@ -688,9 +708,17 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     if (uiSlave.slaveForm.get('noDiscovery')!.value) uiSlave.slaveForm.get('discoverEntitiesList')!.enable()
     else uiSlave.slaveForm.get('discoverEntitiesList')!.disable()
   }
+  // Stable empty-status singleton so a slave without modbus status returns the SAME
+  // reference on every change-detection cycle. Returning a fresh object literal (as before)
+  // fed a new @Input into <app-modbus-error> each cycle, forcing it to re-render forever.
+  private static readonly emptyModbusStatus: ImodbusStatusForSlave = {
+    requestCount: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    errors: [],
+    queueLength: 0,
+  }
   getModbusErrors(uiSlave: IuiSlave): ImodbusStatusForSlave | undefined {
     if (!uiSlave || !uiSlave.slave || !uiSlave.slave.modbusStatusForSlave)
-      return { requestCount: [0, 0, 0, 0, 0, 0, 0, 0, 0], errors: [], queueLength: 0 }
+      return SelectSlaveComponent.emptyModbusStatus
     return uiSlave.slave.modbusStatusForSlave
   }
 }

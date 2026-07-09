@@ -7,7 +7,7 @@ import { LogLevelEnum, Logger } from '../../../specification/index.js'
 import { HttpErrorsEnum, ImodbusSpecification, Ispecification } from '../../../shared/specification/index.js'
 import { ModbusTasks, apiUri } from '../../../shared/server/index.js'
 import { sendResult } from '../sendResult.js'
-import { ApiError, Ctx, Registrar, created, ok, requireBusSlave } from '../routeHelpers.js'
+import { ApiError, Ctx, Registrar, created, ok, requireBusSlave, stripSpecFileData } from '../routeHelpers.js'
 
 const debug = Debug('httpserver')
 const log = new Logger('httpserver')
@@ -69,6 +69,9 @@ export function registerModbusRoutes(r: Registrar): void {
       log.log(LogLevelEnum.error, 'http: get /specification ' + (e as Error).message)
       sendResult(req, res, HttpErrorsEnum.SrvErrInternalServerError, JSON.stringify('read specification ' + (e as Error).message))
     }).subscribe((result) => {
+      // default: file references only; the editor passes filedata=true for the full,
+      // transactional form. result derives from a structuredClone (getSpecificationByFilename).
+      if (req.query['filedata'] !== 'true') stripSpecFileData(result)
       sendResult(req, res, HttpErrorsEnum.OK, JSON.stringify(result))
     })
   })

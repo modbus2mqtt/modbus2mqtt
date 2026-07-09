@@ -74,6 +74,19 @@ describe('GET ' + apiUri.modbusSpecification, () => {
     const rspec: ImodbusSpecification = response.body
     expect(((rspec?.entities[0] as ImodbusEntity).mqttValue as number) - 21).toBeLessThan(0.001)
   })
+  it('strips base64 file contents by default and returns them with filedata=true', async () => {
+    // spec 'c' embeds ~1.4 MB of base64 file data
+    const slim = await ts.request().get(apiUri.modbusSpecification + '?busid=0&slaveid=1&spec=c').expect(HttpErrorsEnum.OK)
+    expect(slim.body.files.length).toBe(2)
+    slim.body.files.forEach((f: { data?: string }) => expect(f).not.toHaveProperty('data'))
+
+    const full = await ts
+      .request()
+      .get(apiUri.modbusSpecification + '?busid=0&slaveid=1&spec=c&filedata=true')
+      .expect(HttpErrorsEnum.OK)
+    expect(full.body.files.length).toBe(2)
+    full.body.files.forEach((f: { data?: string }) => expect(f.data && f.data.length > 0).toBe(true))
+  })
   it('fails without busid', async () => {
     await ts.request().get(apiUri.modbusSpecification + '?slaveid=1').parse(rawText).expect(HttpErrorsEnum.ErrBadRequest)
   })

@@ -2,7 +2,7 @@ import Debug from 'debug'
 import { Bus } from '../../bus.js'
 import { HttpErrorsEnum } from '../../../shared/specification/index.js'
 import { Islave, apiUri } from '../../../shared/server/index.js'
-import { ApiError, Registrar, created, ok, requireBusSlave } from '../routeHelpers.js'
+import { ApiError, Registrar, created, ok, requireBusSlave, toApiSlave } from '../routeHelpers.js'
 
 const debug = Debug('httpserver')
 
@@ -12,7 +12,7 @@ export function registerSlaveRoutes(r: Registrar): void {
       const busid = Number.parseInt(ctx.query['busid'])
       const bus = Bus.getBus(busid)
       if (bus) {
-        return ok(bus.getSlaves())
+        return ok(bus.getSlaves().map(toApiSlave))
       }
     }
     throw new ApiError(HttpErrorsEnum.ErrInvalidParameter, 'Invalid parameter')
@@ -23,7 +23,7 @@ export function registerSlaveRoutes(r: Registrar): void {
       const busid = Number.parseInt(ctx.query['busid'])
       const slaveid = Number.parseInt(ctx.query['slaveid'])
       const slave = Bus.getBus(busid)?.getSlaveBySlaveId(slaveid)
-      return ok(slave)
+      return ok(slave ? toApiSlave(slave) : slave)
     }
     throw new ApiError(HttpErrorsEnum.ErrInvalidParameter, 'Invalid parameter')
   })
@@ -42,7 +42,7 @@ export function registerSlaveRoutes(r: Registrar): void {
       throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'Slave Id is not defined')
     }
     const rc: Islave = bus.writeSlave(ctx.body)
-    return created(rc)
+    return created(toApiSlave(rc))
   })
 
   r.delete(apiUri.slave, (ctx) => {
