@@ -112,6 +112,11 @@
                 [errorStateMatcher]="errorStateMatcher"
                 (change)="onEntityNameValueChange()"
               />
+              <mat-icon
+                matSuffix
+                matTooltip="Name of this value in the MQTT payload. A dot nests the value: &quot;obis.obis_value&quot; produces a nested obis → obis_value object; use [n] for array items, e.g. &quot;values[0]&quot;. Allowed characters: letters, digits, _ - . [ ]. A slash '/' is not allowed (it is the MQTT topic separator and breaks discovery and command topics)."
+                >info_outline</mat-icon
+              >
 
               @if (entityFormGroup!.get('mqttname')?.hasError('unique') != null) {
                 <mat-error> Must be unique within table </mat-error>

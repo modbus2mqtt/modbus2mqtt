@@ -43,7 +43,7 @@ import { MatOption } from '@angular/material/core'
 import { MatSelect } from '@angular/material/select'
 import { MatSlideToggle } from '@angular/material/slide-toggle'
 import { MatInput } from '@angular/material/input'
-import { MatFormField, MatLabel, MatError } from '@angular/material/form-field'
+import { MatFormField, MatLabel, MatError, MatSuffix } from '@angular/material/form-field'
 import { MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion'
 import { EntityValueControlComponent } from '../entity-value-control/entity-value-control.component'
 import { MatIcon } from '@angular/material/icon'
@@ -89,6 +89,7 @@ const newEntity: ImodbusEntityWithName = {
     MatIconButton,
     MatTooltip,
     MatIcon,
+    MatSuffix,
     NgClass,
     EntityValueControlComponent,
     MatCardContent,
