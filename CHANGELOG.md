@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.27.1...modbus2mqtt-v0.28.0) (2026-07-10)
+
+
+### Features
+
+* add {{ pollDate }} URL placeholder for HTTP push ([#279](https://github.com/modbus2mqtt/modbus2mqtt/issues/279)) ([91a3749](https://github.com/modbus2mqtt/modbus2mqtt/commit/91a3749fc7241a14b22c393256353e0a2ad83504))
+
 ## [0.27.1](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.27.0...modbus2mqtt-v0.27.1) (2026-07-10)
 
 
