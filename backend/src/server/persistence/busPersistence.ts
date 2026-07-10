@@ -44,6 +44,8 @@ export class BusPersistence implements ICollectionPersistence<IBus> {
               }
             })
 
+            bus.slaves.sort((a, b) => a.slaveid - b.slaveid)
+
             busses.push(bus)
           } catch (e: unknown) {
             if (e instanceof Error) {

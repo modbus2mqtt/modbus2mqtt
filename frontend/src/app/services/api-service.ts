@@ -59,10 +59,14 @@ export class ApiService {
   loadingError$ = new Subject<boolean>()
 
   errorHandler: (err: HttpErrorResponse) => any
-  getSpecification(specification: string | undefined = undefined): Observable<Ispecification> {
+  // filedata=true requests the full specification including base64 file contents
+  // (files[].data) — needed only by the specification editor whose save posts the
+  // complete specification back (transactional save). Everything else gets the
+  // lightweight form with file references only.
+  getSpecification(specification: string | undefined = undefined, filedata: boolean = false): Observable<Ispecification> {
     if (!specification) throw new Error('spec is a required parameter')
 
-    const f: string = this.getFullUri(apiUri.specfication) + `?spec=${specification}`
+    const f: string = this.getFullUri(apiUri.specfication) + `?spec=${specification}` + (filedata ? '&filedata=true' : '')
     return this.httpClient.get<Ispecification>(f) // No error Handling!!!
   }
 
@@ -70,13 +74,15 @@ export class ApiService {
     busid: number,
     slaveid: number,
     specification: string | undefined = undefined,
-    deviceDetection: boolean | undefined = undefined
+    deviceDetection: boolean | undefined = undefined,
+    filedata: boolean = false
   ): Observable<ImodbusSpecification> {
     let deviceDetectionStr: string = ''
     if (deviceDetection) deviceDetectionStr = '&deviceDetection=1'
 
     let f: string = this.getFullUri(apiUri.modbusSpecification) + `?busid=${busid}&slaveid=${slaveid}`
     if (specification) f = f + `&spec=${specification}${deviceDetectionStr}`
+    if (filedata) f = f + '&filedata=true'
     return this.httpClient.get<ImodbusSpecification>(f).pipe(
       catchError((err) => {
         this.errorHandler(err)
@@ -270,7 +276,11 @@ export class ApiService {
       },
     }
     const f = this.getFullUri(apiUri.slave) + `?busid=${busid}`
-    return this.httpClient.post<Islave>(f, device, httpOptions).pipe(
+    // The specification is a client-side decoration (fetched separately); the backend
+    // persists slaves without it — don't upload it with every save.
+    const body = { ...device }
+    delete body.specification
+    return this.httpClient.post<Islave>(f, body, httpOptions).pipe(
       catchError((err) => {
         this.errorHandler(err)
         return new Observable<Islave>()

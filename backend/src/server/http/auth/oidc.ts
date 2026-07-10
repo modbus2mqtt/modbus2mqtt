@@ -2,8 +2,8 @@ import type { Application, Request, Response } from 'express'
 import session from 'express-session'
 import { randomBytes } from 'node:crypto'
 import * as client from 'openid-client'
-import { LogLevelEnum, Logger } from '../../specification/index.js'
-import { ConfigPersistence } from '../persistence/configPersistence.js'
+import { LogLevelEnum, Logger } from '../../../specification/index.js'
+import { ConfigPersistence } from '../../persistence/configPersistence.js'
 
 const log = new Logger('oidc')
 

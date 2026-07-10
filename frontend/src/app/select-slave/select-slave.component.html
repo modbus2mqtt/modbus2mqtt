@@ -82,6 +82,7 @@
                   matInput
                   formControlName="specificationid"
                   (selectionChange)="onSpecificationChange(uislave)"
+                  (openedChange)="$event && loadIdentSpecs(uislave)"
                   [compareWith]="compareSpecificationIdentification"
                 >
                   @if (uislave.specsObservable | async; as identSpecs) {
@@ -106,7 +107,6 @@
                         <mat-icon [matTooltip]="statusTooltip(ispec ? ispec.status : 3)">{{
                           statusIcon(ispec ? ispec.status : 3)
                         }}</mat-icon>
-                        {{ ispec !== null ? ispec.name : 'unknown' }}
                         {{ ispec !== null ? ispec.name : 'unknown' }}
                       </mat-option>
                     }

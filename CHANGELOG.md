@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.25.9](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.8...modbus2mqtt-v0.25.9) (2026-07-10)
+
+
+### Bug Fixes
+
+* sort slaves numerically by slaveid ([#269](https://github.com/modbus2mqtt/modbus2mqtt/issues/269)) ([eb72a4f](https://github.com/modbus2mqtt/modbus2mqtt/commit/eb72a4f3e05055fcad75ff29b01244e700373f21))
+
+## [0.25.8](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.7...modbus2mqtt-v0.25.8) (2026-07-09)
+
+
+### Performance
+
+* decouple slaves from specifications in the HTTP API ([#267](https://github.com/modbus2mqtt/modbus2mqtt/issues/267)) ([6b8f976](https://github.com/modbus2mqtt/modbus2mqtt/commit/6b8f9763c7d6704baecb75a0257835ce8981f449))
+
+## [0.25.7](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.6...modbus2mqtt-v0.25.7) (2026-07-09)
+
+
+### Bug Fixes
+
+* show error when new slave uses an existing slave id ([#264](https://github.com/modbus2mqtt/modbus2mqtt/issues/264)) ([ee849cb](https://github.com/modbus2mqtt/modbus2mqtt/commit/ee849cb61412ea19733bfa54d85b730edb01c0b3))
+
+## [0.25.6](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.5...modbus2mqtt-v0.25.6) (2026-07-04)
+
+
+### Refactoring
+
+* decompose m2mspecification.ts into single-concern modules ([#262](https://github.com/modbus2mqtt/modbus2mqtt/issues/262)) ([22e35a1](https://github.com/modbus2mqtt/modbus2mqtt/commit/22e35a1eb542ba1c6143e0058b29d7c8e795aa3b))
+
+## [0.25.5](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.4...modbus2mqtt-v0.25.5) (2026-07-04)
+
+
+### Refactoring
+
+* modular HTTP layer with full route test coverage ([#259](https://github.com/modbus2mqtt/modbus2mqtt/issues/259)) ([f8c2f7f](https://github.com/modbus2mqtt/modbus2mqtt/commit/f8c2f7fba3c4fc6e90ae64d44e68a0f9a45c89f9))
+
 ## [0.25.4](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.3...modbus2mqtt-v0.25.4) (2026-06-26)
 
 

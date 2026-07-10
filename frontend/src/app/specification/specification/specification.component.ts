@@ -75,8 +75,8 @@ import { MatIconButton } from '@angular/material/button'
     MatInput,
     TranslationComponent,
     EntityComponent,
-    MatSlideToggle
-],
+    MatSlideToggle,
+  ],
 })
 export class SpecificationComponent extends SessionStorage implements OnInit, OnDestroy {
   slaveid: number | undefined = undefined
@@ -447,15 +447,19 @@ export class SpecificationComponent extends SessionStorage implements OnInit, On
           this.originalSpecification ? this.originalSpecification.filename : null
         )
         .subscribe((spec) => {
-          this.entityApiService.getModbusSpecification(this.busId!, this.slaveid!, spec.filename).subscribe((spec) => {
-            this.setCurrentSpecification(spec)
-            this.entitiesTouched = false
-            this.filesTouched = false
-            this.i18nTouched = false
-            this.enterSpecNameFormGroup.markAsPristine()
-            this.saveSubject.next()
-            if (close) this.closeAndBack()
-          })
+          // filedata=true: the editor needs the base64 file contents so the next save
+          // posts the complete specification back (transactional save)
+          this.entityApiService
+            .getModbusSpecification(this.busId!, this.slaveid!, spec.filename, undefined, true)
+            .subscribe((spec) => {
+              this.setCurrentSpecification(spec)
+              this.entitiesTouched = false
+              this.filesTouched = false
+              this.i18nTouched = false
+              this.enterSpecNameFormGroup.markAsPristine()
+              this.saveSubject.next()
+              if (close) this.closeAndBack()
+            })
         })
     }
   }
@@ -514,10 +518,12 @@ export class SpecificationComponent extends SessionStorage implements OnInit, On
           this.entityApiService.getSlave(this.busId, this.slaveid).subscribe((slave) => {
             if (!this.currentSpecification)
               if (slave.specificationid)
-                this.entityApiService.getSpecification(slave.specificationid).subscribe((spec) => {
+                // filedata=true: the editor needs the base64 file contents so save
+                // posts the complete specification back (transactional save)
+                this.entityApiService.getSpecification(slave.specificationid, true).subscribe((spec) => {
                   this.setCurrentSpecification(spec as ImodbusSpecification)
                   this.entityApiService
-                    .getModbusSpecification(this.busId!, this.slaveid!, slave.specificationid)
+                    .getModbusSpecification(this.busId!, this.slaveid!, slave.specificationid, undefined, true)
                     .subscribe(this.setCurrentSpecification.bind(this))
                 })
               else this.setCurrentSpecification(structuredClone(newSpecification))

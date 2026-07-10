@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, Input, OnInit } from '@angular/core'
+import { Component, Input, OnDestroy, OnInit } from '@angular/core'
 import { MatIconModule } from '@angular/material/icon'
 import { ImodbusErrorsForSlave, ImodbusStatusForSlave, ModbusErrorStates, ModbusTasks } from '@shared/server'
 import { ApiService } from '../services/api-service'
@@ -13,18 +13,24 @@ const oneMinuteInMs = 60 * 1000
   templateUrl: './modbus-error.component.html',
   styleUrl: './modbus-error.component.css',
 })
-export class ModbusErrorComponent implements OnInit {
+export class ModbusErrorComponent implements OnInit, OnDestroy {
   @Input({ required: true }) modbusErrors: ImodbusStatusForSlave | undefined
   @Input({ required: false }) currentDate: number | undefined = undefined
 
   tasksToCount: ModbusTasks[] = [ModbusTasks.poll, ModbusTasks.specification]
 
   tasksToLog: ModbusTasks[] = [ModbusTasks.poll, ModbusTasks.specification]
+  private refreshInterval: ReturnType<typeof setInterval> | undefined
   constructor(private entityApiService: ApiService) {}
   ngOnInit(): void {
-    setInterval(() => {
+    // refreshes the relative "x minutes ago" labels; cleared in ngOnDestroy so it does not
+    // leak an interval (and a change-detection trigger) per slave card on every navigation
+    this.refreshInterval = setInterval(() => {
       this.currentDate = Date.now()
-    }, 60 * 1000)
+    }, oneMinuteInMs)
+  }
+  ngOnDestroy(): void {
+    if (this.refreshInterval) clearInterval(this.refreshInterval)
   }
   getTaskName(task: ModbusTasks): string {
     switch (task) {

@@ -1,7 +1,7 @@
-import { Converters, ImodbusEntity, ModbusRegisterType } from '../shared/specification/index.js'
+import { Converters, ModbusRegisterType } from '../shared/specification/index.js'
 import { Converter } from './converter.js'
 import { EnumNumberFormat, Inumber, Ispecification, Ientity } from '../shared/specification/index.js'
-import { M2mSpecification } from './m2mspecification.js'
+import { getMultiplier, getOffset } from './entityAccessors.js'
 
 export class NumberConverter extends Converter {
   constructor(component?: Converters) {
@@ -10,7 +10,6 @@ export class NumberConverter extends Converter {
   }
   modbus2mqtt(spec: Ispecification, entityid: number, value: number[]): number | string {
     const entity = spec.entities.find((e) => e.id == entityid)
-    const mspec = new M2mSpecification(spec.entities as ImodbusEntity[])
     if (entity) {
       if (value.length == 0) throw new Error('NumberConverter.modbus2mqtt: No value in array')
 
@@ -43,8 +42,8 @@ export class NumberConverter extends Converter {
           v = buffer32.readInt32BE()
           break
       }
-      let multiplier = mspec.getMultiplier(entityid)
-      let offset = mspec.getOffset(entityid)
+      let multiplier = getMultiplier(spec.entities, entityid)
+      let offset = getOffset(spec.entities, entityid)
       if (!multiplier) multiplier = 1
       if (!offset) offset = 0
       v = v * multiplier + offset
@@ -53,9 +52,8 @@ export class NumberConverter extends Converter {
   }
 
   override mqtt2modbus(spec: Ispecification, entityid: number, value: number | string): number[] {
-    const mspec = new M2mSpecification(spec.entities as ImodbusEntity[])
-    let multiplier = mspec.getMultiplier(entityid)
-    let offset = mspec.getOffset(entityid)
+    let multiplier = getMultiplier(spec.entities, entityid)
+    let offset = getOffset(spec.entities, entityid)
 
     if (!multiplier) multiplier = 1
     if (!offset) offset = 0
