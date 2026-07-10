@@ -373,6 +373,8 @@
                       <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
                     }
                   </mat-selection-list>
+                  <h2>POST Body Example</h2>
+                  <textarea rows="10" cols="20" readonly>{{ getHttpPushBody(uislave) }}</textarea>
                 </mat-expansion-panel>
               }
               <mat-expansion-panel>

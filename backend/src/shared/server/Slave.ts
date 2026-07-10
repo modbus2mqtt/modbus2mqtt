@@ -247,12 +247,14 @@ export class Slave {
   // e.g. { "obis": "1-0:1.0.8", "obis_value": 234 }.
   // Builds the HTTP push payload from the selected push entities. If httpPush.root is set, only that
   // subtree is returned; returns null when the root path is not present so the caller skips the push.
-  getHttpPushPayload(entities: ImodbusEntity[]): string | null {
+  // defaultValue substitutes entities without a mqttValue (used by the UI preview to show the shape
+  // with placeholders); the real push passes nothing, so unset values are omitted as before.
+  getHttpPushPayload(entities: ImodbusEntity[], defaultValue?: string | null): string | null {
     const pushEntities = this.slave.httpPush?.pushEntities ?? []
     const holder: { value: unknown } = { value: undefined }
     for (const e of entities) {
       if (e.mqttname != undefined && e.mqttname.length > 0 && e.variableConfiguration == undefined && pushEntities.includes(e.id)) {
-        Slave.setByPath(holder, Slave.parseMqttPath(e.mqttname), e.mqttValue)
+        Slave.setByPath(holder, Slave.parseMqttPath(e.mqttname), e.mqttValue != undefined ? e.mqttValue : defaultValue)
       }
     }
     if (holder.value == undefined) holder.value = {}

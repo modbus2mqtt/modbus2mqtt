@@ -330,6 +330,23 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     const spec = sl.getSpecification()
     return spec ? sl.getStatePayload(spec.entities as any, '') : ''
   }
+  // Preview of the HTTP POST body for the currently selected push entities / root, built from the
+  // live form values so the selection influences the output immediately. Values are placeholders
+  // (empty strings) like the state payload example, since the spec carries no runtime mqttValue here.
+  getHttpPushBody(uiSlave: IuiSlave): string | undefined {
+    if (!this.config || !this.bus) return undefined
+    const url: string | null = uiSlave.slaveForm.get('httpPushUrl')!.value
+    if (!url || url.length === 0) return ''
+    const root: string | null = uiSlave.slaveForm.get('httpPushRoot')!.value
+    const pushEntities: number[] = uiSlave.slaveForm.get('pushEntitiesList')!.value ?? []
+    const httpPush: any = { url, pushEntities }
+    if (root && root.length > 0) httpPush.root = root
+    const sl = new Slave(this.bus.busId, { ...uiSlave.slave, httpPush }, this.config.mqttbasetopic)
+    const spec = sl.getSpecification()
+    if (!spec) return ''
+    const body = sl.getHttpPushPayload(spec.entities as any, '')
+    return body != null ? body : `(root "${root}" not found in the payload)`
+  }
   getTriggerPollTopic(uiSlave: IuiSlave): string | undefined {
     if (!this.config || !this.bus) return undefined
     const sl = new Slave(this.bus.busId, uiSlave.slave, this.config.mqttbasetopic)
