@@ -25,6 +25,11 @@ on:
         description: 'Version: patch|minor|major or explicit (e.g. 1.2.3). If omitted, read from package.json.'
         required: false
         type: string
+      skip_github_release:
+        description: 'Skip GitHub Release creation (e.g. when re-pushing images for an already-released version).'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
