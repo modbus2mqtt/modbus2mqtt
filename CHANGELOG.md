@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.26.1...modbus2mqtt-v0.27.0) (2026-07-10)
+
+
+### Features
+
+* POST Body Example preview in slave HTTP Push section ([#274](https://github.com/modbus2mqtt/modbus2mqtt/issues/274)) ([bd0f7d9](https://github.com/modbus2mqtt/modbus2mqtt/commit/bd0f7d94d9e24ee9ded16a886399ed78ab742cc9))
+
 ## [0.26.1](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.26.0...modbus2mqtt-v0.26.1) (2026-07-10)
 
 
