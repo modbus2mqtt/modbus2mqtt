@@ -113,15 +113,19 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
   onMqttValueChange(_event: any, _entity: ImodbusEntity) {
     _event.target.value = 'YYYY'
   }
+  // Characters permitted in an entity mqttname. Besides [a-zA-Z0-9]:
+  //   '_' '-'   valid in MQTT topics and Home Assistant object_ids
+  //   '.' '[' ']'  structured mqttname: nest the value in the payload, e.g. "obis.obis_value"
+  //               or "arr[0]" (see Slave.parseMqttPath); discovery slugifies these for object_id.
+  // '/' stays blocked: it is the MQTT topic level separator and breaks the command topic
+  // filter (base/+/set/#), the Jinja2 value_template (division) and the HA object_id.
+  private static readonly mqttNameExtraChars = new Set(['_', '-', '.', '[', ']'])
   onMqttKeyPress($event: KeyboardEvent) {
-    // Allowed in MQTT topics and Home Assistant discovery object_ids: [a-zA-Z0-9_-].
-    // '_' and '-' are valid; only the wildcards '+'/'#' and the level separator '/' are not.
     if (
       !('a' <= $event.key && $event.key <= 'z') &&
       !('A' <= $event.key && $event.key <= 'Z') &&
       !('0' <= $event.key && $event.key <= '9') &&
-      $event.key !== '_' &&
-      $event.key !== '-'
+      !EntityComponent.mqttNameExtraChars.has($event.key)
     ) {
       $event.stopImmediatePropagation()
       return false
