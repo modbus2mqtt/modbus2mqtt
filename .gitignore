@@ -163,3 +163,6 @@ distprod
 .skip-precommit
 __tests__/server/tmp-httpserver**/*
 __tests__/server/*_single_*.tsx.*
+
+# pnpm store
+.pnpm-store

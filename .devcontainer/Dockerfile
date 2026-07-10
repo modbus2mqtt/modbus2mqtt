@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM mcr.microsoft.com/devcontainers/typescript-node:20-bookworm
+FROM mcr.microsoft.com/devcontainers/typescript-node:22-bookworm
 
 # Install system dependencies for E2E testing
 RUN apt-get update \
@@ -19,6 +19,8 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Enable corepack to manage package managers like pnpm    
+RUN corepack enable
 
 # Expose all required ports for E2E testing
 EXPOSE 3001 3002 3003 3004 3005 3006 3007 9222
@@ -27,8 +29,9 @@ EXPOSE 3001 3002 3003 3004 3005 3006 3007 9222
 WORKDIR /workspace
 
 # Copy package files and install dependencies as root, then switch to non-root user
-COPY package*.json ./
-RUN npm install
+COPY package*.json pnpm-lock.yaml ./
+
+RUN pnpm install --frozen-lockfile --dangerously-allow-all-builds
 
 # Copy the rest of the workspace
 COPY . .
