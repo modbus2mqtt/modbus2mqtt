@@ -145,6 +145,10 @@ export class EntityValueControlComponent implements OnInit, OnDestroy, OnChanges
           if (this.entity.mqttValue) fc.setValue(this.entity.mqttValue == 'ON')
           break
         case 'value':
+          // Static value (no modbus address): show the computed mqttValue read-only.
+          fc = this.textFormControl
+          if (this.entity.mqttValue != undefined) fc.setValue(this.getMqttValue().toString())
+          break
       }
       if (fc)
         if (this.entity.readonly) fc.disable()
