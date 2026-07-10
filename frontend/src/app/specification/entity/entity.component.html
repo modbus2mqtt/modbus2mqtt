@@ -114,7 +114,7 @@
               />
               <mat-icon
                 matSuffix
-                matTooltip="Name of this value in the MQTT payload. A dot nests the value: &quot;obis.obis_value&quot; produces a nested obis → obis_value object; use [n] for array items, e.g. &quot;values[0]&quot;. Allowed characters: letters, digits, _ - . [ ]. A slash '/' is not allowed (it is the MQTT topic separator and breaks discovery and command topics)."
+                matTooltip="Name of this value in the MQTT payload. A dot nests the value: &quot;obis.obis_value&quot; produces a nested obis → obis_value object. Use [n] to build an array of objects: two entities named &quot;obis[0].obis_key&quot; and &quot;obis[0].obis_value&quot; produce obis: [ { obis_key, obis_value } ]; &quot;obis[1]…&quot; adds a second array item. Allowed characters: letters, digits, _ - . [ ]. A slash '/' is not allowed (it is the MQTT topic separator and breaks discovery and command topics)."
                 >info_outline</mat-icon
               >
 
