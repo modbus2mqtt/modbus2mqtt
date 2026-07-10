@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.9](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.8...modbus2mqtt-v0.25.9) (2026-07-10)
+
+
+### Bug Fixes
+
+* sort slaves numerically by slaveid ([#269](https://github.com/modbus2mqtt/modbus2mqtt/issues/269)) ([eb72a4f](https://github.com/modbus2mqtt/modbus2mqtt/commit/eb72a4f3e05055fcad75ff29b01244e700373f21))
+
 ## [0.25.8](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.7...modbus2mqtt-v0.25.8) (2026-07-09)
 
 
