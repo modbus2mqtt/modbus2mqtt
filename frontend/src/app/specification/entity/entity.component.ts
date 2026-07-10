@@ -114,10 +114,14 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
     _event.target.value = 'YYYY'
   }
   onMqttKeyPress($event: KeyboardEvent) {
+    // Allowed in MQTT topics and Home Assistant discovery object_ids: [a-zA-Z0-9_-].
+    // '_' and '-' are valid; only the wildcards '+'/'#' and the level separator '/' are not.
     if (
       !('a' <= $event.key && $event.key <= 'z') &&
       !('A' <= $event.key && $event.key <= 'Z') &&
-      !('0' <= $event.key && $event.key <= '9')
+      !('0' <= $event.key && $event.key <= '9') &&
+      $event.key !== '_' &&
+      $event.key !== '-'
     ) {
       $event.stopImmediatePropagation()
       return false
