@@ -112,9 +112,11 @@ export class MqttPoller {
                     tAndP.push({ topic: bs.getStateTopic(), payload: bs.getStatePayload(spec.entities), entityid: 0 })
                     tAndP.push({ topic: bs.getAvailabilityTopic(), payload: 'online', entityid: 0 })
                   }
-                  // HTTP push (runs alongside MQTT, or standalone in HTTP-push-only mode)
+                  // HTTP push (runs alongside MQTT, or standalone in HTTP-push-only mode).
+                  // Pass the poll tick time so the {{ pollDate }} URL placeholder reflects the
+                  // scheduled poll time rather than the (possibly later) push completion instant.
                   if (bs.hasHttpPush()) {
-                    HttpPush.pushState(bs, spec).catch((e) =>
+                    HttpPush.pushState(bs, spec, now).catch((e) =>
                       debug('httpPush failed: ' + (e instanceof Error ? e.message : String(e)))
                     )
                   }

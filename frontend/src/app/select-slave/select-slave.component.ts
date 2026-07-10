@@ -112,7 +112,9 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   // Literal strings (contain {{ }}) kept out of the template to avoid Angular interpolation.
   readonly httpPushUrlPlaceholder = 'https://heimvio.de/readings/{{ serialnumber }}'
   readonly httpPushUrlTooltip =
-    'Full target URL. Use {{ path }} placeholders to insert entity values, e.g. {{ serialnumber }}.'
+    'Full target URL. Use {{ path }} placeholders to insert entity values, e.g. {{ serialnumber }}.\n' +
+    'The reserved {{ pollDate }} inserts the poll time as ISO 8601 UTC, e.g. 2026-07-10T08:00:00Z ' +
+    '(e.g. ...?at={{ pollDate }}).'
   readonly pollScheduleTooltip =
     'Optional Unix cron expression. When set it overrides Poll Interval.\n' +
     '5 fields: minute hour day-of-month month day-of-week.\n' +

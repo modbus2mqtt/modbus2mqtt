@@ -250,6 +250,27 @@ describe('Slave http push root + URL templating', () => {
     const slave = new Slave(0, { slaveid: 1, httpPush: { url: 'https://api/static', pushEntities: [1] } }, 'm2m')
     expect(slave.getResolvedHttpPushUrl(orbisEntities)).toBe('https://api/static')
   })
+
+  it('formatPollDate floors to the minute and emits ISO 8601 UTC without milliseconds', () => {
+    expect(Slave.formatPollDate(new Date('2026-07-10T08:00:59.999Z'))).toBe('2026-07-10T08:00:00Z')
+  })
+
+  it('substitutes the reserved {{ pollDate }} with the poll time, url-encoded', () => {
+    const slave = new Slave(0, { slaveid: 1, httpPush: { url: 'https://api/readings?at={{ pollDate }}', pushEntities: [1] } }, 'm2m')
+    const pollDate = new Date('2026-07-10T08:00:03.500Z')
+    expect(slave.getResolvedHttpPushUrl(orbisEntities, pollDate)).toBe('https://api/readings?at=2026-07-10T08%3A00%3A00Z')
+  })
+
+  it('combines an entity placeholder and {{ pollDate }} in one URL', () => {
+    const sn = ent(9, 'serialnumber', '1EMH0011111111', 'text')
+    const slave = new Slave(
+      0,
+      { slaveid: 1, httpPush: { url: 'https://api/readings/{{ serialnumber }}?at={{ pollDate }}', pushEntities: [1] } },
+      'm2m'
+    )
+    const pollDate = new Date('2026-07-10T08:00:00.000Z')
+    expect(slave.getResolvedHttpPushUrl([sn], pollDate)).toBe('https://api/readings/1EMH0011111111?at=2026-07-10T08%3A00%3A00Z')
+  })
 })
 
 // Exercises exactly what the backend poll process runs: mqttpoller calls HttpPush.pushState(slave, spec)
@@ -308,6 +329,19 @@ describe('HttpPush.pushState (poll process)', () => {
       { orbis_key: '0-1:1.8.0', orbis_value: 100 },
       { orbis_key: '0-2:1.8.0', orbis_value: 200 },
     ])
+  })
+
+  it('passes the poll time into the {{ pollDate }} URL placeholder', async () => {
+    fetchMock = jest.fn(async () => ({ ok: true, status: 200, statusText: 'OK' }) as any)
+    globalThis.fetch = fetchMock as any
+    const mk = (id: number, mqttname: string, v: unknown): ImodbusEntity =>
+      ({ id, mqttname, converter: 'number', readonly: true, mqttValue: v }) as unknown as ImodbusEntity
+    const spec = { entities: [mk(1, 'power', 5)] } as unknown as ImodbusSpecification
+    const slave = new Slave(0, { slaveid: 1, httpPush: { url: 'https://api/r?at={{ pollDate }}', pushEntities: [1] } }, 'm2m')
+    await HttpPush.pushState(slave, spec, new Date('2026-07-10T08:00:03.500Z'))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [calledUrl] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(calledUrl).toBe('https://api/r?at=2026-07-10T08%3A00%3A00Z')
   })
 
   it('skips the push (no fetch) when the root path is missing', async () => {

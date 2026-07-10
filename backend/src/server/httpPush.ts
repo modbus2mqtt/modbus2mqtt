@@ -10,11 +10,11 @@ const log = new Logger('httppush')
 export class HttpPush {
   // Pushes the slave's selected entity values to the configured URL via HTTP POST.
   // Errors are logged but never thrown — a failed push must not stop polling or MQTT.
-  static async pushState(slave: Slave, spec: ImodbusSpecification): Promise<void> {
+  static async pushState(slave: Slave, spec: ImodbusSpecification, pollDate?: Date): Promise<void> {
     const httpPush = slave.getHttpPush()
     if (!slave.hasHttpPush() || !httpPush) return
     try {
-      const url = slave.getResolvedHttpPushUrl(spec.entities)
+      const url = slave.getResolvedHttpPushUrl(spec.entities, pollDate)
       if (url == null) {
         log.log(LogLevelEnum.warn, 'HTTP push skipped: URL placeholder not resolvable url: ' + httpPush.url)
         return

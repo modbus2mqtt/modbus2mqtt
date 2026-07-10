@@ -266,9 +266,17 @@ export class Slave {
     }
     return JSON.stringify(holder.value)
   }
+  // Formats a poll timestamp as ISO 8601 in UTC with second precision, floored to the poll minute
+  // (the cron fires once per matching minute), e.g. "2026-07-10T08:00:00Z". Backs the {{ pollDate }}
+  // URL placeholder so the endpoint receives the scheduled poll time, not a noisy sub-second instant.
+  static formatPollDate(pollDate?: Date): string {
+    const t = (pollDate ?? new Date()).getTime()
+    return new Date(Math.floor(t / 60000) * 60000).toISOString().replace(/\.\d{3}Z$/, 'Z')
+  }
   // Resolves {{ path }} placeholders in the push URL against ALL entity values (including device
-  // variables such as serialnumber). Returns null when a placeholder cannot be resolved.
-  getResolvedHttpPushUrl(entities: ImodbusEntity[]): string | null {
+  // variables such as serialnumber). The reserved {{ pollDate }} placeholder yields the poll's
+  // timestamp (see formatPollDate). Returns null when a placeholder cannot be resolved.
+  getResolvedHttpPushUrl(entities: ImodbusEntity[], pollDate?: Date): string | null {
     const url = this.slave.httpPush?.url
     if (url == undefined) return null
     if (!url.includes('{{')) return url
@@ -278,7 +286,16 @@ export class Slave {
         Slave.setByPath(holder, Slave.parseMqttPath(e.mqttname), e.mqttValue)
       }
     }
-    return Slave.substituteTemplate(url, holder.value ?? {})
+    // Entity values live at the object root; add the reserved pollDate alongside them. A non-object
+    // holder (e.g. entities forming a top-level array) has no room for it, so fall back to a fresh
+    // context that still resolves {{ pollDate }} — array-rooted entity placeholders are unrealistic
+    // in a URL anyway.
+    const context: Record<string, unknown> =
+      holder.value != undefined && typeof holder.value === 'object' && !Array.isArray(holder.value)
+        ? (holder.value as Record<string, unknown>)
+        : {}
+    context['pollDate'] = Slave.formatPollDate(pollDate)
+    return Slave.substituteTemplate(url, context)
   }
   static compareSlaves(s1: Slave, s2: Slave): number {
     let rc = s1.busid - s2.busid
