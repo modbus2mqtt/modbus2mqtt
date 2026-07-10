@@ -134,13 +134,18 @@ describe('HTTPS server', () => {
             .get(`https://localhost:${httpsPort}/`, { agent }, (res) => {
               expect(res.statusCode).toBe(200)
 
-              // HTTP redirects to HTTPS
+              // HTTP redirects to HTTPS (302 temporary, see httpServerBase redirect handler)
               http.get(`http://localhost:${httpPort}/test`, (httpRes) => {
-                expect(httpRes.statusCode).toBe(301)
-                expect(httpRes.headers.location).toContain(`https://`)
-                expect(httpRes.headers.location).toContain(String(httpsPort))
-                server.close()
-                resolve()
+                try {
+                  expect(httpRes.statusCode).toBe(302)
+                  expect(httpRes.headers.location).toContain(`https://`)
+                  expect(httpRes.headers.location).toContain(String(httpsPort))
+                  server.close()
+                  resolve()
+                } catch (err) {
+                  server.close()
+                  reject(err)
+                }
               })
             })
             .on('error', (err) => {
