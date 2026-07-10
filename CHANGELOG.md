@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.26.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.9...modbus2mqtt-v0.26.0) (2026-07-10)
+
+
+### Features
+
+* HTTP push of slave readings with cron-based poll scheduling ([#254](https://github.com/modbus2mqtt/modbus2mqtt/issues/254)) ([c39e1ba](https://github.com/modbus2mqtt/modbus2mqtt/commit/c39e1bac96b7b6d3503eb2cd184892255957d20f))
+
+
+### Bug Fixes
+
+* harden MQTT error handling and HTTP redirect, fix frontend debug base href ([#266](https://github.com/modbus2mqtt/modbus2mqtt/issues/266)) ([ced820c](https://github.com/modbus2mqtt/modbus2mqtt/commit/ced820cd5ab6dd2437abe071b61790ff7d9dcb3a))
+
 ## [0.25.9](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.8...modbus2mqtt-v0.25.9) (2026-07-10)
 
 
