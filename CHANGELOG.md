@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.1](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.27.0...modbus2mqtt-v0.27.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* live-update HTTP push body preview under zoneless CD ([#277](https://github.com/modbus2mqtt/modbus2mqtt/issues/277)) ([6c18be0](https://github.com/modbus2mqtt/modbus2mqtt/commit/6c18be01232c610a0a539d2171fe9192b4a0d5a3))
+
 ## [0.27.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.26.1...modbus2mqtt-v0.27.0) (2026-07-10)
 
 
