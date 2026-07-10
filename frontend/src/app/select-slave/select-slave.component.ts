@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, OnInit, Output, ViewChild } from '@angular/core'
+import { Component, ElementRef, EventEmitter, OnInit, Output, signal, ViewChild, WritableSignal } from '@angular/core'
 import {
   AbstractControl,
   FormBuilder,
@@ -67,6 +67,9 @@ interface IuiSlave {
   slaveForm: FormGroup
   commandEntities?: ImodbusEntity[]
   selectedEntitites?: any
+  // Live preview of the HTTP POST body. A signal (not a template method call) so it re-renders
+  // under zoneless change detection when the push entity selection or root form values change.
+  httpPushBody?: WritableSignal<string | undefined>
   // Set once the per-slave modbus identification has been fetched lazily
   // (on first dropdown open). Keeps the initial page load free of N device reads.
   identSpecsLoaded?: boolean
@@ -241,6 +244,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   //slavesFormArray: FormArray<FormGroup>
   slaveNewForm: FormGroup
   paramsSubscription: Subscription | undefined
+  // Per-uiSlave form valueChanges subscriptions driving the live push-body preview signals.
+  private subscriptions: Subscription[] = []
   errorStateMatcher = new M2mErrorStateMatcher()
 
   bus: IBus | undefined
@@ -467,12 +472,19 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     // preparedIdentSpecs list. The per-slave modbus identification is fetched lazily on first
     // dropdown open (loadIdentSpecs) to keep the initial page load free of N device reads.
     rc.specsObservable = new ReplaySubject<IidentificationSpecification[]>(1)
+    // Under zoneless CD the HTTP push body preview cannot be a template method call reading live
+    // form values (nothing re-evaluates it). Drive a signal from the form's valueChanges instead so
+    // selecting push entities or editing the root updates the preview immediately.
+    rc.httpPushBody = signal<string | undefined>(this.getHttpPushBody(rc))
+    this.subscriptions.push(fg.valueChanges.subscribe(() => rc.httpPushBody!.set(this.getHttpPushBody(rc))))
     this.addSpecificationToUiSlave(rc, () => {
       rc.selectedEntitites = this.getSelectedEntites(slave)
       this.fillCommandTopics(rc)
       // slave2Form computed this synchronously before the specification was fetched
       // (slaves arrive without an embedded specification) — recompute now that it's here.
       fg.get('discoverEntitiesList')!.setValue(this.buildDiscoverEntityList(slave))
+      // Recompute now that the specification (and thus entity list) is available.
+      rc.httpPushBody!.set(this.getHttpPushBody(rc))
     })
     return rc
   }
@@ -491,6 +503,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   }
   ngOnDestroy(): void {
     this.paramsSubscription && this.paramsSubscription.unsubscribe()
+    this.subscriptions.forEach((s) => s.unsubscribe())
   }
 
   showUnmatched() {

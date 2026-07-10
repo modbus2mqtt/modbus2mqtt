@@ -152,6 +152,35 @@ describe('Select Slave tests (vitest)', () => {
     httpMock.match(() => true).forEach((r) => r.flush([]))
   })
 
+  it('http push body preview reacts to entity selection and root (zoneless)', async () => {
+    await mount()
+    const uiSlave = fixture.componentInstance.uiSlaves[0]
+
+    // Deterministic spec so the preview does not depend on async spec loading.
+    uiSlave.slave.specification = { entities: [{ id: 1, mqttname: 'e1' }] } as any
+
+    // A URL is required for a non-empty preview.
+    uiSlave.slaveForm.get('httpPushUrl')!.setValue('https://example.com/push')
+    uiSlave.slaveForm.get('pushEntitiesList')!.setValue([])
+    // No entities selected yet -> empty object. The signal updates from valueChanges alone,
+    // without a change-detection cycle (the regression: under zoneless it never re-rendered).
+    expect(uiSlave.httpPushBody!()).toBe('{}')
+
+    // Selecting the entity must immediately update the signal.
+    uiSlave.slaveForm.get('pushEntitiesList')!.setValue([1])
+    expect(uiSlave.httpPushBody!()).toBe('{"e1":""}')
+
+    // A root that exists narrows the payload to that subtree.
+    uiSlave.slaveForm.get('httpPushRoot')!.setValue('e1')
+    expect(uiSlave.httpPushBody!()).toBe('""')
+
+    // A root that does not exist yields the explanatory placeholder.
+    uiSlave.slaveForm.get('httpPushRoot')!.setValue('nope')
+    expect(uiSlave.httpPushBody!()).toContain('not found')
+
+    httpMock.match(() => true).forEach((r) => r.flush([]))
+  })
+
   it('schedule presets, custom and human-readable description', async () => {
     await mount()
     const c = fixture.componentInstance
