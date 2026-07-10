@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.1](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.26.0...modbus2mqtt-v0.26.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* small entity/MQTT-ID UI fixes ([#272](https://github.com/modbus2mqtt/modbus2mqtt/issues/272)) ([43435fd](https://github.com/modbus2mqtt/modbus2mqtt/commit/43435fd77abea819570cc2bd81956989af6e3ae4))
+
 ## [0.26.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.25.9...modbus2mqtt-v0.26.0) (2026-07-10)
 
 
