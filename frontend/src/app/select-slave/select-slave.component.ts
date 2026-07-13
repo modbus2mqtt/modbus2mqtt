@@ -5,6 +5,7 @@ import {
   FormControl,
   FormGroup,
   ValidationErrors,
+  ValidatorFn,
   FormsModule,
   ReactiveFormsModule,
 } from '@angular/forms'
@@ -44,6 +45,7 @@ import {
   Iconfiguration,
   IEntityCommandTopics,
   ImodbusStatusForSlave,
+  ModbusTasks,
 } from '@shared/server'
 import { MatInput } from '@angular/material/input'
 import {
@@ -141,6 +143,62 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     const fields = value.trim().split(/\s+/)
     if (fields.length !== 5) return { cron: true }
     return fields.every((f) => /^[*\d,/\-a-zA-Z]+$/.test(f)) ? null : { cron: true }
+  }
+
+  // Names the backend resolves in a push URL besides the entity mqtt names (see Slave.getResolvedHttpPushUrl)
+  private static readonly reservedPlaceholders = ['pollDate', 'slaveName']
+  // A well formed placeholder: {{ name }}, optional spaces, no braces inside.
+  private static readonly placeholderRegex = /\{\{\s*([^{}]+?)\s*\}\}/g
+
+  // Validates the {{ }} placeholders of the HTTP push URL against the entities of the slave's
+  // specification and the reserved names. The backend silently skips a push whose URL does not
+  // resolve, and a typo like "{pollDate }}" is not a placeholder at all - it would be sent verbatim.
+  private httpPushUrlValidator(slave: Islave): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const url = control.value as string | null
+      if (!url || url.length == 0) return null
+      const names: string[] = []
+      const rest = url.replace(SelectSlaveComponent.placeholderRegex, (_match, name: string) => {
+        names.push(name)
+        return ''
+      })
+      // Anything left over means a brace does not belong to a well formed placeholder.
+      if (rest.includes('{') || rest.includes('}')) return { placeholderSyntax: true }
+      if (names.includes('slaveName')) {
+        const name = control.parent?.get('name')?.value ?? slave.name
+        if (!name || String(name).length == 0) return { slaveNameEmpty: true }
+      }
+      const known = this.getPlaceholderNames(slave)
+      // The specification (and with it the entity names) is fetched after the form was built.
+      // Until it is here only the syntax can be checked.
+      if (known == undefined) return null
+      const unknown = names.filter((n) => !known.includes(n))
+      return unknown.length > 0 ? { unknownPlaceholder: unknown.join(', ') } : null
+    }
+  }
+
+  // All names a push URL placeholder may use, or undefined while the specification is not loaded.
+  private getPlaceholderNames(slave: Islave): string[] | undefined {
+    const spec = slave.specification as ImodbusSpecification | undefined
+    if (!spec || !spec.entities) return undefined
+    const entityNames = spec.entities.map((e) => e.mqttname).filter((n): n is string => n != undefined && n.length > 0)
+    return [...SelectSlaveComponent.reservedPlaceholders, ...entityNames]
+  }
+
+  // Message below the URL field. Kept in the component because the texts contain {{ }}, which
+  // the template would interpolate.
+  getHttpPushUrlError(uiSlave: IuiSlave): string | null {
+    const control = uiSlave.slaveForm.get('httpPushUrl')
+    if (!control || !control.errors) return null
+    if (control.errors['placeholderSyntax'])
+      return 'Malformed placeholder: every {{ and }} must be doubled, e.g. {{ serialnumber }}.'
+    if (control.errors['slaveNameEmpty']) return '{{ slaveName }} is used, but this slave has no Slave Name.'
+    const unknown = control.errors['unknownPlaceholder']
+    if (unknown) {
+      const known = this.getPlaceholderNames(uiSlave.slave)
+      return 'Unknown placeholder: ' + unknown + '. Available: ' + (known ? known.join(', ') : '')
+    }
+    return null
   }
 
   // Common schedules offered in the preset dropdown ('' = no schedule, use the interval).
@@ -515,6 +573,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       fg.get('discoverEntitiesList')!.setValue(this.buildDiscoverEntityList(slave))
       // Recompute now that the specification (and thus entity list) is available.
       rc.httpPushBody!.set(this.getHttpPushBody(rc))
+      // The URL validator could only check the syntax while the entity names were unknown.
+      fg.get('httpPushUrl')!.updateValueAndValidity()
     })
     return rc
   }
@@ -669,7 +729,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         noDiscovery: [false],
         configurationUrl: [slave.configurationUrl],
         discoverEntitiesList: [[]],
-        httpPushUrl: [slave.httpPush?.url],
+        httpPushUrl: [slave.httpPush?.url, this.httpPushUrlValidator(slave)],
         httpPushPat: [null as string | null],
         httpPushRoot: [slave.httpPush?.root],
         pushEntitiesList: [[] as number[]],
@@ -994,7 +1054,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   // reference on every change-detection cycle. Returning a fresh object literal (as before)
   // fed a new @Input into <app-modbus-error> each cycle, forcing it to re-render forever.
   private static readonly emptyModbusStatus: ImodbusStatusForSlave = {
-    requestCount: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    // one counter per ModbusTasks member, so the array grows with the enum
+    requestCount: new Array(Object.keys(ModbusTasks).length / 2).fill(0),
     errors: [],
     queueLength: 0,
   }

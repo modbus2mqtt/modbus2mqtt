@@ -26,7 +26,20 @@ describe('ModbusErrorComponent (vitest)', () => {
     queueLength: 23,
   })
 
-  async function mount(currentDate: number): Promise<ComponentFixture<ModbusErrorComponent>> {
+  // The transport tasks have no register address, they carry a message instead
+  const buildHttpPushErrors = (): ImodbusStatusForSlave => ({
+    errors: [
+      { task: ModbusTasks.httpPush, date: date, state: ModbusErrorStates.httpStatus, message: '503 Service Unavailable' },
+      { task: ModbusTasks.httpPush, date: date, state: ModbusErrorStates.httpStatus, message: '503 Service Unavailable' },
+    ],
+    requestCount: [0, 0, 0, 0, 0, 0, 0, 0, 0, 7],
+    queueLength: 0,
+  })
+
+  async function mount(
+    currentDate: number,
+    status: ImodbusStatusForSlave = buildErrors()
+  ): Promise<ComponentFixture<ModbusErrorComponent>> {
     ;(window as any).configuration = { rootUrl: '/' }
 
     await TestBed.configureTestingModule({
@@ -35,7 +48,7 @@ describe('ModbusErrorComponent (vitest)', () => {
     }).compileComponents()
 
     fixture = TestBed.createComponent(ModbusErrorComponent)
-    fixture.componentInstance.modbusErrors = buildErrors()
+    fixture.componentInstance.modbusErrors = status
     fixture.componentInstance.currentDate = currentDate
     fixture.detectChanges()
 
@@ -60,5 +73,14 @@ describe('ModbusErrorComponent (vitest)', () => {
     const f = await mount(date + 90 * 1000)
     const desc = f.nativeElement.querySelector('mat-panel-description')
     expect(desc?.textContent).toContain('1:30 minutes ago')
+  })
+
+  it('shows an http push error with its message instead of a register address', async () => {
+    const f = await mount(date + 1000, buildHttpPushErrors())
+    const text = f.nativeElement.textContent
+    expect(text).toContain('HTTP Push')
+    expect(text).toContain('(7 processed calls)')
+    expect(text).toContain('HTTP Error Status')
+    expect(f.componentInstance.getErrors(buildHttpPushErrors().errors)).toEqual(['503 Service Unavailable: 2'])
   })
 })

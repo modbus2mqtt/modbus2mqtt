@@ -128,6 +128,11 @@ export enum ModbusErrorStates {
   illegalfunctioncode,
   illegaladdress,
   initialConnect,
+  // States of the non-modbus tasks (mqttPublish, httpPush). New members must be appended,
+  // the numeric values are persisted in cached error lists.
+  connection, // broker/endpoint unreachable, refused, DNS failure
+  httpStatus, // HTTP push answered with a non 2xx status
+  configuration, // push URL placeholder or root path could not be resolved
 }
 
 export interface ImodbusAddress {
@@ -145,12 +150,19 @@ export enum ModbusTasks {
   entity = 5,
   writeEntity = 6,
   initialConnect = 7,
+  // Tasks which don't talk modbus. They share the per slave error list so the UI shows every
+  // failure of a poll cycle in one place. Append only: the value indexes requestCount.
+  mqttPublish = 8,
+  httpPush = 9,
 }
+// A failure of one task of a slave. Modbus tasks carry the failing register address, the
+// transport tasks (mqttPublish, httpPush) carry a message instead - they have no address.
 export interface ImodbusErrorsForSlave {
   task: ModbusTasks
   date: number
-  address: ImodbusAddress
+  address?: ImodbusAddress
   state: ModbusErrorStates
+  message?: string
 }
 export interface ImodbusStatusForSlave {
   requestCount: number[]

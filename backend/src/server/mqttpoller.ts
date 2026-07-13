@@ -1,4 +1,4 @@
-import { Slave, PollModes, ModbusTasks } from '../shared/server/index.js'
+import { Slave, PollModes, ModbusTasks, ModbusErrorStates } from '../shared/server/index.js'
 import Debug from 'debug'
 import { LogLevelEnum, Logger } from '../specification/index.js'
 import { Bus } from './bus.js'
@@ -8,6 +8,7 @@ import { ItopicAndPayloads, MqttDiscover } from './mqttdiscover.js'
 import { MqttConnector } from './mqttconnector.js'
 import { HttpPush } from './httpPush.js'
 import { CronSchedule } from './cronSchedule.js'
+import { countSlaveRequest, recordSlaveError } from './slaveStatus.js'
 
 const debug = Debug('mqttpoller')
 const defaultPollCount = 50 // 5 seconds
@@ -82,7 +83,9 @@ export class MqttPoller {
         }
       })
       if (needPolls.length > 0) {
-        const tAndP: ItopicAndPayloads[] = []
+        // The slave is kept alongside its messages: publish happens after all slaves have been read,
+        // so a publish error must still be attributed to the slave it belongs to.
+        const tAndP: { slave: Slave; message: ItopicAndPayloads }[] = []
         let pollDeviceCount = 0
         let devicesToPoll = 0
         needPolls.forEach((bs) => {
@@ -109,8 +112,14 @@ export class MqttPoller {
               }).subscribe({
                 next: (spec) => {
                   if (bs.shouldPublishMqtt()) {
-                    tAndP.push({ topic: bs.getStateTopic(), payload: bs.getStatePayload(spec.entities), entityid: 0 })
-                    tAndP.push({ topic: bs.getAvailabilityTopic(), payload: 'online', entityid: 0 })
+                    tAndP.push({
+                      slave: bs,
+                      message: { topic: bs.getStateTopic(), payload: bs.getStatePayload(spec.entities), entityid: 0 },
+                    })
+                    tAndP.push({
+                      slave: bs,
+                      message: { topic: bs.getAvailabilityTopic(), payload: 'online', entityid: 0 },
+                    })
                   }
                   // HTTP push (runs alongside MQTT, or standalone in HTTP-push-only mode).
                   // Pass the poll tick time so the {{ pollDate }} URL placeholder reflects the
@@ -135,8 +144,19 @@ export class MqttPoller {
                   if (pollDeviceCount == devicesToPoll) {
                     this.connector.getMqttClient((mqttClient) => {
                       debug('poll: publishing')
-                      tAndP.forEach((tAndP) => {
-                        mqttClient.publish(tAndP.topic, tAndP.payload)
+                      tAndP.forEach((entry) => {
+                        // Without the callback a publish failure (broker gone, queue full) was lost
+                        // entirely. It is now visible in the slave's Status & Errors panel.
+                        mqttClient.publish(entry.message.topic, entry.message.payload, (err) => {
+                          if (err)
+                            recordSlaveError(
+                              entry.slave,
+                              ModbusTasks.mqttPublish,
+                              ModbusErrorStates.connection,
+                              err.message + ' topic: ' + entry.message.topic
+                            )
+                          else countSlaveRequest(entry.slave, ModbusTasks.mqttPublish)
+                        })
                       })
                       resolve()
                     })

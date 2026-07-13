@@ -156,6 +156,48 @@ describe('Select Slave tests (vitest)', () => {
     httpMock.match(() => true).forEach((r) => r.flush([]))
   })
 
+  // The backend resolves {{ name }} against the entity mqtt names plus pollDate and slaveName. A
+  // malformed or unknown placeholder makes it skip the push (or send the text verbatim), so the
+  // form flags it while the URL is being typed. The fixture spec has one entity, mqttname 'e1'.
+  describe('http push url placeholders', () => {
+    async function validate(url: string): Promise<string | null> {
+      const uiSlave = fixture.componentInstance.uiSlaves[0]
+      uiSlave.slaveForm.get('httpPushUrl')!.setValue(url)
+      safeDetectChanges()
+      return fixture.componentInstance.getHttpPushUrlError(uiSlave)
+    }
+
+    it('accepts an entity name and the reserved names', async () => {
+      await mount()
+      expect(await validate('https://api/r/{{ e1 }}?at={{ pollDate }}&m={{ slaveName }}')).toBeNull()
+      expect(await validate('https://api/r')).toBeNull()
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+
+    it('rejects a placeholder with a missing brace', async () => {
+      await mount()
+      // this typo is silently sent to the endpoint as literal text
+      expect(await validate('https://api/r?at={pollDate }}')).toContain('Malformed placeholder')
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+
+    it('rejects an unknown name and lists the available ones', async () => {
+      await mount()
+      const error = await validate('https://api/r/{{ serialnumber }}')
+      expect(error).toContain('Unknown placeholder: serialnumber')
+      expect(error).toContain('pollDate, slaveName, e1')
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+
+    it('rejects slaveName when the slave has no name', async () => {
+      await mount()
+      const uiSlave = fixture.componentInstance.uiSlaves[0]
+      uiSlave.slaveForm.get('name')!.setValue('')
+      expect(await validate('https://api/r?m={{ slaveName }}')).toContain('this slave has no Slave Name')
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+  })
+
   describe('referencing slaves', () => {
     // What the backend serves for a reference: the inherited fields are materialized, and
     // referenceSlaveId marks it as following slave 1.

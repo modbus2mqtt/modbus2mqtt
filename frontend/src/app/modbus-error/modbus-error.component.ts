@@ -17,9 +17,9 @@ export class ModbusErrorComponent implements OnInit, OnDestroy {
   @Input({ required: true }) modbusErrors: ImodbusStatusForSlave | undefined
   @Input({ required: false }) currentDate: number | undefined = undefined
 
-  tasksToCount: ModbusTasks[] = [ModbusTasks.poll, ModbusTasks.specification]
+  tasksToCount: ModbusTasks[] = [ModbusTasks.poll, ModbusTasks.specification, ModbusTasks.mqttPublish, ModbusTasks.httpPush]
 
-  tasksToLog: ModbusTasks[] = [ModbusTasks.poll, ModbusTasks.specification]
+  tasksToLog: ModbusTasks[] = [ModbusTasks.poll, ModbusTasks.specification, ModbusTasks.mqttPublish, ModbusTasks.httpPush]
   private refreshInterval: ReturnType<typeof setInterval> | undefined
   constructor(private entityApiService: ApiService) {}
   ngOnInit(): void {
@@ -50,6 +50,10 @@ export class ModbusErrorComponent implements OnInit, OnDestroy {
         return 'Poll'
       case ModbusTasks.initialConnect:
         return 'Initial Connect'
+      case ModbusTasks.mqttPublish:
+        return 'MQTT Publish'
+      case ModbusTasks.httpPush:
+        return 'HTTP Push'
       default:
         return 'unknown'
     }
@@ -100,6 +104,12 @@ export class ModbusErrorComponent implements OnInit, OnDestroy {
         return 'Other'
       case ModbusErrorStates.initialConnect:
         return 'Initial Connect'
+      case ModbusErrorStates.connection:
+        return 'Connection Failed'
+      case ModbusErrorStates.httpStatus:
+        return 'HTTP Error Status'
+      case ModbusErrorStates.configuration:
+        return 'Configuration Error'
       default:
         return 'unknown'
     }
@@ -133,35 +143,39 @@ export class ModbusErrorComponent implements OnInit, OnDestroy {
     })
     return states
   }
+  // Renders an error list as text. Modbus errors are grouped by register type and address, the
+  // errors of the transport tasks (MQTT Publish, HTTP Push) have no address and are grouped by
+  // their message instead.
   getErrors(inValue: ImodbusErrorsForSlave[]): string[] {
     const rc: {
       registerType: ModbusRegisterType
       addresses: { address: number; count: number }[]
     }[] = []
-    const previous: ImodbusErrorsForSlave = {
-      address: { address: -1, registerType: ModbusRegisterType.AnalogInputs },
-      task: ModbusTasks.initialConnect,
-      state: ModbusErrorStates.noerror,
-      date: 0,
-    }
+    const messages: { message: string; count: number }[] = []
     if (inValue != undefined)
       inValue.forEach((v) => {
-        if (v.address.address != previous.address.address || v.address.registerType != previous.address.registerType) {
-          const foundRgType = rc.find((rcv) => v.address.registerType == rcv.registerType)
-          if (foundRgType) {
-            const foundAddr = foundRgType.addresses.find((a) => v.address.address == a.address)
-            if (foundAddr) foundAddr.count++
-            else
-              foundRgType.addresses.push({
-                address: v.address.address,
-                count: 1,
-              })
-          } else
-            rc.push({
-              registerType: v.address.registerType,
-              addresses: [{ address: v.address.address, count: 1 }],
-            })
+        const address = v.address
+        if (address == undefined) {
+          const message = v.message != undefined && v.message.length > 0 ? v.message : this.getErrorStateName(v.state)
+          const found = messages.find((m) => m.message == message)
+          if (found) found.count++
+          else messages.push({ message, count: 1 })
+          return
         }
+        const foundRgType = rc.find((rcv) => address.registerType == rcv.registerType)
+        if (foundRgType) {
+          const foundAddr = foundRgType.addresses.find((a) => address.address == a.address)
+          if (foundAddr) foundAddr.count++
+          else
+            foundRgType.addresses.push({
+              address: address.address,
+              count: 1,
+            })
+        } else
+          rc.push({
+            registerType: address.registerType,
+            addresses: [{ address: address.address, count: 1 }],
+          })
       })
     const rcs: string[] = []
     rc.forEach((v) => {
@@ -173,6 +187,7 @@ export class ModbusErrorComponent implements OnInit, OnDestroy {
       r += addr.join(', ') + ']\n'
       rcs.push(r)
     })
+    messages.forEach((m) => rcs.push(m.message + ': ' + m.count))
     return rcs
   }
   getSinceTimeString(errorList: ImodbusErrorsForSlave[]): string {

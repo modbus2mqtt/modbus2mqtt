@@ -40,6 +40,8 @@ export interface IconsumerModbusAPI {
     options: IQueueOptions
   ) => Promise<void>
   readModbusRegister: (slaveId: number, addresses: Set<ImodbusAddress>, options: IexecuteOptions) => Promise<ImodbusValues>
+  addSlaveError: (slaveid: number, task: ModbusTasks, state: ModbusErrorStates, message: string) => void
+  countRequest: (slaveid: number, task: ModbusTasks) => void
 }
 export interface IModbusConfiguration {
   getId: () => number
@@ -367,5 +369,13 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
   }
   getErrors(slaveid: number): ImodbusStatusForSlave {
     return this._modbusRTUWorker.getErrors(slaveid)
+  }
+  // Entry point for the non modbus tasks (mqtt publish, http push) to report into the slave's
+  // error list, so the UI shows all failures of a poll cycle in one place.
+  addSlaveError(slaveid: number, task: ModbusTasks, state: ModbusErrorStates, message: string): void {
+    this._modbusRTUWorker.addSlaveError(slaveid, task, state, message)
+  }
+  countRequest(slaveid: number, task: ModbusTasks): void {
+    this._modbusRTUWorker.countRequest(slaveid, task)
   }
 }

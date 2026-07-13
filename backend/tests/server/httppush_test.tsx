@@ -1,10 +1,11 @@
-import { it, expect, describe, beforeAll, afterAll, jest } from '@jest/globals'
+import { it, expect, describe, beforeAll, beforeEach, afterAll, jest } from '@jest/globals'
 import * as fs from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { Converters, ModbusRegisterType, VariableTargetParameters } from '../../src/shared/specification/index.js'
 import { IfileSpecification, M2mSpecification } from '../../src/specification/index.js'
-import { Islave, PollModes, Slave } from '../../src/shared/server/index.js'
+import { Islave, ModbusErrorStates, ModbusTasks, PollModes, Slave } from '../../src/shared/server/index.js'
+import { Bus } from '../../src/server/bus.js'
 import { ImodbusEntity, ImodbusSpecification } from '../../src/shared/specification/index.js'
 import { ConfigPersistence } from '../../src/server/persistence/configPersistence.js'
 import { encryptSecret, decryptSecret } from '../../src/server/secureSecret.js'
@@ -404,6 +405,69 @@ describe('HttpPush.pushState (poll process)', () => {
     const slave = new Slave(0, { slaveid: 1, httpPush: { url: 'https://api/x', root: 'missing', pushEntities: [1] } }, 'm2m')
     await HttpPush.pushState(slave, spec)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// A failed push must show up in the slave's Status & Errors panel next to the modbus errors.
+describe('HttpPush.pushState error reporting', () => {
+  let originalFetch: typeof globalThis.fetch
+  let errors: { task: ModbusTasks; state: ModbusErrorStates; message: string }[]
+  let counted: ModbusTasks[]
+  let getBusSpy: ReturnType<typeof jest.spyOn>
+
+  const spec = {
+    entities: [{ id: 1, mqttname: 'power', converter: 'number', readonly: true, mqttValue: 5 }],
+  } as unknown as ImodbusSpecification
+  const slave = new Slave(0, { slaveid: 7, httpPush: { url: 'https://api/x', pushEntities: [1] } }, 'm2m')
+
+  beforeAll(() => {
+    originalFetch = globalThis.fetch
+  })
+  afterAll(() => {
+    globalThis.fetch = originalFetch
+    getBusSpy.mockRestore()
+  })
+  beforeEach(() => {
+    errors = []
+    counted = []
+    const modbusAPI = {
+      addSlaveError: (_slaveid: number, task: ModbusTasks, state: ModbusErrorStates, message: string) =>
+        errors.push({ task, state, message }),
+      countRequest: (_slaveid: number, task: ModbusTasks) => counted.push(task),
+    }
+    getBusSpy = jest.spyOn(Bus, 'getBus').mockReturnValue({ getModbusAPI: () => modbusAPI } as any)
+  })
+
+  it('records a non 2xx response as httpStatus error', async () => {
+    globalThis.fetch = jest.fn(async () => ({ ok: false, status: 503, statusText: 'Service Unavailable' }) as any) as any
+    await HttpPush.pushState(slave, spec)
+    expect(errors).toEqual([
+      { task: ModbusTasks.httpPush, state: ModbusErrorStates.httpStatus, message: '503 Service Unavailable' },
+    ])
+    expect(counted).toEqual([])
+  })
+
+  it('records an unreachable endpoint as connection error', async () => {
+    globalThis.fetch = jest.fn(async () => {
+      throw new Error('fetch failed')
+    }) as any
+    await HttpPush.pushState(slave, spec)
+    expect(errors).toEqual([{ task: ModbusTasks.httpPush, state: ModbusErrorStates.connection, message: 'fetch failed' }])
+  })
+
+  it('records an unresolvable URL placeholder as configuration error', async () => {
+    globalThis.fetch = jest.fn(async () => ({ ok: true, status: 200, statusText: 'OK' }) as any) as any
+    const unresolvable = new Slave(0, { slaveid: 7, httpPush: { url: 'https://api/{{ serialnumber }}', pushEntities: [1] } }, 'm2m')
+    await HttpPush.pushState(unresolvable, spec)
+    expect(errors.map((e) => e.state)).toEqual([ModbusErrorStates.configuration])
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+
+  it('counts a successful push instead of recording an error', async () => {
+    globalThis.fetch = jest.fn(async () => ({ ok: true, status: 200, statusText: 'OK' }) as any) as any
+    await HttpPush.pushState(slave, spec)
+    expect(errors).toEqual([])
+    expect(counted).toEqual([ModbusTasks.httpPush])
   })
 })
 

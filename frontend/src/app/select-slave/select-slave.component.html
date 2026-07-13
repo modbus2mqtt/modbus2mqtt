@@ -426,6 +426,9 @@
                           [placeholder]="httpPushUrlPlaceholder"
                           [matTooltip]="httpPushUrlTooltip"
                         />
+                        @if (getHttpPushUrlError(uislave); as urlError) {
+                          <mat-error>{{ urlError }}</mat-error>
+                        }
                       </mat-form-field>
                       <mat-form-field class="width550">
                         <mat-label>Bearer PAT</mat-label>
@@ -460,15 +463,15 @@
                     </ng-template>
                   </mat-expansion-panel>
                 }
-                <mat-expansion-panel>
-                  <mat-expansion-panel-header>
-                    <mat-panel-title>Modbus Status &amp;Errors </mat-panel-title>
-                  </mat-expansion-panel-header>
-                  <ng-template matExpansionPanelContent>
-                    <app-modbus-error-component [modbusErrors]="getModbusErrors(uislave)" />
-                  </ng-template>
-                </mat-expansion-panel>
               }
+              <mat-expansion-panel>
+                <mat-expansion-panel-header>
+                  <mat-panel-title>Status &amp; Errors </mat-panel-title>
+                </mat-expansion-panel-header>
+                <ng-template matExpansionPanelContent>
+                  <app-modbus-error-component [modbusErrors]="getModbusErrors(uislave)" />
+                </ng-template>
+              </mat-expansion-panel>
             </mat-card-content>
           </form>
         </mat-card>

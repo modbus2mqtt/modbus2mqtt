@@ -26,16 +26,13 @@ interface IModbusResultCache extends IModbusResultOrError {
 }
 class ModbusErrorDescription {
   constructor(
-    private queueEntry: IQueueEntry,
-    private state: ModbusErrorStates,
+    private error: Omit<ImodbusErrorsForSlave, 'date'>,
     public date: Date = new Date()
   ) {}
   getModbusErorForSlave(): ImodbusErrorsForSlave {
     return {
+      ...this.error,
       date: this.date.getTime(),
-      task: this.queueEntry.options.task,
-      address: this.queueEntry.address,
-      state: this.state,
     }
   }
 }
@@ -382,11 +379,34 @@ export class ModbusRTUWorker extends ModbusWorker {
     })
   }
   public addError(queueEntry: IQueueEntry, state: ModbusErrorStates, date: Date = new Date()) {
-    let c = this.cache.get(queueEntry.slaveId)
-    if (this.cache.get(queueEntry.slaveId) == undefined) this.cache.set(queueEntry.slaveId, this.createEmptyIModbusValues())
-    c = this.cache.get(queueEntry.slaveId)
-    c?.errors.splice(0, c.errors.length - 50)
-    c?.errors.push(new ModbusErrorDescription(queueEntry, state, date))
+    this.pushError(
+      queueEntry.slaveId,
+      new ModbusErrorDescription({ task: queueEntry.options.task, address: queueEntry.address, state }, date)
+    )
+  }
+  // Records a failure of a task which doesn't talk modbus (mqttPublish, httpPush). It has no
+  // register address, the message describes the failure instead. Shares the slave's error list,
+  // so a poll cycle failing at any stage shows up in the slave's Status & Errors panel.
+  public addSlaveError(slaveId: number, task: ModbusTasks, state: ModbusErrorStates, message: string, date: Date = new Date()) {
+    this.pushError(slaveId, new ModbusErrorDescription({ task, state, message }, date))
+  }
+  // Counts a successfully processed call of a non modbus task. The modbus tasks are counted in
+  // processOneEntry(); without this the UI would report "0 processed calls" for mqtt and http push.
+  public countRequest(slaveId: number, task: ModbusTasks, date: Date = new Date()) {
+    this.getOrCreateCache(slaveId).requestCount[task][date.getMinutes()]++
+  }
+  private pushError(slaveId: number, description: ModbusErrorDescription) {
+    const c = this.getOrCreateCache(slaveId)
+    c.errors.splice(0, c.errors.length - 50)
+    c.errors.push(description)
+  }
+  private getOrCreateCache(slaveId: number): ImodbusValuesCache {
+    let c = this.cache.get(slaveId)
+    if (c == undefined) {
+      c = this.createEmptyIModbusValues()
+      this.cache.set(slaveId, c)
+    }
+    return c
   }
   private compareEntities(a: IQueueEntry, b: IQueueEntry): number {
     return b.options.task - a.options.task
@@ -449,6 +469,10 @@ export class ModbusRTUWorker extends ModbusWorker {
         queueLength: this.queue.getLength(),
       }
     }
-    return { errors: [], requestCount: [0, 0, 0, 0, 0, 0, 0, 0], queueLength: 0 } as ImodbusStatusForSlave
+    return {
+      errors: [],
+      requestCount: new Array(Object.keys(ModbusTasks).length / 2).fill(0),
+      queueLength: 0,
+    } as ImodbusStatusForSlave
   }
 }

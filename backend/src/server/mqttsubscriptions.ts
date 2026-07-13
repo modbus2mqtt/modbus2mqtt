@@ -1,4 +1,4 @@
-import { Slave, ModbusTasks } from '../shared/server/index.js'
+import { Slave, ModbusTasks, ModbusErrorStates } from '../shared/server/index.js'
 import Debug from 'debug'
 import { ConfigSpecification, ConverterMap, LogLevelEnum, Logger } from '../specification/index.js'
 import { Bus } from './bus.js'
@@ -10,6 +10,7 @@ import { Ientity, ImodbusSpecification } from '../shared/specification/index.js'
 import { Converter } from '../specification/index.js'
 import { Observable } from 'rxjs'
 import { IClientPublishOptions, MqttClient } from 'mqtt'
+import { countSlaveRequest, recordSlaveError } from './slaveStatus.js'
 
 const debug = Debug('mqttsubscription')
 const log = new Logger('mqttsubscription')
@@ -142,11 +143,14 @@ export class MqttSubscriptions {
       if (slave.shouldPublishMqtt()) {
         await this.publishAsync(mqttClient, topic, slave.getStatePayload(spec.entities), options)
         await this.publishAsync(mqttClient, slave.getAvailabilityTopic(), 'online', options)
+        countSlaveRequest(slave, ModbusTasks.mqttPublish)
       }
       if (slave.hasHttpPush()) await HttpPush.pushState(slave, spec)
     } catch (e: unknown) {
+      // HttpPush records its own errors, so anything arriving here failed to publish to mqtt.
       const msg = e instanceof Error ? e.message : String(e)
       log.log(LogLevelEnum.error, 'publishState failed: ' + msg)
+      recordSlaveError(slave, ModbusTasks.mqttPublish, ModbusErrorStates.connection, msg + ' topic: ' + topic)
       try {
         await this.publishAsync(mqttClient, slave.getAvailabilityTopic(), 'offline', options)
       } catch (e2: unknown) {
