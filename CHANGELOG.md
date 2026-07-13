@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.30.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.29.0...modbus2mqtt-v0.30.0) (2026-07-13)
+
+
+### Features
+
+* slave references - inherit a slave's configuration on the same bus ([#286](https://github.com/modbus2mqtt/modbus2mqtt/issues/286)) ([6663336](https://github.com/modbus2mqtt/modbus2mqtt/commit/66633369617a47c89c05881c8cbfda135d820475))
+
+## [0.29.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.28.0...modbus2mqtt-v0.29.0) (2026-07-13)
+
+
+### Features
+
+* add {{ slaveName }} URL placeholder for HTTP push ([#284](https://github.com/modbus2mqtt/modbus2mqtt/issues/284)) ([5814732](https://github.com/modbus2mqtt/modbus2mqtt/commit/58147325592fad5e8a3277e7d52bdd40c6d97580))
+
 ## [0.28.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.27.1...modbus2mqtt-v0.28.0) (2026-07-10)
 
 

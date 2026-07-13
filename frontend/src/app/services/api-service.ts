@@ -412,11 +412,6 @@ export class ApiService {
       })
     )
   }
-  /**
-   * detachReferences lets the backend turn the slaves referencing this one into standalone slaves
-   * (keeping their inherited configuration) instead of refusing the delete with a 409.
-   * errorHandler returning true suppresses the global alert, so the caller can handle the 409 itself.
-   */
   // Runs one poll cycle for the slave now, regardless of its poll mode and interval. Returns the
   // slave with the refreshed modbusStatusForSlave. The caller passes an errorHandler to report a
   // failing poll (timeout, modbus error) instead of silently swallowing it.
@@ -428,6 +423,11 @@ export class ApiService {
       })
     )
   }
+  /**
+   * detachReferences lets the backend turn the slaves referencing this one into standalone slaves
+   * (keeping their inherited configuration) instead of refusing the delete with a 409.
+   * errorHandler returning true suppresses the global alert, so the caller can handle the 409 itself.
+   */
   deleteSlave(
     busid: number,
     slaveid: number,
