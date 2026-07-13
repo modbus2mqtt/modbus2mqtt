@@ -217,6 +217,35 @@ describe('Select Slave tests (vitest)', () => {
       httpMock.match(() => true).forEach((r) => r.flush([]))
     })
 
+    it('turns an existing slave into a reference when one is selected in its card', async () => {
+      // two standalone slaves: slave 2 can take its settings from slave 1
+      const standalone = [slavesFixture[0], { ...slavesFixture[0], slaveid: 2, name: 'second meter', rootTopic: 'meters/2' }]
+      await mount(standalone)
+      const component = fixture.componentInstance
+      const uiSlave = component.uiSlaves.find((u) => u.slave.slaveid === 2)!
+
+      // the card of an existing standalone slave offers the reference (this is what makes it reachable
+      // without recreating the slave)
+      expect(uiSlave.slaveForm.get('referenceSlaveId')!.value).toBeNull()
+      expect(component.referenceCandidates(2).map((s) => s.slaveid)).toEqual([1])
+
+      uiSlave.slaveForm.get('referenceSlaveId')!.setValue(1)
+      safeDetectChanges()
+      component.saveSlave(uiSlave)
+      safeDetectChanges()
+
+      const postReq = httpMock.expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave'))
+      expect(postReq.request.body).toEqual({
+        slaveid: 2,
+        referenceSlaveId: 1,
+        name: 'second meter',
+        rootTopic: 'meters/2',
+      })
+      postReq.flush(postReq.request.body)
+      safeDetectChanges()
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+
     it('offers to detach the references when deleting a referenced slave (409)', async () => {
       await mount(referencingSlaves)
       const component = fixture.componentInstance

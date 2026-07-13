@@ -590,6 +590,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     fg.get('discoverEntitiesList')!.setValue(this.buildDiscoverEntityList(slave))
     if (slave.noDiscovery) fg.get('discoverEntitiesList')!.disable()
     else fg.get('discoverEntitiesList')!.enable()
+    fg.get('referenceSlaveId')!.setValue(slave.referenceSlaveId ?? null)
     fg.get('httpPushUrl')!.setValue(slave.httpPush?.url ?? null)
     fg.get('httpPushPat')!.setValue(null) // never prefill the PAT into the form
     fg.get('httpPushRoot')!.setValue(slave.httpPush?.root ?? null)
@@ -651,6 +652,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         httpPushPat: [null as string | null],
         httpPushRoot: [slave.httpPush?.root],
         pushEntitiesList: [[] as number[]],
+        // Lets an existing standalone slave become a reference to another one.
+        referenceSlaveId: [null as number | null],
       })
       this.slave2Form(slave, fg)
       return fg
@@ -791,6 +794,16 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     }
   }
   saveSlave(uiSlave: IuiSlave) {
+    // A standalone slave that got a reference selected becomes a referencing slave on save: it keeps
+    // its name/root topic and inherits the rest from now on (the previously configured values are
+    // dropped - the referenced slave's win).
+    const newReference: number | null = uiSlave.slaveForm.get('referenceSlaveId')?.value ?? null
+    if (!this.isReference(uiSlave.slave) && newReference != null) {
+      SelectSlaveComponent.referenceControllers.forEach((controller) => {
+        SelectSlaveComponent.form2SlaveSetValue(uiSlave, controller)
+      })
+      uiSlave.slave.referenceSlaveId = newReference
+    }
     // A referencing slave saves its own fields only. Writing back the inherited ones would bake in a
     // copy that stops following the referenced slave (the backend discards them anyway).
     if (this.isReference(uiSlave.slave)) {
