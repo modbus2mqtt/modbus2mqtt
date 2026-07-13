@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.32.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.31.0...modbus2mqtt-v0.32.0) (2026-07-13)
+
+
+### Features
+
+* add per-slave maxRegistersPerRequest for Modbus read chunking ([#283](https://github.com/modbus2mqtt/modbus2mqtt/issues/283)) ([76c4170](https://github.com/modbus2mqtt/modbus2mqtt/commit/76c4170e5bdc8e9a0ffef337eb13101e92599317))
+* configurable serial framing (data bits, parity, stop bits) ([#292](https://github.com/modbus2mqtt/modbus2mqtt/issues/292)) ([4252605](https://github.com/modbus2mqtt/modbus2mqtt/commit/42526050114aabd222b9582b548b9b4f23b477b2))
+
+
+### Bug Fixes
+
+* a slave that cannot be polled says so in Status & Errors ([#294](https://github.com/modbus2mqtt/modbus2mqtt/issues/294)) ([f48804f](https://github.com/modbus2mqtt/modbus2mqtt/commit/f48804fc8c5afaf525f44dba41f25df17750c8db))
+* **devcontainer:** make the devcontainer work with pnpm + Node 22 ([#281](https://github.com/modbus2mqtt/modbus2mqtt/issues/281)) ([184951b](https://github.com/modbus2mqtt/modbus2mqtt/commit/184951b0069c42288b76b073b9a51210fd1be154))
+* honour swapWords/swapBytes and keep the last value on a failed poll ([#291](https://github.com/modbus2mqtt/modbus2mqtt/issues/291)) ([2fba5d2](https://github.com/modbus2mqtt/modbus2mqtt/commit/2fba5d24b16462f43b8b75e01e1e2da2a3a511e2))
+* render slave list reliably under zoneless change detection ([#282](https://github.com/modbus2mqtt/modbus2mqtt/issues/282)) ([cd3fb61](https://github.com/modbus2mqtt/modbus2mqtt/commit/cd3fb6104b48360eac82d8a79b013d1371a53613))
+
 ## [0.31.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.30.0...modbus2mqtt-v0.31.0) (2026-07-13)
 
 
