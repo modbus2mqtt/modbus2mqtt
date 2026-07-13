@@ -31,7 +31,7 @@ export enum PollModes {
   intervallHttpPushNoMqtt = 4, // interval poll + HTTP push, no MQTT state publishing
 }
 export interface IhttpPush {
-  url: string // full target URL, may contain {{ path }} placeholders, e.g. https://heimvio.de/readings/{{ serialnumber }}; reserved {{ pollDate }} = poll time as ISO 8601 UTC
+  url: string // full target URL, may contain {{ path }} placeholders, e.g. https://heimvio.de/readings/{{ serialnumber }}; reserved: {{ pollDate }} = poll time as ISO 8601 UTC, {{ slaveName }} = the slave's name
   patEnc?: string // AES-256-GCM encrypted Bearer PAT (base64), see secureSecret.ts
   pushEntities?: number[] // entity ids to include in the push payload
   root?: string // optional path (mqttname format) selecting a subtree of the push payload, e.g. "orbis"

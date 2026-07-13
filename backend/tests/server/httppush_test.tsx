@@ -271,6 +271,35 @@ describe('Slave http push root + URL templating', () => {
     const pollDate = new Date('2026-07-10T08:00:00.000Z')
     expect(slave.getResolvedHttpPushUrl([sn], pollDate)).toBe('https://api/readings/1EMH0011111111?at=2026-07-10T08%3A00%3A00Z')
   })
+
+  it('substitutes the reserved {{ slaveName }} with the slave name, url-encoded', () => {
+    const slave = new Slave(
+      0,
+      { slaveid: 1, name: 'Zähler Küche/EG', httpPush: { url: 'https://api/readings?meter={{ slaveName }}', pushEntities: [1] } },
+      'm2m'
+    )
+    expect(slave.getResolvedHttpPushUrl(orbisEntities)).toBe('https://api/readings?meter=Z%C3%A4hler%20K%C3%BCche%2FEG')
+  })
+
+  it('returns null for {{ slaveName }} when the slave has no name', () => {
+    const slave = new Slave(0, { slaveid: 1, httpPush: { url: 'https://api/readings?meter={{ slaveName }}', pushEntities: [1] } }, 'm2m')
+    expect(slave.getResolvedHttpPushUrl(orbisEntities)).toBeNull()
+  })
+
+  it('combines {{ slaveName }}, an entity placeholder and {{ pollDate }} in one URL', () => {
+    const sn = ent(9, 'serialnumber', '1EMH0011111111', 'text')
+    const slave = new Slave(
+      0,
+      {
+        slaveid: 1,
+        name: 'Meter 1',
+        httpPush: { url: 'https://api/{{ slaveName }}/{{ serialnumber }}?at={{ pollDate }}', pushEntities: [1] },
+      },
+      'm2m'
+    )
+    const pollDate = new Date('2026-07-10T08:00:00.000Z')
+    expect(slave.getResolvedHttpPushUrl([sn], pollDate)).toBe('https://api/Meter%201/1EMH0011111111?at=2026-07-10T08%3A00%3A00Z')
+  })
 })
 
 // Exercises exactly what the backend poll process runs: mqttpoller calls HttpPush.pushState(slave, spec)

@@ -275,7 +275,9 @@ export class Slave {
   }
   // Resolves {{ path }} placeholders in the push URL against ALL entity values (including device
   // variables such as serialnumber). The reserved {{ pollDate }} placeholder yields the poll's
-  // timestamp (see formatPollDate). Returns null when a placeholder cannot be resolved.
+  // timestamp (see formatPollDate), {{ slaveName }} the slave's configured name. All substituted
+  // values are URL-encoded. Returns null when a placeholder cannot be resolved (e.g. {{ slaveName }}
+  // on a slave without a name), which makes the caller skip the push.
   getResolvedHttpPushUrl(entities: ImodbusEntity[], pollDate?: Date): string | null {
     const url = this.slave.httpPush?.url
     if (url == undefined) return null
@@ -286,15 +288,16 @@ export class Slave {
         Slave.setByPath(holder, Slave.parseMqttPath(e.mqttname), e.mqttValue)
       }
     }
-    // Entity values live at the object root; add the reserved pollDate alongside them. A non-object
-    // holder (e.g. entities forming a top-level array) has no room for it, so fall back to a fresh
-    // context that still resolves {{ pollDate }} — array-rooted entity placeholders are unrealistic
-    // in a URL anyway.
+    // Entity values live at the object root; add the reserved variables alongside them. A non-object
+    // holder (e.g. entities forming a top-level array) has no room for them, so fall back to a fresh
+    // context that still resolves the reserved names — array-rooted entity placeholders are
+    // unrealistic in a URL anyway.
     const context: Record<string, unknown> =
       holder.value != undefined && typeof holder.value === 'object' && !Array.isArray(holder.value)
         ? (holder.value as Record<string, unknown>)
         : {}
     context['pollDate'] = Slave.formatPollDate(pollDate)
+    if (this.slave.name != undefined && this.slave.name.length > 0) context['slaveName'] = this.slave.name
     return Slave.substituteTemplate(url, context)
   }
   static compareSlaves(s1: Slave, s2: Slave): number {

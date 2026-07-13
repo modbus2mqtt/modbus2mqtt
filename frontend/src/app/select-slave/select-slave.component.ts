@@ -117,7 +117,9 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   readonly httpPushUrlTooltip =
     'Full target URL. Use {{ path }} placeholders to insert entity values, e.g. {{ serialnumber }}.\n' +
     'The reserved {{ pollDate }} inserts the poll time as ISO 8601 UTC, e.g. 2026-07-10T08:00:00Z ' +
-    '(e.g. ...?at={{ pollDate }}).'
+    '(e.g. ...?at={{ pollDate }}).\n' +
+    'The reserved {{ slaveName }} inserts the Slave Name from Slave Settings ' +
+    '(e.g. ...?meter={{ slaveName }}). All values are URL-encoded.'
   readonly pollScheduleTooltip =
     'Optional Unix cron expression. When set it overrides Poll Interval.\n' +
     '5 fields: minute hour day-of-month month day-of-week.\n' +
