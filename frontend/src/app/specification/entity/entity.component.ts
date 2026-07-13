@@ -171,16 +171,18 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
   numberPropertiesFormGroup: FormGroup
   stringPropertiesFormGroup: FormGroup
   valuePropertiesFormGroup: FormGroup
+  // The names every datasheet and every modbus tool uses, with the function code that reads them.
+  // AnalogInputs is what the code calls them; in the modbus world they are Input Registers (FC 4).
   registerTypes: IRegisterType[] = [
     {
       registerType: ModbusRegisterType.HoldingRegister,
-      name: 'Holding Registers',
+      name: 'Holding Registers (FC 3)',
     },
-    { registerType: ModbusRegisterType.AnalogInputs, name: 'Analog Input' },
-    { registerType: ModbusRegisterType.Coils, name: 'Coils' },
+    { registerType: ModbusRegisterType.AnalogInputs, name: 'Input Registers (FC 4)' },
+    { registerType: ModbusRegisterType.Coils, name: 'Coils (FC 1)' },
     {
       registerType: ModbusRegisterType.DiscreteInputs,
-      name: 'Discrete Inputs',
+      name: 'Discrete Inputs (FC 2)',
     },
   ]
 

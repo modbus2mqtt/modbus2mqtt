@@ -104,6 +104,44 @@
                   </div>
                   <div>
                     <mat-form-field>
+                      <mat-label>Data Bits</mat-label>
+                      <mat-select
+                        matInput
+                        formControlName="dataBits"
+                        matTooltip="Serial framing. Together with parity and stop bits this is the '8N1' of the device's manual. Change it only if the device asks for it."
+                      >
+                        @for (dataBits of dataBitsOptions; track $index) {
+                          <mat-option [value]="dataBits">{{ dataBits }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                  <div>
+                    <mat-form-field>
+                      <mat-label>Parity</mat-label>
+                      <mat-select
+                        matInput
+                        formControlName="parity"
+                        matTooltip="The Modbus specification asks for even parity (8E1), but most devices ship with none (8N1). Use what the device's manual says."
+                      >
+                        @for (parity of parityOptions; track parity.value) {
+                          <mat-option [value]="parity.value">{{ parity.label }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                  <div>
+                    <mat-form-field>
+                      <mat-label>Stop Bits</mat-label>
+                      <mat-select matInput formControlName="stopBits">
+                        @for (stopBits of stopBitsOptions; track $index) {
+                          <mat-option [value]="stopBits">{{ stopBits }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                  <div>
+                    <mat-form-field>
                       <mat-label>Timeout</mat-label>
                       <input type="number" matInput formControlName="timeout" />
                     </mat-form-field>

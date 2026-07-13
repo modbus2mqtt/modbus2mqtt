@@ -6,6 +6,9 @@ import {
   ITCPConnection,
   IModbusConnection,
   ImodbusStatusForSlave,
+  DEFAULT_SERIAL_DATABITS,
+  DEFAULT_SERIAL_PARITY,
+  DEFAULT_SERIAL_STOPBITS,
 } from '../shared/server/index.js'
 import { ImodbusValues, Logger, LogLevelEnum } from '../specification/index.js'
 import { ModbusRegisterType } from '../shared/specification/index.js'
@@ -78,8 +81,7 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
         options.maxRegistersPerRequest ?? this.modbusConfiguration.getMaxRegistersPerRequestBySlaveId(slaveId),
     }
 
-    if (this.modbusClient && this.modbusClient.isOpen)
-      return this.modbusRTUprocessor.execute(slaveId, addresses, resolvedOptions)
+    if (this.modbusClient && this.modbusClient.isOpen) return this.modbusRTUprocessor.execute(slaveId, addresses, resolvedOptions)
     else
       return new Promise<ImodbusValues>((resolve, reject) => {
         this.initialConnect()
@@ -291,10 +293,18 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
     if (this.modbusClient == undefined) this.modbusClient = new ModbusRTU()
     if (this.modbusClient.isOpen) return Promise.resolve()
 
-    const port = (this.modbusConfiguration.getModbusConnection() as IRTUConnection).serialport
-    const baudrate = (this.modbusConfiguration.getModbusConnection() as IRTUConnection).baudrate
+    const rtu = this.modbusConfiguration.getModbusConnection() as IRTUConnection
+    const port = rtu.serialport
+    const baudrate = rtu.baudrate
     if (port && baudrate) {
-      return this.modbusClient.connectRTUBuffered(port, { baudRate: baudrate })
+      // Framing beyond the baud rate was hard wired to 8N1 before. A device that speaks 8E1 - which
+      // the Modbus specification actually asks for - answered with nothing but timeouts and CRC errors.
+      return this.modbusClient.connectRTUBuffered(port, {
+        baudRate: baudrate,
+        dataBits: (rtu.dataBits ?? DEFAULT_SERIAL_DATABITS) as 7 | 8,
+        parity: rtu.parity ?? DEFAULT_SERIAL_PARITY,
+        stopBits: (rtu.stopBits ?? DEFAULT_SERIAL_STOPBITS) as 1 | 2,
+      })
     } else {
       const host = (this.modbusConfiguration.getModbusConnection() as ITCPConnection).host
       const tcpport = (this.modbusConfiguration.getModbusConnection() as ITCPConnection).port

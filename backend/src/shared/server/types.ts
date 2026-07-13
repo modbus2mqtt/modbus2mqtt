@@ -56,11 +56,21 @@ export interface ImqttClient {
   log?: (...args: unknown[]) => void
 }
 
+// Modbus RTU framing. The Modbus specification asks for even parity (8E1), but most devices ship
+// with 8N1, so that stays the default when nothing is configured. Devices that insist on 8E1 or 8N2
+// could not be reached at all before these settings existed.
+export type SerialParity = 'none' | 'even' | 'odd'
+export const DEFAULT_SERIAL_DATABITS = 8
+export const DEFAULT_SERIAL_PARITY: SerialParity = 'none'
+export const DEFAULT_SERIAL_STOPBITS = 1
 export interface IRTUConnection {
   serialport: string
   baudrate: number
   timeout: number
   tcpBridgePort?: number
+  dataBits?: number // 7 or 8, default 8
+  parity?: SerialParity // default none
+  stopBits?: number // 1 or 2, default 1
 }
 export interface ITCPConnection {
   host: string
@@ -107,10 +117,19 @@ export interface IBus {
   connectionData: IModbusConnection
   slaves: Islave[]
 }
+// The framing as the modbus world writes it: 8N1, 8E1, 8N2 ...
+export function getSerialFraming(connection: IRTUConnection): string {
+  const parity = connection.parity ?? DEFAULT_SERIAL_PARITY
+  return (
+    (connection.dataBits ?? DEFAULT_SERIAL_DATABITS).toString() +
+    parity.charAt(0).toUpperCase() +
+    (connection.stopBits ?? DEFAULT_SERIAL_STOPBITS).toString()
+  )
+}
 export function getConnectionName(connection: IModbusConnection): string {
   if ((connection as IRTUConnection).baudrate) {
     const c = connection as IRTUConnection
-    return 'RTU: ' + c.serialport + '(' + c.baudrate + ') t: ' + c.timeout
+    return 'RTU: ' + c.serialport + '(' + c.baudrate + ' ' + getSerialFraming(c) + ') t: ' + c.timeout
   } else {
     const c = connection as ITCPConnection
     return 'TCP: ' + c.host + ':' + c.port + ' t: ' + (c.timeout ? c.timeout : 100)

@@ -6,7 +6,11 @@ declare module 'modbus-serial' {
     setID(id: number): void
     setTimeout(ms: number): void
     close(cb: () => void): void
-    connectRTUBuffered(path: string, opts: { baudRate: number }): Promise<void>
+    // dataBits/parity/stopBits are passed straight to serialport; omitting them means 8N1.
+    connectRTUBuffered(
+      path: string,
+      opts: { baudRate: number; dataBits?: 7 | 8; parity?: 'none' | 'even' | 'odd'; stopBits?: 1 | 2 }
+    ): Promise<void>
     connectTCP(host: string, opts: { port: number }): Promise<void>
     readHoldingRegisters(address: number, length: number): Promise<ReadRegisterResult>
     readInputRegisters(address: number, length: number): Promise<ReadRegisterResult>

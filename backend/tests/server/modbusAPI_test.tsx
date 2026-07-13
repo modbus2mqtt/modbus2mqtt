@@ -13,7 +13,7 @@ import {
   LogLevelEnum,
 } from '../../src/specification/index.js'
 import { ModbusAPI } from '../../src/server/modbusAPI.js'
-import { MAX_REGISTERS_PER_REQUEST_DEFAULT, ModbusTasks } from '../../src/shared/server/index.js'
+import { MAX_REGISTERS_PER_REQUEST_DEFAULT, ModbusTasks, IRTUConnection, getConnectionName } from '../../src/shared/server/index.js'
 import { TempConfigDirHelper, getAvailablePort } from './testhelper.js'
 
 const debug = Debug('bustest')
@@ -234,4 +234,49 @@ describe('ServerTCP based', () => {
   })
 
   // no-op
+})
+
+// Issue #78: the serial framing was hard wired to 8N1. The modbus specification asks for even parity
+// (8E1), and devices that insist on it - or on 8N2 - answered with nothing but timeouts.
+describe('serial framing', () => {
+  function connectOptionsFor(connection: Partial<IRTUConnection>): Record<string, unknown> {
+    const modbusAPI = new ModbusAPI({
+      getId: () => 0,
+      getName: () => 'framing',
+      getSlaveTimeoutBySlaveId: () => 100,
+      getMaxRegistersPerRequestBySlaveId: () => 125,
+      getModbusConnection: () => ({ serialport: '/dev/ttyUSB0', baudrate: 9600, timeout: 100, ...connection }) as IRTUConnection,
+    })
+    let opts: Record<string, unknown> = {}
+    modbusAPI['modbusClient'] = {
+      isOpen: false,
+      connectRTUBuffered: (_path: string, o: Record<string, unknown>) => {
+        opts = o
+        return Promise.resolve()
+      },
+    } as any
+    modbusAPI['connectRTUClientLocked']()
+    return opts
+  }
+
+  it('defaults to 8N1 when nothing is configured', () => {
+    expect(connectOptionsFor({})).toEqual({ baudRate: 9600, dataBits: 8, parity: 'none', stopBits: 1 })
+  })
+
+  it('passes the configured framing to the serial port', () => {
+    expect(connectOptionsFor({ dataBits: 8, parity: 'even', stopBits: 1 })).toEqual({
+      baudRate: 9600,
+      dataBits: 8,
+      parity: 'even',
+      stopBits: 1,
+    })
+    expect(connectOptionsFor({ stopBits: 2 })).toEqual({ baudRate: 9600, dataBits: 8, parity: 'none', stopBits: 2 })
+  })
+
+  it('shows the framing in the bus name', () => {
+    expect(getConnectionName({ serialport: '/dev/ttyUSB0', baudrate: 9600, timeout: 100 })).toContain('9600 8N1')
+    expect(
+      getConnectionName({ serialport: '/dev/ttyUSB0', baudrate: 9600, timeout: 100, parity: 'even' } as IRTUConnection)
+    ).toContain('9600 8E1')
+  })
 })

@@ -15,7 +15,18 @@ import { Clipboard } from '@angular/cdk/clipboard'
 import { MatSelectionList } from '@angular/material/list'
 import { ApiService } from '../services/api-service'
 import { MatTableDataSource } from '@angular/material/table'
-import { IBus, IModbusConnection, IRTUConnection, ITCPConnection, getBusName, getConnectionName } from '@shared/server'
+import {
+  IBus,
+  IModbusConnection,
+  IRTUConnection,
+  ITCPConnection,
+  SerialParity,
+  DEFAULT_SERIAL_DATABITS,
+  DEFAULT_SERIAL_PARITY,
+  DEFAULT_SERIAL_STOPBITS,
+  getBusName,
+  getConnectionName,
+} from '@shared/server'
 import { MatSelectChange, MatSelect } from '@angular/material/select'
 import { ActivatedRoute, Router } from '@angular/router'
 import { Observable, Subscription } from 'rxjs'
@@ -77,6 +88,15 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
   busses: MatTableDataSource<IBus> = new MatTableDataSource<IBus>([])
   bussesObservable: Observable<IBus[]>
   baudRates: Array<number> = [2400, 4800, 9600, 11200, 115700]
+  // Modbus RTU framing. 8N1 is what most devices ship with, but the specification asks for even
+  // parity, and a device that insists on 8E1 or 8N2 could not be reached before these existed.
+  dataBitsOptions: Array<number> = [7, 8]
+  parityOptions: Array<{ value: SerialParity; label: string }> = [
+    { value: 'none', label: 'None (N)' },
+    { value: 'even', label: 'Even (E)' },
+    { value: 'odd', label: 'Odd (O)' },
+  ]
+  stopBitsOptions: Array<number> = [1, 2]
   selectedBaudRate: number | undefined = undefined
   @ViewChild('selectBaudRate') selectBaudRate: MatSelectionList | undefined
   @Input() preselectedBusId: number | undefined = undefined
@@ -150,6 +170,12 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
         if (to) to.setValue(timeout)
         const tbp = fg.get(['rtu', 'tcpBridgePort'])
         if (tbp) tbp.setValue(tcpBridgePort ?? null)
+        const db = fg.get(['rtu', 'dataBits'])
+        if (db) db.setValue((bus.connectionData as IRTUConnection).dataBits ?? DEFAULT_SERIAL_DATABITS)
+        const pa = fg.get(['rtu', 'parity'])
+        if (pa) pa.setValue((bus.connectionData as IRTUConnection).parity ?? DEFAULT_SERIAL_PARITY)
+        const sb = fg.get(['rtu', 'stopBits'])
+        if (sb) sb.setValue((bus.connectionData as IRTUConnection).stopBits ?? DEFAULT_SERIAL_STOPBITS)
       } else {
         const host = (bus.connectionData as ITCPConnection).host
         const port = (bus.connectionData as ITCPConnection).port
@@ -214,6 +240,12 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
           ;(connectionData as IRTUConnection).serialport = serial.value
           ;(connectionData as IRTUConnection).timeout = timeout.value
         }
+        const dataBits = fg.get(['rtu', 'dataBits']) as FormControl
+        const parity = fg.get(['rtu', 'parity']) as FormControl
+        const stopBits = fg.get(['rtu', 'stopBits']) as FormControl
+        if (dataBits) (connectionData as IRTUConnection).dataBits = Number(dataBits.value)
+        if (parity) (connectionData as IRTUConnection).parity = parity.value
+        if (stopBits) (connectionData as IRTUConnection).stopBits = Number(stopBits.value)
         // Optional BridgePort
         const tcpBridgePort = fg.get(['rtu', 'tcpBridgePort']) as FormControl
         if (tcpBridgePort) {
@@ -287,6 +319,9 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
       rtu: this._formBuilder.group({
         serial: [null, this.serialValidator],
         selectBaudRate: [9600, Validators.required],
+        dataBits: [DEFAULT_SERIAL_DATABITS, Validators.required],
+        parity: [DEFAULT_SERIAL_PARITY, Validators.required],
+        stopBits: [DEFAULT_SERIAL_STOPBITS, Validators.required],
         timeout: [BUS_TIMEOUT_DEFAULT, Validators.required],
         tcpBridgePort: [null],
       }),
