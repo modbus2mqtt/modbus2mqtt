@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.30.0...modbus2mqtt-v0.31.0) (2026-07-13)
+
+
+### Features
+
+* report mqtt/http push failures per slave and trigger a test poll from the UI ([#288](https://github.com/modbus2mqtt/modbus2mqtt/issues/288)) ([972c64a](https://github.com/modbus2mqtt/modbus2mqtt/commit/972c64a89a460ee667b9d5517e5ba07d88819431))
+
 ## [0.30.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.29.0...modbus2mqtt-v0.30.0) (2026-07-13)
 
 
