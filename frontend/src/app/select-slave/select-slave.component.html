@@ -182,101 +182,109 @@
                   <mat-expansion-panel-header>
                     <mat-panel-title> Slave Settings </mat-panel-title>
                   </mat-expansion-panel-header>
-                  <mat-form-field class="width150pt">
-                    <mat-label>Slave Name</mat-label>
-                    <input
-                      matInput
-                      matTooltipClass="tooltip-class"
-                      matTooltip="Optional: Sets a name for the device
+                  <ng-template matExpansionPanelContent>
+                    <mat-form-field class="width150pt">
+                      <mat-label>Slave Name</mat-label>
+                      <input
+                        matInput
+                        matTooltipClass="tooltip-class"
+                        matTooltip="Optional: Sets a name for the device
 
                   The specification name is used if the name is not specified.
                   
                   Set the name if there are multiple devices with the same specification to have unique device names
                   
                   The name is also shown in the header of this card"
-                      formControlName="name"
-                      [errorStateMatcher]="errorStateMatcher"
-                    />
-                    @if (uislave.slaveForm.get('name')!.hasError('duplicates') != null) {
-                      <mat-error> Must be unique </mat-error>
-                    }
-                  </mat-form-field>
-                  @if ([0, 2, 4].includes(uislave.slaveForm.get('pollMode')!.value)) {
-                    @if (!uislave.slaveForm.get('pollSchedule')!.value) {
-                      <mat-form-field class="width150pt">
-                        <mat-label>Poll Interval [ms]</mat-label>
-                        <input matInput formControlName="pollInterval" type="number" placeholder="1000" />
+                        formControlName="name"
+                        [errorStateMatcher]="errorStateMatcher"
+                      />
+                      @if (uislave.slaveForm.get('name')!.hasError('duplicates') != null) {
+                        <mat-error> Must be unique </mat-error>
+                      }
+                    </mat-form-field>
+                    @if ([0, 2, 4].includes(uislave.slaveForm.get('pollMode')!.value)) {
+                      @if (!uislave.slaveForm.get('pollSchedule')!.value) {
+                        <mat-form-field class="width150pt">
+                          <mat-label>Poll Interval [ms]</mat-label>
+                          <input matInput formControlName="pollInterval" type="number" placeholder="1000" />
+                        </mat-form-field>
+                      }
+                      <mat-form-field class="width200pt">
+                        <mat-label>Poll Schedule</mat-label>
+                        <mat-select
+                          formControlName="pollSchedulePreset"
+                          (selectionChange)="onPollSchedulePresetChange(uislave.slaveForm)"
+                        >
+                          @for (preset of pollSchedulePresets; track preset.value) {
+                            <mat-option [value]="preset.value">{{ preset.label }}</mat-option>
+                          }
+                          <mat-option [value]="pollScheduleCustom">Custom cron…</mat-option>
+                        </mat-select>
                       </mat-form-field>
+                      @if (uislave.slaveForm.get('pollSchedulePreset')!.value === pollScheduleCustom) {
+                        <mat-form-field class="width200pt">
+                          <mat-label>Custom cron</mat-label>
+                          <input
+                            matInput
+                            formControlName="pollSchedule"
+                            placeholder="0 * * * *"
+                            [matTooltip]="pollScheduleTooltip"
+                          />
+                          @if (uislave.slaveForm.get('pollSchedule')!.hasError('cron')) {
+                            <mat-error>Invalid cron — need 5 fields, e.g. "0 * * * *"</mat-error>
+                          }
+                        </mat-form-field>
+                      }
+                      @if (describeCron(uislave.slaveForm.get('pollSchedule')!.value); as scheduleDescription) {
+                        <div class="poll-schedule-hint">→ {{ scheduleDescription }}</div>
+                      }
                     }
-                    <mat-form-field class="width200pt">
-                      <mat-label>Poll Schedule</mat-label>
-                      <mat-select
-                        formControlName="pollSchedulePreset"
-                        (selectionChange)="onPollSchedulePresetChange(uislave.slaveForm)"
-                      >
-                        @for (preset of pollSchedulePresets; track preset.value) {
-                          <mat-option [value]="preset.value">{{ preset.label }}</mat-option>
-                        }
-                        <mat-option [value]="pollScheduleCustom">Custom cron…</mat-option>
+                    <mat-form-field class="width150pt">
+                      <mat-label>Poll Mode</mat-label>
+                      <mat-select matInput formControlName="pollMode">
+                        <mat-option [value]="0">Interval</mat-option>
+                        <mat-option [value]="2">Interval and Triggger</mat-option>
+                        <mat-option [value]="1">Trigger only</mat-option>
+                        <mat-option [value]="3">No polling</mat-option>
+                        <mat-option [value]="4">HTTP Push (no MQTT)</mat-option>
                       </mat-select>
                     </mat-form-field>
-                    @if (uislave.slaveForm.get('pollSchedulePreset')!.value === pollScheduleCustom) {
-                      <mat-form-field class="width200pt">
-                        <mat-label>Custom cron</mat-label>
-                        <input matInput formControlName="pollSchedule" placeholder="0 * * * *" [matTooltip]="pollScheduleTooltip" />
-                        @if (uislave.slaveForm.get('pollSchedule')!.hasError('cron')) {
-                          <mat-error>Invalid cron — need 5 fields, e.g. "0 * * * *"</mat-error>
-                        }
-                      </mat-form-field>
-                    }
-                    @if (describeCron(uislave.slaveForm.get('pollSchedule')!.value); as scheduleDescription) {
-                      <div class="poll-schedule-hint">→ {{ scheduleDescription }}</div>
-                    }
-                  }
-                  <mat-form-field class="width150pt">
-                    <mat-label>Poll Mode</mat-label>
-                    <mat-select matInput formControlName="pollMode">
-                      <mat-option [value]="0">Interval</mat-option>
-                      <mat-option [value]="2">Interval and Triggger</mat-option>
-                      <mat-option [value]="1">Trigger only</mat-option>
-                      <mat-option [value]="3">No polling</mat-option>
-                      <mat-option [value]="4">HTTP Push (no MQTT)</mat-option>
-                    </mat-select>
-                  </mat-form-field>
+                  </ng-template>
                 </mat-expansion-panel>
                 @if (uislave.slave.specificationid; as specid) {
                   <mat-expansion-panel>
                     <mat-expansion-panel-header>
                       <mat-panel-title> MQTT Topics </mat-panel-title>
                     </mat-expansion-panel-header>
-                    <h2>Quality of Service</h2>
-                    <mat-form-field class="width200pt">
-                      <mat-label>Quality of Service</mat-label>
-                      <mat-select
-                        matTooltipClass="tooltip-class"
-                        formControlName="qos"
-                        matTooltip="Optional: 
+                    <ng-template matExpansionPanelContent>
+                      <h2>Quality of Service</h2>
+                      <mat-form-field class="width200pt">
+                        <mat-label>Quality of Service</mat-label>
+                        <mat-select
+                          matTooltipClass="tooltip-class"
+                          formControlName="qos"
+                          matTooltip="Optional: 
                         
                         Auto: If the slave has only read only entities, Quality of Service is not set
                         
                         1 - at least once: Every publication of states or subscription to this slave will at be transfered at least one time
                         
                         2 - exactly once:Every publication of states or subscription to this slave will at be transfered exactly one time"
-                      >
-                        <mat-option [value]="-1">Auto</mat-option>
-                        <mat-option [value]="1">1 - at least once</mat-option>
-                        <mat-option [value]="2">2 - exactly once</mat-option>
-                      </mat-select>
-                    </mat-form-field>
-                    <h2>Root Topic</h2>
-                    <mat-form-field class="width150pt">
-                      <mat-label>Root Topic Name</mat-label>
-                      <input
-                        matInput
-                        matTooltipClass="tooltip-class"
-                        formControlName="rootTopic"
-                        (change)="onRootTopicChange(uislave)"
-                        matTooltip='Optional: 
+                        >
+                          <mat-option [value]="-1">Auto</mat-option>
+                          <mat-option [value]="1">1 - at least once</mat-option>
+                          <mat-option [value]="2">2 - exactly once</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                      <h2>Root Topic</h2>
+                      <mat-form-field class="width150pt">
+                        <mat-label>Root Topic Name</mat-label>
+                        <input
+                          matInput
+                          matTooltipClass="tooltip-class"
+                          formControlName="rootTopic"
+                          (change)="onRootTopicChange(uislave)"
+                          matTooltip='Optional: 
                         
                         Sets the first part of the MQTT state and command topics. 
                         
@@ -284,98 +292,98 @@
                         command topics for modbus values will be name "heatpump/modbus/<mqttname>"
                           
                         It is in the responsibility of the user to make sure, that there are no duplicates in MQTT topic names'
-                      />
-                    </mat-form-field>
-                    <h2>Configuration URL</h2>
-                    <mat-form-field class="width150pt">
-                      <mat-label>Configuration URL</mat-label>
-                      <input
-                        matInput
-                        matTooltipClass="tooltip-class"
-                        formControlName="configurationUrl"
-                        placeholder="http://192.168.1.100:8080"
-                        matTooltip="Optional:
+                        />
+                      </mat-form-field>
+                      <h2>Configuration URL</h2>
+                      <mat-form-field class="width150pt">
+                        <mat-label>Configuration URL</mat-label>
+                        <input
+                          matInput
+                          matTooltipClass="tooltip-class"
+                          formControlName="configurationUrl"
+                          placeholder="http://192.168.1.100:8080"
+                          matTooltip="Optional:
 
                         Web UI URL of the device, published as device.configuration_url in the Home Assistant MQTT discovery payload.
 
                         Example: http://192.168.1.100:8080 or https://device.local"
-                      />
-                    </mat-form-field>
-                    <h2>State Topic</h2>
+                        />
+                      </mat-form-field>
+                      <h2>State Topic</h2>
 
-                    @if (config.rootUrl != undefined) {
-                      <div matTooltip="Use this URL inside of Home Assistant Addons (E.g.Nodered)">
-                        Web Service Root: <strong>{{ config.rootUrl }}</strong>
-                      </div>
-                      <mat-slide-toggle
-                        class="width50"
-                        formControlName="showUrl"
-                        matTooltip="Use this URL inside of Home Assistant Addons (E.g.Nodered)"
-                        >Show REST API Url instead of MQTT Topics</mat-slide-toggle
-                      >
-                    }
+                      @if (config.rootUrl != undefined) {
+                        <div matTooltip="Use this URL inside of Home Assistant Addons (E.g.Nodered)">
+                          Web Service Root: <strong>{{ config.rootUrl }}</strong>
+                        </div>
+                        <mat-slide-toggle
+                          class="width50"
+                          formControlName="showUrl"
+                          matTooltip="Use this URL inside of Home Assistant Addons (E.g.Nodered)"
+                          >Show REST API Url instead of MQTT Topics</mat-slide-toggle
+                        >
+                      }
 
-                    <div>
-                      {{ getStateTopic(uislave)
-                      }}<button
-                        mat-icon-button
-                        mat-small-icon-button
-                        class="material-icons app-toolbar-menu save-button"
-                        matTooltip="Copy to Clipboard"
-                        (click)="copy2Clipboard(getStateTopic(uislave))"
-                        color="primary"
-                      >
-                        <mat-icon>content_copy</mat-icon>
-                      </button>
-                    </div>
-                    <h2>State Payload Example</h2>
-                    <textarea id="w3review" name="w3review" rows="10" cols="20">
-                        {{ getStatePayload(uislave) }}
-                      </textarea
-                    >
-                    @if ([1, 2].includes(uislave.slaveForm.get('pollMode')!.value)) {
-                      <h2>Trigger Poll Topic</h2>
                       <div>
-                        {{ getTriggerPollTopic(uislave)
+                        {{ getStateTopic(uislave)
                         }}<button
                           mat-icon-button
                           mat-small-icon-button
                           class="material-icons app-toolbar-menu save-button"
                           matTooltip="Copy to Clipboard"
-                          (click)="copy2Clipboard(getTriggerPollTopic(uislave))"
+                          (click)="copy2Clipboard(getStateTopic(uislave))"
                           color="primary"
                         >
                           <mat-icon>content_copy</mat-icon>
                         </button>
                       </div>
-                    }
-                    <h2>Command Topics</h2>
-                    <dl>
-                      @for (commandEntity of uislave.commandEntities; track $index) {
-                        <dt>{{ getSpecEntityName(uislave, commandEntity.entityId) }}</dt>
-                        <dd>
-                          {{ getCommandTopic(uislave, commandEntity) }}
-                          <button
+                      <h2>State Payload Example</h2>
+                      <textarea id="w3review" name="w3review" rows="10" cols="20">
+                        {{ getStatePayload(uislave) }}
+                      </textarea>
+                      @if ([1, 2].includes(uislave.slaveForm.get('pollMode')!.value)) {
+                        <h2>Trigger Poll Topic</h2>
+                        <div>
+                          {{ getTriggerPollTopic(uislave)
+                          }}<button
                             mat-icon-button
                             mat-small-icon-button
                             class="material-icons app-toolbar-menu save-button"
-                            (click)="copy2Clipboard(getCommandTopic(uislave, commandEntity))"
+                            matTooltip="Copy to Clipboard"
+                            (click)="copy2Clipboard(getTriggerPollTopic(uislave))"
                             color="primary"
                           >
                             <mat-icon>content_copy</mat-icon>
                           </button>
-                        </dd>
-                        @if (getModbusCommandTopic(uislave, commandEntity) != '') {
+                        </div>
+                      }
+                      <h2>Command Topics</h2>
+                      <dl>
+                        @for (commandEntity of uislave.commandEntities; track $index) {
+                          <dt>{{ getSpecEntityName(uislave, commandEntity.entityId) }}</dt>
                           <dd>
-                            .../set/modbus/
-                            <!--<button mat-icon-button matTooltipClass="tooltip-class" mat-small-icon-button class="material-icons app-toolbar-menu save-button"
+                            {{ getCommandTopic(uislave, commandEntity) }}
+                            <button
+                              mat-icon-button
+                              mat-small-icon-button
+                              class="material-icons app-toolbar-menu save-button"
+                              (click)="copy2Clipboard(getCommandTopic(uislave, commandEntity))"
+                              color="primary"
+                            >
+                              <mat-icon>content_copy</mat-icon>
+                            </button>
+                          </dd>
+                          @if (getModbusCommandTopic(uislave, commandEntity) != '') {
+                            <dd>
+                              .../set/modbus/
+                              <!--<button mat-icon-button matTooltipClass="tooltip-class" mat-small-icon-button class="material-icons app-toolbar-menu save-button"
                              (click)="copy2Clipboard(commandEntity.modbusCommandTopic)" color="primary">
                             <mat-icon>content_copy</mat-icon>
                         </button> does not work seems to be an angular bug -->
-                          </dd>
+                            </dd>
+                          }
                         }
-                      }
-                    </dl>
+                      </dl>
+                    </ng-template>
                   </mat-expansion-panel>
                 }
                 @if (uislave.slave.specificationid; as specid) {
@@ -383,18 +391,20 @@
                     <mat-expansion-panel-header>
                       <mat-panel-title> MQTT Discovery Filter </mat-panel-title>
                     </mat-expansion-panel-header>
-                    <mat-slide-toggle
-                      class="width550"
-                      formControlName="noDiscovery"
-                      (toggleChange)="disableDiscoverEntitiesList(uislave)"
-                      >{{ getNoDiscoveryText(uislave) }}<br />Click to toggle</mat-slide-toggle
-                    >
-                    <h2>Deselect to exclude from Discovery</h2>
-                    <mat-selection-list #noDiscovery formControlName="discoverEntitiesList">
-                      @for (selected of uislave.selectedEntitites; track $index) {
-                        <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
-                      }
-                    </mat-selection-list>
+                    <ng-template matExpansionPanelContent>
+                      <mat-slide-toggle
+                        class="width550"
+                        formControlName="noDiscovery"
+                        (toggleChange)="disableDiscoverEntitiesList(uislave)"
+                        >{{ getNoDiscoveryText(uislave) }}<br />Click to toggle</mat-slide-toggle
+                      >
+                      <h2>Deselect to exclude from Discovery</h2>
+                      <mat-selection-list #noDiscovery formControlName="discoverEntitiesList">
+                        @for (selected of uislave.selectedEntitites; track $index) {
+                          <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
+                        }
+                      </mat-selection-list>
+                    </ng-template>
                   </mat-expansion-panel>
                 }
                 @if (uislave.slave.specificationid; as specid) {
@@ -402,54 +412,61 @@
                     <mat-expansion-panel-header>
                       <mat-panel-title> HTTP Push </mat-panel-title>
                     </mat-expansion-panel-header>
-                    <p>
-                      Push selected entity values to an external URL via HTTP POST. The URL is slave specific (e.g. it contains the
-                      device serial number). Set the poll mode to "HTTP Push (no MQTT)" to disable MQTT publishing for this slave.
-                    </p>
-                    <mat-form-field class="width550">
-                      <mat-label>URL</mat-label>
-                      <input
-                        matInput
-                        formControlName="httpPushUrl"
-                        [placeholder]="httpPushUrlPlaceholder"
-                        [matTooltip]="httpPushUrlTooltip"
-                      />
-                    </mat-form-field>
-                    <mat-form-field class="width550">
-                      <mat-label>Bearer PAT</mat-label>
-                      <input
-                        matInput
-                        type="password"
-                        formControlName="httpPushPat"
-                        autocomplete="new-password"
-                        [placeholder]="hasHttpPushPat(uislave) ? '•••••••• (stored, leave empty to keep)' : 'Personal Access Token'"
-                        matTooltip="Stored encrypted. Leave empty to keep the currently stored token."
-                      />
-                    </mat-form-field>
-                    <mat-form-field class="width550">
-                      <mat-label>Root (optional)</mat-label>
-                      <input
-                        matInput
-                        formControlName="httpPushRoot"
-                        placeholder="orbis"
-                        matTooltip="Send only this subtree of the payload, e.g. 'orbis' to post just the orbis array. Same path format as the entity MQTT name."
-                      />
-                    </mat-form-field>
-                    <h2>Select entities to push</h2>
-                    <mat-selection-list formControlName="pushEntitiesList">
-                      @for (selected of uislave.selectedEntitites; track $index) {
-                        <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
-                      }
-                    </mat-selection-list>
-                    <h2>POST Body Example</h2>
-                    <textarea rows="10" cols="20" readonly>{{ uislave.httpPushBody?.() }}</textarea>
+                    <ng-template matExpansionPanelContent>
+                      <p>
+                        Push selected entity values to an external URL via HTTP POST. The URL is slave specific (e.g. it contains
+                        the device serial number). Set the poll mode to "HTTP Push (no MQTT)" to disable MQTT publishing for this
+                        slave.
+                      </p>
+                      <mat-form-field class="width550">
+                        <mat-label>URL</mat-label>
+                        <input
+                          matInput
+                          formControlName="httpPushUrl"
+                          [placeholder]="httpPushUrlPlaceholder"
+                          [matTooltip]="httpPushUrlTooltip"
+                        />
+                      </mat-form-field>
+                      <mat-form-field class="width550">
+                        <mat-label>Bearer PAT</mat-label>
+                        <input
+                          matInput
+                          type="password"
+                          formControlName="httpPushPat"
+                          autocomplete="new-password"
+                          [placeholder]="
+                            hasHttpPushPat(uislave) ? '•••••••• (stored, leave empty to keep)' : 'Personal Access Token'
+                          "
+                          matTooltip="Stored encrypted. Leave empty to keep the currently stored token."
+                        />
+                      </mat-form-field>
+                      <mat-form-field class="width550">
+                        <mat-label>Root (optional)</mat-label>
+                        <input
+                          matInput
+                          formControlName="httpPushRoot"
+                          placeholder="orbis"
+                          matTooltip="Send only this subtree of the payload, e.g. 'orbis' to post just the orbis array. Same path format as the entity MQTT name."
+                        />
+                      </mat-form-field>
+                      <h2>Select entities to push</h2>
+                      <mat-selection-list formControlName="pushEntitiesList">
+                        @for (selected of uislave.selectedEntitites; track $index) {
+                          <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
+                        }
+                      </mat-selection-list>
+                      <h2>POST Body Example</h2>
+                      <textarea rows="10" cols="20" readonly>{{ uislave.httpPushBody?.() }}</textarea>
+                    </ng-template>
                   </mat-expansion-panel>
                 }
                 <mat-expansion-panel>
                   <mat-expansion-panel-header>
                     <mat-panel-title>Modbus Status &amp;Errors </mat-panel-title>
                   </mat-expansion-panel-header>
-                  <app-modbus-error-component [modbusErrors]="getModbusErrors(uislave)" />
+                  <ng-template matExpansionPanelContent>
+                    <app-modbus-error-component [modbusErrors]="getModbusErrors(uislave)" />
+                  </ng-template>
                 </mat-expansion-panel>
               }
             </mat-card-content>

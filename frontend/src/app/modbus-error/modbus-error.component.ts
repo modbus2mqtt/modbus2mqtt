@@ -23,6 +23,10 @@ export class ModbusErrorComponent implements OnInit, OnDestroy {
   private refreshInterval: ReturnType<typeof setInterval> | undefined
   constructor(private entityApiService: ApiService) {}
   ngOnInit(): void {
+    // Pin the reference time up front. Without it getCurrentDate() fell back to Date.now() on every
+    // call, so the same "x seconds ago" expression yielded a different value in the two change
+    // detection passes of dev mode (NG0100) - and the labels ticked at a random rate.
+    if (this.currentDate == undefined) this.currentDate = Date.now()
     // refreshes the relative "x minutes ago" labels; cleared in ngOnDestroy so it does not
     // leak an interval (and a change-detection trigger) per slave card on every navigation
     this.refreshInterval = setInterval(() => {
