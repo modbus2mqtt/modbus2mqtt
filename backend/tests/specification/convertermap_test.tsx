@@ -387,3 +387,111 @@ it('test button converter', () => {
   modbusValue = converter?.mqtt2modbus(spec, entity.id, 'OFF')
   expect(modbusValue![0]).toBe(0)
 })
+
+// Issue #246: swapWords/swapBytes were stored in the specification and offered in the UI, but no
+// converter ever read them. A Sungrow inverter sends the low word of a 32 bit value first, so
+// "Total DC power" of 177 W arrived as 177 << 16 = 11599872 and the Swap Word toggle did nothing.
+function numberEntity(converterParameters: object): Ientity {
+  return {
+    id: 1,
+    mqttname: 'mqtt',
+    converter: 'number' as Converters,
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: false,
+    modbusAddress: 5016,
+    converterParameters,
+  } as Ientity
+}
+function decode(entity: Ientity, registers: number[]): number {
+  spec.entities = [entity]
+  return ConverterMap.getConverter(entity)!.modbus2mqtt(spec, entity.id, registers) as number
+}
+
+it('decodes a 32 bit number, high word first, when swapWords is off', () => {
+  const entity = numberEntity({ multiplier: 1, offset: 0, numberFormat: EnumNumberFormat.unsignedInt32 })
+  expect(decode(entity, [0, 177])).toBe(177)
+  expect(decode(entity, [177, 0])).toBe(11599872) // 177 << 16 - the value the issue reports
+})
+
+it('decodes a 32 bit number, low word first, when swapWords is on', () => {
+  const entity = numberEntity({
+    multiplier: 1,
+    offset: 0,
+    numberFormat: EnumNumberFormat.unsignedInt32,
+    swapWords: true,
+  })
+  // the raw registers from the issue: 5016 = 177, 5017 = 0
+  expect(decode(entity, [177, 0])).toBe(177)
+  expect(decode(entity, [0, 1])).toBe(65536)
+})
+
+it('swapWords works for signedInt32 and float32 too', () => {
+  const signed = numberEntity({ multiplier: 1, offset: 0, numberFormat: EnumNumberFormat.signedInt32, swapWords: true })
+  expect(decode(signed, [0xffff, 0xffff])).toBe(-1)
+  // -2 = 0xfffffffe: high word 0xffff, low word 0xfffe -> device sends the low word first
+  expect(decode(signed, [0xfffe, 0xffff])).toBe(-2)
+
+  const float = numberEntity({ multiplier: 1, offset: 0, numberFormat: EnumNumberFormat.float32, swapWords: true })
+  // 1.5f = 0x3fc00000
+  expect(decode(float, [0x0000, 0x3fc0])).toBe(1.5)
+})
+
+it('swapBytes turns the bytes inside every register around', () => {
+  const entity = numberEntity({ multiplier: 1, offset: 0, swapBytes: true })
+  expect(decode(entity, [0x3412])).toBe(0x1234)
+
+  const both = numberEntity({
+    multiplier: 1,
+    offset: 0,
+    numberFormat: EnumNumberFormat.unsignedInt32,
+    swapWords: true,
+    swapBytes: true,
+  })
+  // canonical 0x12345678 arriving as low word first with swapped bytes: [0x7856, 0x3412]
+  expect(decode(both, [0x7856, 0x3412])).toBe(0x12345678)
+})
+
+it('swapWords is ignored for a 16 bit number', () => {
+  const entity = numberEntity({ multiplier: 1, offset: 0, numberFormat: EnumNumberFormat.signedInt16, swapWords: true })
+  expect(decode(entity, [0xffff])).toBe(-1)
+})
+
+it('rejects a 32 bit number that was read with a single register', () => {
+  const entity = numberEntity({ multiplier: 1, offset: 0, numberFormat: EnumNumberFormat.unsignedInt32 })
+  spec.entities = [entity]
+  expect(() => ConverterMap.getConverter(entity)!.modbus2mqtt(spec, entity.id, [177])).toThrow('two registers')
+})
+
+it('writes the registers back in the layout the device sent them in', () => {
+  const entity = numberEntity({
+    multiplier: 1,
+    offset: 0,
+    numberFormat: EnumNumberFormat.unsignedInt32,
+    swapWords: true,
+    swapBytes: true,
+  })
+  spec.entities = [entity]
+  const converter = ConverterMap.getConverter(entity)!
+  const registers = converter.mqtt2modbus(spec, entity.id, 0x12345678)
+  expect(registers).toEqual([0x7856, 0x3412])
+  // round trip: what we write is what we would read back
+  expect(converter.modbus2mqtt(spec, entity.id, registers)).toBe(0x12345678)
+})
+
+it('text swapBytes turns the characters of a register around', () => {
+  const entity = {
+    id: 1,
+    mqttname: 'serial',
+    converter: 'text' as Converters,
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: false,
+    modbusAddress: 1,
+    converterParameters: { stringlength: 6, swapBytes: true },
+  } as Ientity
+  spec.entities = [entity]
+  const converter = ConverterMap.getConverter(entity)!
+  // "MODBUS" sent byte swapped per register: "OM", "BD", "SU"
+  const registers = [0x4f4d, 0x4244, 0x5355]
+  expect(converter.modbus2mqtt(spec, entity.id, registers)).toBe('MODBUS')
+  expect(converter.mqtt2modbus(spec, entity.id, 'MODBUS')).toEqual(registers)
+})

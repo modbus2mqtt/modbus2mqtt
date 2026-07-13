@@ -284,6 +284,19 @@ export class ModbusRTUWorker extends ModbusWorker {
       }
   }
 
+  // The last successfully read values of the entry's address range, or undefined as soon as one
+  // register of it has no cached value (a value the cache dropped as too old, or one never read).
+  private getCachedData(current: IQueueEntry): number[] | undefined {
+    const table = this.getCachedMap(current)
+    if (table == undefined) return undefined
+    const rc: number[] = []
+    for (let idx = 0; idx < (current.address.length ? current.address.length : 1); idx++) {
+      const cached = table.get(current.address.address + idx)
+      if (cached == undefined || cached.data == undefined || cached.data.length == 0) return undefined
+      rc.push(cached.data[0])
+    }
+    return rc
+  }
   private isInCacheMap(current: IQueueEntry): Map<number, IModbusResultOrError> | undefined {
     if (current.options && current.options.useCache) {
       const mp = this.getCachedMap(current)
@@ -344,8 +357,17 @@ export class ModbusRTUWorker extends ModbusWorker {
               .catch((e) => {
                 this.debugMessage(current, ' failed permanently')
                 this.updateCacheError(current, e)
-                debug('Success: ' + current.address.address + 'e: ' + e.message)
-                current.onError(current, e)
+                debug('Failed: ' + current.address.address + ' e: ' + e.message)
+                // A failed poll read used to yield no data at all, so the entity was published as an
+                // empty value and Home Assistant flipped it to "unknown" until the next successful
+                // poll (issue #229). The cache still holds the last good value (updateCacheError keeps
+                // it for errorTimeout), so keep publishing that instead of a hole. The failure is not
+                // swallowed: it was recorded in the slave's Status & Errors before we got here.
+                const lastKnown = current.options.task == ModbusTasks.poll ? this.getCachedData(current) : undefined
+                if (lastKnown != undefined) {
+                  this.debugMessage(current, ' serving the last known value from the cache')
+                  current.onResolve(current, lastKnown)
+                } else current.onError(current, e)
                 resolve()
               })
           })
@@ -414,7 +436,14 @@ export class ModbusRTUWorker extends ModbusWorker {
   private processOneEntry(): Promise<void> | undefined {
     const current = this.queue.dequeue()
     if (current) {
-      debug('processOneEntry: ql:' + this.queue.getLength() + ' address: ' + current?.address.address + ' len: ' + (current?.address.length ? current.address.length : 1))
+      debug(
+        'processOneEntry: ql:' +
+          this.queue.getLength() +
+          ' address: ' +
+          current?.address.address +
+          ' len: ' +
+          (current?.address.length ? current.address.length : 1)
+      )
       const dt = new Date()
       if (this.cache.get(current.slaveId) == undefined) this.cache.set(current.slaveId, this.createEmptyIModbusValues())
       const cacheEntry = this.cache.get(current.slaveId)

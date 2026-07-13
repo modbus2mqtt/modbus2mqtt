@@ -20,11 +20,19 @@ export class TextConverter extends Converter {
       return (entity.converterParameters as Ivalue).value
     const cvP = entity?.converterParameters as Itext
     const buffer = Buffer.allocUnsafe(cvP.stringlength * 2)
-    for (let idx = 0; idx < (cvP.stringlength + 1) / 2; idx++) buffer.writeUInt16BE(value[idx], idx * 2)
+    // Some devices put the two characters of a register in the opposite order ("OMDBSU" instead of
+    // "MODBUS"). swapBytes turns the register around before the text is read out of it.
+    for (let idx = 0; idx < (cvP.stringlength + 1) / 2; idx++)
+      buffer.writeUInt16BE(TextConverter.swapBytesIf(value[idx], cvP.swapBytes === true), idx * 2)
 
     const idx = buffer.findIndex((v) => v == 0)
     if (idx >= 0) return buffer.subarray(0, idx).toString()
     return buffer.toString()
+  }
+  // Swapping is its own inverse, so both directions use it.
+  private static swapBytesIf(register: number, swap: boolean): number {
+    if (!swap) return register
+    return ((register & 0xff) << 8) | ((register >> 8) & 0xff)
   }
   override getModbusRegisterTypes(): ModbusRegisterType[] {
     return [ModbusRegisterType.HoldingRegister, ModbusRegisterType.AnalogInputs]
@@ -32,10 +40,11 @@ export class TextConverter extends Converter {
   override mqtt2modbus(spec: Ispecification, entityid: number, _value: string): number[] {
     const entity = spec.entities.find((e) => e.id == entityid)
     if (!entity) throw new Error('entity not found in entities')
+    const swapBytes = (entity.converterParameters as Itext | undefined)?.swapBytes === true
     const rc: number[] = []
     for (let i = 0; i < _value.length; i += 2) {
-      if (i + 1 < _value.length) rc.push((_value.charCodeAt(i) << 8) | _value.charCodeAt(i + 1))
-      else rc.push(_value.charCodeAt(i) << 8)
+      const register = i + 1 < _value.length ? (_value.charCodeAt(i) << 8) | _value.charCodeAt(i + 1) : _value.charCodeAt(i) << 8
+      rc.push(TextConverter.swapBytesIf(register, swapBytes))
     }
     return rc
   }

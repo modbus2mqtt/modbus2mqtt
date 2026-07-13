@@ -359,3 +359,80 @@ describe('ModbusRTUWorker write', () => {
     await finished
   })
 })
+
+// Issue #229: a failing poll read produced no data, the entity was published as an empty value and
+// Home Assistant flipped it to "unknown" until the next successful poll - the values kept toggling.
+// The cache still holds the last successfully read value, so a failing poll now serves that.
+class FlakyApi implements IModbusAPI {
+  fail = false
+  constructor(private cacheId: string) {}
+  getCacheId(): string {
+    return this.cacheId
+  }
+  reconnectRTU(): Promise<void> {
+    return Promise.resolve()
+  }
+  private read = (_slaveid: number, _address: number, _length: number) => {
+    if (this.fail) {
+      const e = new Error('Error') as Error & { errno?: string }
+      e.errno = 'ETIMEDOUT'
+      return Promise.reject(e)
+    }
+    return Promise.resolve({ data: [42], duration: 1 })
+  }
+  readHoldingRegisters = this.read
+  readCoils = this.read
+  readDiscreteInputs = this.read
+  readInputRegisters = this.read
+  writeHoldingRegisters = () => Promise.resolve()
+  writeCoils = () => Promise.resolve()
+}
+
+function poll(worker: ModbusRTUWorker, queue: ModbusRTUQueue, task: ModbusTasks): Promise<number[] | Error> {
+  return new Promise<number[] | Error>((resolve) => {
+    queue.enqueue(
+      1,
+      { registerType: ModbusRegisterType.HoldingRegister, address: 7 },
+      (_qe, data) => resolve(data as number[]),
+      (_qe, e) => resolve(e as Error),
+      { task, errorHandling: {} }
+    )
+    worker.run()
+  })
+}
+
+describe('failing reads keep the last known value (issue #229)', () => {
+  it('serves the cached value when a poll read fails', async () => {
+    const api = new FlakyApi('flaky-poll')
+    const queue = new ModbusRTUQueue()
+    const worker = new ModbusRTUWorker(api, queue)
+
+    expect(await poll(worker, queue, ModbusTasks.poll)).toEqual([42])
+
+    // the device stops answering: the poll must still deliver the last known value, not a hole
+    api.fail = true
+    expect(await poll(worker, queue, ModbusTasks.poll)).toEqual([42])
+  })
+
+  it('does not fake a value for a task other than the poll', async () => {
+    const api = new FlakyApi('flaky-spec')
+    const queue = new ModbusRTUQueue()
+    const worker = new ModbusRTUWorker(api, queue)
+
+    expect(await poll(worker, queue, ModbusTasks.specification)).toEqual([42])
+
+    // device detection and specification reads must see the failure - a stale value would
+    // silently identify the wrong device
+    api.fail = true
+    expect(await poll(worker, queue, ModbusTasks.specification)).toBeInstanceOf(Error)
+  })
+
+  it('reports the failure when nothing was ever read successfully', async () => {
+    const api = new FlakyApi('flaky-cold')
+    api.fail = true
+    const queue = new ModbusRTUQueue()
+    const worker = new ModbusRTUWorker(api, queue)
+
+    expect(await poll(worker, queue, ModbusTasks.poll)).toBeInstanceOf(Error)
+  })
+})
