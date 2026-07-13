@@ -217,6 +217,27 @@ describe('Select Slave tests (vitest)', () => {
       httpMock.match(() => true).forEach((r) => r.flush([]))
     })
 
+    it('the card header link button adds a slave referencing this one', async () => {
+      await mount()
+      const component = fixture.componentInstance
+      const root = component.uiSlaves.find((u) => u.slave.slaveid === 1)!
+
+      component.addReferencingSlave(root)
+      safeDetectChanges()
+
+      // next free slave id, and nothing but the reference - the rest is inherited
+      const postReq = httpMock.expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave'))
+      expect(postReq.request.body).toEqual({ slaveid: 2, referenceSlaveId: 1 })
+
+      postReq.flush({ ...slavesFixture[0], slaveid: 2, referenceSlaveId: 1, name: undefined })
+      safeDetectChanges()
+
+      const child = component.uiSlaves.find((u) => u.slave.slaveid === 2)!
+      expect(component.isReference(child.slave)).toBe(true)
+      expect(component.referencingSlaves(root.slave).map((s) => s.slaveid)).toEqual([2])
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+
     it('turns an existing slave into a reference when one is selected in its card', async () => {
       // two standalone slaves: slave 2 can take its settings from slave 1
       const standalone = [slavesFixture[0], { ...slavesFixture[0], slaveid: 2, name: 'second meter', rootTopic: 'meters/2' }]

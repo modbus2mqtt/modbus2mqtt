@@ -51,7 +51,33 @@
                   >
                     <mat-icon>delete</mat-icon>
                   </button>
+                  @if (isReference(uislave.slave)) {
+                    <button
+                      mat-icon-button
+                      class="material-icons app-toolbar-menu save-button"
+                      matTooltipClass="tooltip-class"
+                      matTooltip="Stop following the referenced slave
+
+                  This slave keeps the inherited settings as its own and can be edited individually again."
+                      color="primary"
+                      (click)="detachSlave(uislave)"
+                    >
+                      <mat-icon>link_off</mat-icon>
+                    </button>
+                  }
                   @if (!isReference(uislave.slave)) {
+                    <button
+                      mat-icon-button
+                      class="material-icons app-toolbar-menu save-button"
+                      matTooltipClass="tooltip-class"
+                      matTooltip="Add a slave that takes its settings from this one
+
+                  The new slave inherits everything - specification, poll, HTTP push, discovery - and follows every change made here. Only its Slave Id, Slave Name and MQTT Root Topic are individual."
+                      color="primary"
+                      (click)="addReferencingSlave(uislave)"
+                    >
+                      <mat-icon>link</mat-icon>
+                    </button>
                     <button
                       mat-icon-button
                       class="material-icons app-toolbar-menu delete-button"
@@ -86,14 +112,6 @@
                   } @else {
                     References the unknown slave {{ uislave.slave.referenceSlaveId }}. This slave is not polled.
                   }
-                  <button
-                    mat-button
-                    color="primary"
-                    (click)="detachSlave(uislave)"
-                    matTooltip="Keep the inherited settings as this slave's own and stop following the referenced slave"
-                  >
-                    Detach
-                  </button>
                 </p>
                 <mat-form-field class="width150pt">
                   <mat-label>Slave Name</mat-label>

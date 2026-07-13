@@ -614,6 +614,21 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   referencingSlaves(slave: Islave): Islave[] {
     return this.uiSlaves.map((u) => u.slave).filter((s) => s.referenceSlaveId === slave.slaveid)
   }
+  // The header's link button (like "Add this Entity" on an entity card): creates a new slave that
+  // inherits everything from this one, so a second identical device is one click away. Only its slave
+  // id, name and MQTT root topic remain to be filled in.
+  addReferencingSlave(uiSlave: IuiSlave): void {
+    if (!this.bus || this.isReference(uiSlave.slave)) return
+    const slaveid = this.nextFreeSlaveId()
+    this.entityApiService
+      .postSlave(this.bus.busId, { slaveid: slaveid, referenceSlaveId: uiSlave.slave.slaveid })
+      .subscribe((slave) => {
+        this.uiSlaves = ([] as IuiSlave[]).concat(this.uiSlaves, [this.getUiSlave(slave, false)])
+      })
+  }
+  private nextFreeSlaveId(): number {
+    return this.uiSlaves.reduce((max, u) => Math.max(max, u.slave.slaveid), 0) + 1
+  }
   // Turns a referencing slave into a standalone one: it keeps the values it inherited (they are
   // already materialized on the slave) and stops following the referenced slave.
   detachSlave(uiSlave: IuiSlave): void {
