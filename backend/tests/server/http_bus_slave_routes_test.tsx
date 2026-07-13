@@ -5,6 +5,7 @@ import { Bus } from '../../src/server/bus.js'
 import { ConfigBus } from '../../src/server/configbus.js'
 import { initBussesForTest } from './configsbase.js'
 import { createTestServer, rawText, TestServer } from './httpTestHelper.js'
+import { MqttSubscriptions } from '../../src/server/mqttsubscriptions.js'
 
 let ts: TestServer
 beforeAll(async () => {
@@ -309,6 +310,57 @@ describe('referencing slaves via ' + apiUri.slave, () => {
       expect(Bus.getBus(0)!.getSlaveBySlaveId(33)).toBeUndefined()
     } finally {
       await cleanup()
+    }
+  })
+})
+
+// The test poll runs the same code path as the mqtt triggerPoll topic. Here it is stubbed: what the
+// route must get right is finding the slave, rejecting the cases it cannot poll, and answering with
+// the refreshed Status & Errors.
+describe('POST ' + apiUri.pollSlave, () => {
+  function slaveWithSpec(): Islave {
+    return Bus.getBus(0)!
+      .getSlaves()
+      .find((s) => s.specificationid != undefined)!
+  }
+
+  it('polls a slave and returns it with its status', async () => {
+    const publishState = vi.spyOn(MqttSubscriptions.getInstance(), 'publishState').mockResolvedValue({} as any)
+    try {
+      const slave = slaveWithSpec()
+      const response = await ts
+        .request()
+        .post(apiUri.pollSlave + '?busid=0&slaveid=' + slave.slaveid)
+        .expect(HttpErrorsEnum.OK)
+      expect(publishState).toHaveBeenCalledTimes(1)
+      // the poll runs for the slave that was asked for, whatever its poll mode says
+      expect(publishState.mock.calls[0][0].getSlaveId()).toBe(slave.slaveid)
+      expect(response.body.slaveid).toBe(slave.slaveid)
+      expect(response.body.modbusStatusForSlave).toBeDefined()
+    } finally {
+      publishState.mockRestore()
+    }
+  })
+
+  it('fails for an unknown slave', async () => {
+    await ts
+      .request()
+      .post(apiUri.pollSlave + '?busid=0&slaveid=987')
+      .parse(rawText)
+      .expect(HttpErrorsEnum.ErrNotFound)
+  })
+
+  it('fails for a slave without specification', async () => {
+    const noSpec = 44
+    Bus.getBus(0)!.writeSlave({ slaveid: noSpec })
+    try {
+      await ts
+        .request()
+        .post(apiUri.pollSlave + '?busid=0&slaveid=' + noSpec)
+        .parse(rawText)
+        .expect(HttpErrorsEnum.ErrInvalidParameter)
+    } finally {
+      Bus.getBus(0)!.deleteSlave(noSpec)
     }
   })
 })

@@ -42,6 +42,23 @@
                 }
 
                 @if (!needsSaving(i)) {
+                  @if (uislave.slave.specificationid != undefined) {
+                    <button
+                      mat-icon-button
+                      class="material-icons app-toolbar-menu save-button"
+                      matTooltipClass="tooltip-class"
+                      matTooltip="Poll this slave now
+
+                  Reads the device, publishes the MQTT state and runs the HTTP push - once, right now. Poll mode and poll interval are ignored, so a slave set to 'no poll' can be tested too.
+
+                  The result appears in Status & Errors below."
+                      color="primary"
+                      [disabled]="isPolling(uislave)"
+                      (click)="pollSlave(uislave)"
+                    >
+                      <mat-icon>bolt</mat-icon>
+                    </button>
+                  }
                   <button
                     mat-icon-button
                     class="material-icons app-toolbar-menu delete-button"
@@ -467,6 +484,7 @@
               <mat-expansion-panel>
                 <mat-expansion-panel-header>
                   <mat-panel-title>Status &amp; Errors </mat-panel-title>
+                  <mat-panel-description>{{ getPollMessage(uislave) }}</mat-panel-description>
                 </mat-expansion-panel-header>
                 <ng-template matExpansionPanelContent>
                   <app-modbus-error-component [modbusErrors]="getModbusErrors(uislave)" />

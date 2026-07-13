@@ -1,12 +1,32 @@
 import Debug from 'debug'
 import { Bus } from '../../bus.js'
+import { Config } from '../../config.js'
 import { SlaveReferencedError } from '../../configbus.js'
 import { HttpErrorsEnum } from '../../../shared/specification/index.js'
-import { Islave, apiUri } from '../../../shared/server/index.js'
+import { Islave, Slave, apiUri } from '../../../shared/server/index.js'
+import { MqttSubscriptions } from '../../mqttsubscriptions.js'
 import { ApiError, Registrar, created, ok, requireBusSlave, toApiSlave } from '../routeHelpers.js'
 import { encryptSecret } from '../../secureSecret.js'
 
 const debug = Debug('httpserver')
+const pollTimeout = 30000
+
+// Rejects with an ApiError when the promise does not settle in time, so a hanging poll cannot
+// hold the http request open forever.
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new ApiError(HttpErrorsEnum.ErrRequestTimeout, message + ms / 1000 + 's')), ms)
+    promise
+      .then((v) => {
+        clearTimeout(timer)
+        resolve(v)
+      })
+      .catch((e) => {
+        clearTimeout(timer)
+        reject(e)
+      })
+  })
+}
 
 export function registerSlaveRoutes(r: Registrar): void {
   r.get(apiUri.slaves, (ctx) => {
@@ -77,6 +97,26 @@ export function registerSlaveRoutes(r: Registrar): void {
     }
     const rc: Islave = bus.writeSlave(incoming)
     return created(toApiSlave(rc))
+  })
+
+  // Runs one poll cycle for a slave right now: modbus read, mqtt publish and http push - the very
+  // same code path the mqtt triggerPoll topic uses. It ignores pollMode and pollInterval, so a slave
+  // set to "no poll" or to a rare cron schedule can be tested without changing its configuration.
+  // Returns the slave including its refreshed Status & Errors.
+  r.post(apiUri.pollSlave, async (ctx) => {
+    const { busid, slaveid } = requireBusSlave(ctx)
+    const bus = Bus.getBus(busid)
+    if (!bus) throw new ApiError(HttpErrorsEnum.ErrNotFound, 'Bus not found. Id: ' + busid)
+    const islave = bus.getSlaveBySlaveId(slaveid)
+    if (!islave) throw new ApiError(HttpErrorsEnum.ErrNotFound, 'Slave ' + slaveid + ' not found on bus ' + busid)
+    if (!islave.specificationid)
+      throw new ApiError(HttpErrorsEnum.ErrInvalidParameter, 'Slave ' + slaveid + ' has no specification, nothing to poll')
+    const slave = new Slave(busid, islave, Config.getConfiguration().mqttbasetopic)
+    debug('POST /slave/poll: bus ' + busid + ' slave ' + slaveid)
+    // A poll waits for the mqtt client, which never arrives when no broker is reachable. Time out
+    // instead of letting the request hang; the failures are recorded in Status & Errors either way.
+    await withTimeout(MqttSubscriptions.getInstance().publishState(slave), pollTimeout, 'Poll did not finish within ')
+    return ok(toApiSlave(bus.getSlaveBySlaveId(slaveid)!))
   })
 
   r.delete(apiUri.slave, (ctx) => {

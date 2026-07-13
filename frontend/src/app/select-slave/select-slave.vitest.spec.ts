@@ -198,6 +198,54 @@ describe('Select Slave tests (vitest)', () => {
     })
   })
 
+  // The test poll runs a slave's poll cycle now, whatever its poll mode and interval say. The
+  // response carries the refreshed status, which the card must pick up.
+  describe('test poll', () => {
+    it('posts the poll and shows the refreshed status', async () => {
+      await mount()
+      const component = fixture.componentInstance
+      const uiSlave = component.uiSlaves[0]
+
+      component.pollSlave(uiSlave)
+      expect(component.isPolling(uiSlave)).toBe(true)
+
+      const req = httpMock.expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave/poll'))
+      expect(req.request.urlWithParams).toContain('slaveid=1')
+      req.flush({
+        ...slavesFixture[0],
+        modbusStatusForSlave: { errors: [], requestCount: [0, 0, 0, 9, 0, 0, 0, 0, 0, 0], queueLength: 0 },
+      })
+      safeDetectChanges()
+
+      expect(component.isPolling(uiSlave)).toBe(false)
+      expect(component.getPollMessage(uiSlave)).toContain('Polled at')
+      expect(component.getModbusErrors(component.uiSlaves[0])!.requestCount[3]).toBe(9)
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+
+    it('reports a failing poll', async () => {
+      await mount()
+      const component = fixture.componentInstance
+      const uiSlave = component.uiSlaves[0]
+      // the api service alerts the details; the card keeps the short message
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+      try {
+        component.pollSlave(uiSlave)
+        httpMock
+          .expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave/poll'))
+          .flush('Poll did not finish within 30s', { status: 408, statusText: 'Request Timeout' })
+        safeDetectChanges()
+
+        expect(component.isPolling(uiSlave)).toBe(false)
+        expect(component.getPollMessage(uiSlave)).toContain('Poll failed: Poll did not finish within 30s')
+        httpMock.match(() => true).forEach((r) => r.flush([]))
+      } finally {
+        // a leaked spy would be reused by the next vi.spyOn(window, 'alert') - with its calls
+        alertSpy.mockRestore()
+      }
+    })
+  })
+
   describe('referencing slaves', () => {
     // What the backend serves for a reference: the inherited fields are materialized, and
     // referenceSlaveId marks it as following slave 1.

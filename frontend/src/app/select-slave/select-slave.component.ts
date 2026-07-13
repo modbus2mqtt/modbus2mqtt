@@ -47,10 +47,12 @@ import {
   ImodbusStatusForSlave,
   ModbusTasks,
 } from '@shared/server'
+import { HttpErrorResponse } from '@angular/common/http'
 import { MatInput } from '@angular/material/input'
 import {
   MatExpansionPanel,
   MatExpansionPanelContent,
+  MatExpansionPanelDescription,
   MatExpansionPanelHeader,
   MatExpansionPanelTitle,
 } from '@angular/material/expansion'
@@ -81,6 +83,9 @@ interface IuiSlave {
   // Set once the per-slave modbus identification has been fetched lazily
   // (on first dropdown open). Keeps the initial page load free of N device reads.
   identSpecsLoaded?: boolean
+  // State of a manually triggered test poll. A signal so the result (and the refreshed
+  // Status & Errors) render under zoneless change detection when the http response arrives.
+  pollState: WritableSignal<{ running: boolean; message?: string }>
 }
 
 @Component({
@@ -113,6 +118,7 @@ interface IuiSlave {
     // Renders a panel's body only once it is opened: the cards hold five panels each, and rendering
     // them all eagerly made every change detection cycle walk the whole (mostly invisible) DOM.
     MatExpansionPanelContent,
+    MatExpansionPanelDescription,
     MatExpansionPanelHeader,
     MatExpansionPanelTitle,
     MatInput,
@@ -545,6 +551,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       slave: slave,
       label: this.getSlaveName(slave),
       slaveForm: fg,
+      pollState: signal<{ running: boolean; message?: string }>({ running: false }),
     } as any
     // ReplaySubject(1) so the template's `| async` receives the spec list even when
     // loadIdentSpecs() resolves (microtask) before Angular subscribes via change detection.
@@ -766,6 +773,35 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   uniqueNameValidator: any = (slaveId: number, control: AbstractControl): ValidationErrors | null => {
     if (this.hasDuplicateName(slaveId, control.value)) return { duplicates: control.value }
     else return null
+  }
+
+  // Runs one poll cycle for this slave now - modbus read, MQTT publish and HTTP push - no matter
+  // what its poll mode and interval say. The response carries the refreshed Status & Errors, so a
+  // failing device, broker or push endpoint becomes visible right in the card.
+  pollSlave(uiSlave: IuiSlave): void {
+    if (!this.bus || uiSlave.pollState().running) return
+    uiSlave.pollState.set({ running: true, message: 'Polling…' })
+    this.entityApiService
+      .pollSlave(this.bus.busId, uiSlave.slave.slaveid, (err) => {
+        uiSlave.pollState.set({ running: false, message: 'Poll failed: ' + this.getPollErrorText(err) })
+        // false: the api service still shows the error details
+        return false
+      })
+      .subscribe((slave) => {
+        this.updateUiSlaveData(slave)
+        uiSlave.pollState.set({ running: false, message: 'Polled at ' + new Date().toLocaleTimeString() })
+      })
+  }
+  private getPollErrorText(err: HttpErrorResponse): string {
+    if (err.error && err.error.error) return String(err.error.error)
+    if (err.error) return String(err.error)
+    return err.statusText ? err.statusText : err.message
+  }
+  getPollMessage(uiSlave: IuiSlave): string {
+    return uiSlave.pollState().message ?? ''
+  }
+  isPolling(uiSlave: IuiSlave): boolean {
+    return uiSlave.pollState().running
   }
 
   deleteSlave(slave: Islave | null, detachReferences: boolean = false) {

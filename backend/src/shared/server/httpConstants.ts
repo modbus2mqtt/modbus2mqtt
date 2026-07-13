@@ -18,6 +18,7 @@ export enum apiUri {
   bus = '/api/bus',
   slaves = '/api/slaves',
   slave = '/api/slave',
+  pollSlave = '/api/slave/poll',
   configuration = '/api/configuration',
   translate = '/api/translate',
   validateMqtt = '/api/validate/mqtt',

@@ -417,6 +417,17 @@ export class ApiService {
    * (keeping their inherited configuration) instead of refusing the delete with a 409.
    * errorHandler returning true suppresses the global alert, so the caller can handle the 409 itself.
    */
+  // Runs one poll cycle for the slave now, regardless of its poll mode and interval. Returns the
+  // slave with the refreshed modbusStatusForSlave. The caller passes an errorHandler to report a
+  // failing poll (timeout, modbus error) instead of silently swallowing it.
+  pollSlave(busid: number, slaveid: number, errorHandler?: (err: HttpErrorResponse) => boolean): Observable<Islave> {
+    return this.httpClient.post<Islave>(this.getFullUri(apiUri.pollSlave) + `?busid=${busid}&slaveid=${slaveid}`, {}).pipe(
+      catchError((err) => {
+        if (errorHandler == undefined || !errorHandler(err)) this.errorHandler(err)
+        return new Observable<Islave>()
+      })
+    )
+  }
   deleteSlave(
     busid: number,
     slaveid: number,
