@@ -72,6 +72,8 @@
                       matTooltipClass="tooltip-class"
                       matTooltip="Add a slave that takes its settings from this one
 
+                  Prepares the New Slave card below: enter the Slave Id (the device's Modbus address) and add it.
+
                   The new slave inherits everything - specification, poll, HTTP push, discovery - and follows every change made here. Only its Slave Id, Slave Name and MQTT Root Topic are individual."
                       color="primary"
                       (click)="addReferencingSlave(uislave)"
@@ -199,25 +201,6 @@
                       <mat-error> Must be unique </mat-error>
                     }
                   </mat-form-field>
-                  @if (referenceCandidates(uislave.slave.slaveid).length > 0) {
-                    <mat-form-field class="width200pt">
-                      <mat-label>Take settings from</mat-label>
-                      <mat-select
-                        formControlName="referenceSlaveId"
-                        matTooltipClass="tooltip-class"
-                        matTooltip="Optional: take every setting (specification, poll, HTTP push, discovery) from another slave of this bus and follow its changes.
-
-                  Only Slave Name, Slave Id and MQTT Root Topic stay individual.
-
-                  Use this for identical devices - e.g. several meters pushing to the same endpoint - so they are configured in one place. Saving replaces this slave's own settings with the referenced slave's."
-                      >
-                        <mat-option [value]="null">Own settings (no reference)</mat-option>
-                        @for (candidate of referenceCandidates(uislave.slave.slaveid); track candidate.slaveid) {
-                          <mat-option [value]="candidate.slaveid">{{ getSlaveName(candidate) }}</mat-option>
-                        }
-                      </mat-select>
-                    </mat-form-field>
-                  }
                   @if ([0, 2, 4].includes(uislave.slaveForm.get('pollMode')!.value)) {
                     @if (!uislave.slaveForm.get('pollSchedule')!.value) {
                       <mat-form-field class="width150pt">
@@ -473,7 +456,7 @@
           </form>
         </mat-card>
       }
-      <mat-card class="width550pt card">
+      <mat-card class="width550pt card" #newSlaveCard>
         <form (keydown.enter)="keyDown($event, slaveNewForm)" [formGroup]="slaveNewForm">
           <mat-card-header
             ><mat-card-title class="clickable">New Slave</mat-card-title>
@@ -495,11 +478,13 @@
           <mat-card-content>
             <mat-form-field class="field width150pt">
               <mat-label>Slave Id</mat-label>
-              <input matInput name="slaveId" formControlName="slaveId" type="number" />
+              <input matInput name="slaveId" formControlName="slaveId" type="number" #newSlaveIdInput />
             </mat-form-field>
-            <mat-slide-toggle class="width50" formControlName="detectSpec" [matTooltip]="getDetectSpecToolTip()"
-              >Enable Specification matching.</mat-slide-toggle
-            >
+            @if (!slaveNewForm.get('referenceSlaveId')!.value) {
+              <mat-slide-toggle class="width50" formControlName="detectSpec" [matTooltip]="getDetectSpecToolTip()"
+                >Enable Specification matching.</mat-slide-toggle
+              >
+            }
             @if (referenceCandidates().length > 0) {
               <mat-form-field class="field width200pt">
                 <mat-label>Take settings from</mat-label>

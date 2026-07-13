@@ -259,6 +259,10 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   bus: IBus | undefined
   preselectedSlaveId: number | undefined = undefined
   @ViewChild('slavesBody') slavesBody: ElementRef | undefined
+  // The "New Slave" card: the link button on a slave card sends the user here with the reference preset.
+  // read: ElementRef because a bare ViewChild on <mat-card> yields the component, not the element.
+  @ViewChild('newSlaveCard', { read: ElementRef }) newSlaveCard: ElementRef | undefined
+  @ViewChild('newSlaveIdInput', { read: ElementRef }) newSlaveIdInput: ElementRef | undefined
   @Output() slaveidEventEmitter = new EventEmitter<number | undefined>()
   ngOnInit(): void {
     this.currentLanguage = getCurrentLanguage()
@@ -590,7 +594,6 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     fg.get('discoverEntitiesList')!.setValue(this.buildDiscoverEntityList(slave))
     if (slave.noDiscovery) fg.get('discoverEntitiesList')!.disable()
     else fg.get('discoverEntitiesList')!.enable()
-    fg.get('referenceSlaveId')!.setValue(slave.referenceSlaveId ?? null)
     fg.get('httpPushUrl')!.setValue(slave.httpPush?.url ?? null)
     fg.get('httpPushPat')!.setValue(null) // never prefill the PAT into the form
     fg.get('httpPushRoot')!.setValue(slave.httpPush?.root ?? null)
@@ -614,20 +617,15 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
   referencingSlaves(slave: Islave): Islave[] {
     return this.uiSlaves.map((u) => u.slave).filter((s) => s.referenceSlaveId === slave.slaveid)
   }
-  // The header's link button (like "Add this Entity" on an entity card): creates a new slave that
-  // inherits everything from this one, so a second identical device is one click away. Only its slave
-  // id, name and MQTT root topic remain to be filled in.
+  // The header's link button: prepares the "New Slave" card with a reference to this slave. The slave
+  // id cannot be generated - it is the device's Modbus address - so the user enters it there and the
+  // new slave then inherits everything but name and MQTT root topic from this one.
   addReferencingSlave(uiSlave: IuiSlave): void {
-    if (!this.bus || this.isReference(uiSlave.slave)) return
-    const slaveid = this.nextFreeSlaveId()
-    this.entityApiService
-      .postSlave(this.bus.busId, { slaveid: slaveid, referenceSlaveId: uiSlave.slave.slaveid })
-      .subscribe((slave) => {
-        this.uiSlaves = ([] as IuiSlave[]).concat(this.uiSlaves, [this.getUiSlave(slave, false)])
-      })
-  }
-  private nextFreeSlaveId(): number {
-    return this.uiSlaves.reduce((max, u) => Math.max(max, u.slave.slaveid), 0) + 1
+    if (this.isReference(uiSlave.slave)) return
+    this.slaveNewForm.get('referenceSlaveId')!.setValue(uiSlave.slave.slaveid)
+    // optional calls: jsdom implements neither
+    this.newSlaveCard?.nativeElement?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    this.newSlaveIdInput?.nativeElement?.focus?.()
   }
   // Turns a referencing slave into a standalone one: it keeps the values it inherited (they are
   // already materialized on the slave) and stops following the referenced slave.
@@ -667,8 +665,6 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         httpPushPat: [null as string | null],
         httpPushRoot: [slave.httpPush?.root],
         pushEntitiesList: [[] as number[]],
-        // Lets an existing standalone slave become a reference to another one.
-        referenceSlaveId: [null as number | null],
       })
       this.slave2Form(slave, fg)
       return fg
@@ -809,16 +805,6 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     }
   }
   saveSlave(uiSlave: IuiSlave) {
-    // A standalone slave that got a reference selected becomes a referencing slave on save: it keeps
-    // its name/root topic and inherits the rest from now on (the previously configured values are
-    // dropped - the referenced slave's win).
-    const newReference: number | null = uiSlave.slaveForm.get('referenceSlaveId')?.value ?? null
-    if (!this.isReference(uiSlave.slave) && newReference != null) {
-      SelectSlaveComponent.referenceControllers.forEach((controller) => {
-        SelectSlaveComponent.form2SlaveSetValue(uiSlave, controller)
-      })
-      uiSlave.slave.referenceSlaveId = newReference
-    }
     // A referencing slave saves its own fields only. Writing back the inherited ones would bake in a
     // copy that stops following the referenced slave (the backend discards them anyway).
     if (this.isReference(uiSlave.slave)) {

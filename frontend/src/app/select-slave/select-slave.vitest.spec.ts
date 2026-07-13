@@ -217,7 +217,7 @@ describe('Select Slave tests (vitest)', () => {
       httpMock.match(() => true).forEach((r) => r.flush([]))
     })
 
-    it('the card header link button adds a slave referencing this one', async () => {
+    it('the card header link button prepares the New Slave card with the reference', async () => {
       await mount()
       const component = fixture.componentInstance
       const root = component.uiSlaves.find((u) => u.slave.slaveid === 1)!
@@ -225,45 +225,24 @@ describe('Select Slave tests (vitest)', () => {
       component.addReferencingSlave(root)
       safeDetectChanges()
 
-      // next free slave id, and nothing but the reference - the rest is inherited
-      const postReq = httpMock.expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave'))
-      expect(postReq.request.body).toEqual({ slaveid: 2, referenceSlaveId: 1 })
+      // The slave id is the device's Modbus address and cannot be generated: nothing is created yet,
+      // the user enters the id in the prepared New Slave card.
+      expect(component.slaveNewForm.get('referenceSlaveId')!.value).toBe(1)
+      httpMock.expectNone((r) => r.method === 'POST')
 
-      postReq.flush({ ...slavesFixture[0], slaveid: 2, referenceSlaveId: 1, name: undefined })
+      component.slaveNewForm.get('slaveId')!.setValue(7)
+      component.addSlave(component.slaveNewForm)
       safeDetectChanges()
 
-      const child = component.uiSlaves.find((u) => u.slave.slaveid === 2)!
+      const postReq = httpMock.expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave'))
+      expect(postReq.request.body).toEqual({ slaveid: 7, referenceSlaveId: 1 })
+
+      postReq.flush({ ...slavesFixture[0], slaveid: 7, referenceSlaveId: 1 })
+      safeDetectChanges()
+
+      const child = component.uiSlaves.find((u) => u.slave.slaveid === 7)!
       expect(component.isReference(child.slave)).toBe(true)
-      expect(component.referencingSlaves(root.slave).map((s) => s.slaveid)).toEqual([2])
-      httpMock.match(() => true).forEach((r) => r.flush([]))
-    })
-
-    it('turns an existing slave into a reference when one is selected in its card', async () => {
-      // two standalone slaves: slave 2 can take its settings from slave 1
-      const standalone = [slavesFixture[0], { ...slavesFixture[0], slaveid: 2, name: 'second meter', rootTopic: 'meters/2' }]
-      await mount(standalone)
-      const component = fixture.componentInstance
-      const uiSlave = component.uiSlaves.find((u) => u.slave.slaveid === 2)!
-
-      // the card of an existing standalone slave offers the reference (this is what makes it reachable
-      // without recreating the slave)
-      expect(uiSlave.slaveForm.get('referenceSlaveId')!.value).toBeNull()
-      expect(component.referenceCandidates(2).map((s) => s.slaveid)).toEqual([1])
-
-      uiSlave.slaveForm.get('referenceSlaveId')!.setValue(1)
-      safeDetectChanges()
-      component.saveSlave(uiSlave)
-      safeDetectChanges()
-
-      const postReq = httpMock.expectOne((r) => r.method === 'POST' && r.url.includes('/api/slave'))
-      expect(postReq.request.body).toEqual({
-        slaveid: 2,
-        referenceSlaveId: 1,
-        name: 'second meter',
-        rootTopic: 'meters/2',
-      })
-      postReq.flush(postReq.request.body)
-      safeDetectChanges()
+      expect(component.referencingSlaves(root.slave).map((s) => s.slaveid)).toEqual([7])
       httpMock.match(() => true).forEach((r) => r.flush([]))
     })
 
