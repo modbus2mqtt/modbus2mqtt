@@ -4,7 +4,7 @@ import { MqttClient } from 'mqtt'
 import { FakeModes, FakeMqtt, initBussesForTest, setConfigsDirsForTest } from './configsbase.js'
 import { Bus } from '../../src/server/bus.js'
 import { expect, test, beforeAll, afterAll } from 'vitest'
-import { Slave, PollModes } from '../../src/shared/server/index.js'
+import { Slave, PollModes, ModbusTasks, ModbusErrorStates } from '../../src/shared/server/index.js'
 import { ConfigBus } from '../../src/server/configbus.js'
 import { MqttConnector } from '../../src/server/mqttconnector.js'
 import { MqttPoller } from '../../src/server/mqttpoller.js'
@@ -204,4 +204,70 @@ test('poll counter resets at threshold and allows re-polling', async () => {
   expect(pollInfo2).toBeDefined()
   expect(pollInfo2!.count).toBeGreaterThan(0)
   expect(pollInfo2!.count).toBeLessThan(50)
+})
+
+// A slave that cannot be polled - no specification, an unloadable one (issue #237: a broken
+// modbus2mqtt.yaml is logged once at startup and skipped), or an invalid cron - silently stops
+// publishing. That used to be visible in a single log line; it now shows up in the slave's card.
+function collectSlaveErrors(): { errors: { task: ModbusTasks; state: ModbusErrorStates; message: string }[]; restore: () => void } {
+  const errors: { task: ModbusTasks; state: ModbusErrorStates; message: string }[] = []
+  const api = Bus.getBus(0)!.getModbusAPI()
+  const original = api.addSlaveError
+  api.addSlaveError = (_slaveid: number, task: ModbusTasks, state: ModbusErrorStates, message: string) =>
+    errors.push({ task, state, message })
+  return { errors, restore: () => (api.addSlaveError = original) }
+}
+
+test('a slave whose specification cannot be loaded reports it in Status & Errors', async () => {
+  const fd = getFakeDiscovery()
+  copySubscribedSlaves(fd.msub['subscribedSlaves'], fakeDiscovery.msub['subscribedSlaves'])
+
+  const target = Bus.getBus(0)!
+    .getSlaves()
+    .find((s) => s.pollMode != undefined && ![PollModes.noPoll, PollModes.trigger].includes(s.pollMode) && s.specification)
+  expect(target).toBeDefined()
+  const savedSpec = target!.specification
+  delete target!.specification // what a failed spec load leaves behind
+  const collected = collectSlaveErrors()
+
+  try {
+    await fd.mdl['poll']!(Bus.getBus(0)!)
+    expect(collected.errors.length).toBe(1)
+    expect(collected.errors[0].task).toBe(ModbusTasks.poll)
+    expect(collected.errors[0].state).toBe(ModbusErrorStates.configuration)
+    expect(collected.errors[0].message).toContain('could not be loaded')
+    expect(collected.errors[0].message).toContain('not polled')
+
+    // the poll ticks 10x a second - the error list must not be flooded with the same message
+    await fd.mdl['poll']!(Bus.getBus(0)!)
+    await fd.mdl['poll']!(Bus.getBus(0)!)
+    expect(collected.errors.length).toBe(1)
+  } finally {
+    collected.restore()
+    target!.specification = savedSpec
+  }
+})
+
+test('an invalid poll schedule reports it in Status & Errors', async () => {
+  const fd = getFakeDiscovery()
+  copySubscribedSlaves(fd.msub['subscribedSlaves'], fakeDiscovery.msub['subscribedSlaves'])
+
+  const target = Bus.getBus(0)!
+    .getSlaves()
+    .find((s) => s.pollMode != undefined && ![PollModes.noPoll, PollModes.trigger].includes(s.pollMode) && s.specification)
+  expect(target).toBeDefined()
+  const saved = target!.pollSchedule
+  target!.pollSchedule = 'not a cron'
+  const collected = collectSlaveErrors()
+
+  try {
+    await fd.mdl['poll']!(Bus.getBus(0)!)
+    expect(collected.errors.length).toBe(1)
+    expect(collected.errors[0].state).toBe(ModbusErrorStates.configuration)
+    expect(collected.errors[0].message).toContain('Invalid poll schedule')
+  } finally {
+    collected.restore()
+    if (saved == undefined) delete target!.pollSchedule
+    else target!.pollSchedule = saved
+  }
 })

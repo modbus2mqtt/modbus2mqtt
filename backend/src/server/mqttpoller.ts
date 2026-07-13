@@ -12,6 +12,9 @@ import { countSlaveRequest, recordSlaveError } from './slaveStatus.js'
 
 const debug = Debug('mqttpoller')
 const defaultPollCount = 50 // 5 seconds
+// A configuration problem keeps a slave mute until someone fixes it, so it is re-recorded at this
+// interval: the error list drops entries older than an hour.
+const configErrorReportInterval = 15 * 60 * 1000 // 15 minutes
 const log = new Logger('mqttpoller')
 interface IslavePollInfo {
   count: number
@@ -24,6 +27,10 @@ export class MqttPoller {
   private slavePollInfo: Map<number, IslavePollInfo> = new Map<number, IslavePollInfo>()
   private warnedNoSpecSlaves: Set<number> = new Set<number>()
   private warnedBadCron: Set<number> = new Set<number>()
+  // When the last "this slave cannot be polled" was recorded, per slave. A configuration problem
+  // does not fix itself, so it is re-recorded regularly: the error list drops entries after an hour,
+  // and a slave that has been mute for a day should still say so.
+  private lastConfigErrorReport: Map<number, number> = new Map<number, number>()
 
   constructor(private connector: MqttConnector) {}
 
@@ -52,7 +59,7 @@ export class MqttPoller {
           if (schedule != undefined && schedule.trim().length > 0) {
             // An invalid expression is logged once and the slave is NOT polled (rather than falling
             // back to the short default interval, which would e.g. spam an HTTP push endpoint).
-            const cron = this.getCronSchedule(schedule, sl.getSlaveId())
+            const cron = this.getCronSchedule(schedule, sl)
             if (cron) {
               const minute = Math.floor(now.getTime() / 60000)
               triggerNow = pc.lastFiredMinute !== minute && cron.matches(now)
@@ -70,13 +77,11 @@ export class MqttPoller {
               pc.processing = true
               needPolls.push(s)
             } else {
-              if (slave.specificationid && !this.warnedNoSpecSlaves.has(s.getSlaveId())) {
-                log.log(
-                  LogLevelEnum.error,
-                  'No specification found for slave ' + s.getSlaveId() + ' specid: ' + s.getSpecificationId()
-                )
-                this.warnedNoSpecSlaves.add(s.getSlaveId())
-              }
+              // The slave cannot be polled: either it has no specification at all, or its
+              // specification failed to load (a broken yaml is logged once at startup and skipped).
+              // Either way the slave silently stops publishing - which used to be visible in a single
+              // log line only. Record it, so its card says why it went quiet.
+              this.reportNotPollable(s, slave.specificationid)
             }
           }
           this.slavePollInfo.set(sl.getSlaveId(), pc)
@@ -187,19 +192,49 @@ export class MqttPoller {
     })
   }
 
+  // A slave whose specification is missing or unloadable is never published. The log says so once at
+  // startup; this puts it into the slave's Status & Errors, where someone looking for the missing
+  // values will actually find it.
+  private reportNotPollable(slave: Slave, specificationid: string | undefined): void {
+    const slaveid = slave.getSlaveId()
+    const message =
+      specificationid != undefined
+        ? 'Specification "' + specificationid + '" could not be loaded. The slave is not polled.'
+        : 'No specification assigned. The slave is not polled.'
+    if (specificationid != undefined && !this.warnedNoSpecSlaves.has(slaveid)) {
+      log.log(LogLevelEnum.error, 'No specification found for slave ' + slaveid + ' specid: ' + specificationid)
+      this.warnedNoSpecSlaves.add(slaveid)
+    }
+    this.reportConfigError(slave, message)
+  }
+
+  // Throttled: the poll ticks every 100ms, and an unpollable slave would otherwise flood its own
+  // error list and push the real modbus errors out of it.
+  private reportConfigError(slave: Slave, message: string): void {
+    const slaveid = slave.getSlaveId()
+    const last = this.lastConfigErrorReport.get(slaveid)
+    const now = Date.now()
+    if (last != undefined && now - last < configErrorReportInterval) return
+    this.lastConfigErrorReport.set(slaveid, now)
+    recordSlaveError(slave, ModbusTasks.poll, ModbusErrorStates.configuration, message)
+  }
+
   // Parses a slave's cron expression, or returns undefined when it is invalid (logged once per
   // slave). The caller skips polling on undefined so a typo does not trigger unintended polls.
-  private getCronSchedule(expression: string, slaveId: number): CronSchedule | undefined {
+  private getCronSchedule(expression: string, slave: Slave): CronSchedule | undefined {
+    const slaveId = slave.getSlaveId()
     try {
       const cron = CronSchedule.parse(expression)
       this.warnedBadCron.delete(slaveId)
       return cron
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
       if (!this.warnedBadCron.has(slaveId)) {
-        const msg = e instanceof Error ? e.message : String(e)
         log.log(LogLevelEnum.error, 'Invalid pollSchedule for slave ' + slaveId + ', skipping poll: ' + msg)
         this.warnedBadCron.add(slaveId)
       }
+      // Same as a missing specification: the slave is never polled and would go quiet without a word.
+      this.reportConfigError(slave, 'Invalid poll schedule "' + expression + '": ' + msg + '. The slave is not polled.')
       return undefined
     }
   }
