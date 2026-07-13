@@ -23,13 +23,19 @@ describe('GET ' + apiUri.busses, () => {
 
 describe('GET ' + apiUri.bus, () => {
   it('returns a single bus', async () => {
-    const response = await ts.request().get(apiUri.bus + '?busid=0').expect(200)
+    const response = await ts
+      .request()
+      .get(apiUri.bus + '?busid=0')
+      .expect(200)
     const bus: IBus = response.body
     expect(bus.busId).toBe(0)
     expect(bus.connectionData).toBeDefined()
   })
   it('returns bus slaves without embedded specification, leaving the in-memory slaves intact', async () => {
-    const response = await ts.request().get(apiUri.bus + '?busid=0').expect(200)
+    const response = await ts
+      .request()
+      .get(apiUri.bus + '?busid=0')
+      .expect(200)
     const bus: IBus = response.body
     const withSpecId = bus.slaves.find((s) => s.specificationid != undefined)
     expect(withSpecId).toBeDefined()
@@ -79,7 +85,11 @@ describe('POST/DELETE ' + apiUri.bus, () => {
     conn.timeout = 500
     initBussesForTest()
     ConfigBus.updateBusProperties(Bus.getBus(0)!.properties, conn)
-    await ts.request().post(apiUri.bus + '?busid=0').send(conn).expect(HttpErrorsEnum.OkCreated)
+    await ts
+      .request()
+      .post(apiUri.bus + '?busid=0')
+      .send(conn)
+      .expect(HttpErrorsEnum.OkCreated)
     expect(Bus.getBus(0)!.properties.connectionData.timeout).toBe(500)
     conn.timeout = 100
     ConfigBus.updateBusProperties(Bus.getBus(0)!.properties, conn)
@@ -93,12 +103,18 @@ describe('POST/DELETE ' + apiUri.bus, () => {
 
 describe('GET ' + apiUri.slaves, () => {
   it('lists slaves of a bus', async () => {
-    const response = await ts.request().get(apiUri.slaves + '?busid=0').expect(200)
+    const response = await ts
+      .request()
+      .get(apiUri.slaves + '?busid=0')
+      .expect(200)
     expect(response.body.length).toBeGreaterThan(0)
     expect(response.body[0]).toHaveProperty('slaveid')
   })
   it('decouples slaves from specifications: no embedded specification in the payload', async () => {
-    const response = await ts.request().get(apiUri.slaves + '?busid=0').expect(200)
+    const response = await ts
+      .request()
+      .get(apiUri.slaves + '?busid=0')
+      .expect(200)
     const withSpecId = response.body.find((s: Islave) => s.specificationid != undefined)
     expect(withSpecId).toBeDefined()
     response.body.forEach((s: Islave) => expect(s).not.toHaveProperty('specification'))
@@ -115,41 +131,184 @@ describe('GET ' + apiUri.slaves, () => {
 
 describe('GET ' + apiUri.slave, () => {
   it('returns a single slave', async () => {
-    const response = await ts.request().get(apiUri.slave + '?busid=0&slaveid=1').expect(200)
+    const response = await ts
+      .request()
+      .get(apiUri.slave + '?busid=0&slaveid=1')
+      .expect(200)
     const slave: Islave = response.body
     expect(slave.slaveid).toBe(1)
   })
   it('returns the slave without embedded specification, leaving the in-memory slave intact', async () => {
-    const response = await ts.request().get(apiUri.slave + '?busid=0&slaveid=1').expect(200)
+    const response = await ts
+      .request()
+      .get(apiUri.slave + '?busid=0&slaveid=1')
+      .expect(200)
     expect(response.body.specificationid).toBeDefined()
     expect(response.body).not.toHaveProperty('specification')
     expect(Bus.getBus(0)!.getSlaveBySlaveId(1)!.specification).toBeDefined()
   })
   it('fails without slaveid', async () => {
-    await ts.request().get(apiUri.slave + '?busid=0').parse(rawText).expect(HttpErrorsEnum.ErrInvalidParameter)
+    await ts
+      .request()
+      .get(apiUri.slave + '?busid=0')
+      .parse(rawText)
+      .expect(HttpErrorsEnum.ErrInvalidParameter)
   })
 })
 
 describe('POST/DELETE ' + apiUri.slave, () => {
   it('creates and deletes a slave', async () => {
     const newSlave: Islave = { slaveid: 21, name: 'http-test-slave', specificationid: 'waterleveltransmitter' } as Islave
-    const postResponse = await ts.request().post(apiUri.slave + '?busid=0').send(newSlave).expect(HttpErrorsEnum.OkCreated)
+    const postResponse = await ts
+      .request()
+      .post(apiUri.slave + '?busid=0')
+      .send(newSlave)
+      .expect(HttpErrorsEnum.OkCreated)
     expect(postResponse.body.slaveid).toBe(21)
     // response is decoupled from the specification, the in-memory slave is not
     expect(postResponse.body).not.toHaveProperty('specification')
     expect(Bus.getBus(0)!.getSlaveBySlaveId(21)).toBeDefined()
     expect(Bus.getBus(0)!.getSlaveBySlaveId(21)!.specification).toBeDefined()
 
-    await ts.request().delete(apiUri.slave + '?busid=0&slaveid=21').expect(200)
+    await ts
+      .request()
+      .delete(apiUri.slave + '?busid=0&slaveid=21')
+      .expect(200)
     expect(Bus.getBus(0)!.getSlaveBySlaveId(21)).toBeUndefined()
   })
   it('POST fails without busid', async () => {
     await ts.request().post(apiUri.slave).send({ slaveid: 21 }).parse(rawText).expect(HttpErrorsEnum.ErrBadRequest)
   })
   it('POST fails without slaveid in body', async () => {
-    await ts.request().post(apiUri.slave + '?busid=0').send({ name: 'no-slaveid' }).parse(rawText).expect(HttpErrorsEnum.ErrBadRequest)
+    await ts
+      .request()
+      .post(apiUri.slave + '?busid=0')
+      .send({ name: 'no-slaveid' })
+      .parse(rawText)
+      .expect(HttpErrorsEnum.ErrBadRequest)
   })
   it('DELETE fails without slaveid', async () => {
-    await ts.request().delete(apiUri.slave + '?busid=0').parse(rawText).expect(HttpErrorsEnum.ErrBadRequest)
+    await ts
+      .request()
+      .delete(apiUri.slave + '?busid=0')
+      .parse(rawText)
+      .expect(HttpErrorsEnum.ErrBadRequest)
+  })
+})
+
+describe('referencing slaves via ' + apiUri.slave, () => {
+  const ROOT_ID = 31
+  const CHILD_ID = 32
+
+  async function postRoot(): Promise<void> {
+    const root: Islave = {
+      slaveid: ROOT_ID,
+      name: 'root meter',
+      specificationid: 'waterleveltransmitter',
+      httpPush: { url: 'https://heimvio.de/readings/{{ slaveName }}' },
+    } as Islave
+    await ts
+      .request()
+      .post(apiUri.slave + '?busid=0')
+      .send(root)
+      .expect(HttpErrorsEnum.OkCreated)
+  }
+  async function postChild(): Promise<void> {
+    const child: Islave = { slaveid: CHILD_ID, referenceSlaveId: ROOT_ID, name: 'child meter' } as Islave
+    await ts
+      .request()
+      .post(apiUri.slave + '?busid=0')
+      .send(child)
+      .expect(HttpErrorsEnum.OkCreated)
+  }
+  async function cleanup(): Promise<void> {
+    for (const id of [CHILD_ID, ROOT_ID])
+      if (Bus.getBus(0)!.getSlaveBySlaveId(id)) await ts.request().delete(apiUri.slave + '?busid=0&slaveid=' + id)
+  }
+
+  it('serves a referencing slave with the inherited fields materialized', async () => {
+    await postRoot()
+    await postChild()
+    try {
+      const response = await ts
+        .request()
+        .get(apiUri.slave + '?busid=0&slaveid=' + CHILD_ID)
+        .expect(200)
+      const child: Islave = response.body
+      expect(child.referenceSlaveId).toBe(ROOT_ID)
+      expect(child.specificationid).toBe('waterleveltransmitter')
+      expect(child.httpPush!.url).toBe('https://heimvio.de/readings/{{ slaveName }}')
+      expect(child.name).toBe('child meter')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('DELETE of a referenced slave conflicts and names the referencing slaves', async () => {
+    await postRoot()
+    await postChild()
+    try {
+      const response = await ts
+        .request()
+        .delete(apiUri.slave + '?busid=0&slaveid=' + ROOT_ID)
+        .parse(rawText)
+        .expect(HttpErrorsEnum.ErrConflict)
+      expect(String(response.body)).toContain(String(CHILD_ID))
+      expect(Bus.getBus(0)!.getSlaveBySlaveId(ROOT_ID)).toBeDefined()
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('DELETE with detachReferences keeps the referencing slaves as standalone slaves', async () => {
+    await postRoot()
+    await postChild()
+    try {
+      await ts
+        .request()
+        .delete(apiUri.slave + '?busid=0&slaveid=' + ROOT_ID + '&detachReferences=true')
+        .expect(200)
+      expect(Bus.getBus(0)!.getSlaveBySlaveId(ROOT_ID)).toBeUndefined()
+      const detached = Bus.getBus(0)!.getSlaveBySlaveId(CHILD_ID)!
+      expect(detached.referenceSlaveId).toBeUndefined()
+      expect(detached.specificationid).toBe('waterleveltransmitter')
+      expect(detached.httpPush!.url).toBe('https://heimvio.de/readings/{{ slaveName }}')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('POST rejects a reference to an unknown slave', async () => {
+    await ts
+      .request()
+      .post(apiUri.slave + '?busid=0')
+      .send({ slaveid: CHILD_ID, referenceSlaveId: 987 })
+      .parse(rawText)
+      .expect(HttpErrorsEnum.ErrInvalidParameter)
+  })
+
+  it('POST rejects a self reference', async () => {
+    await ts
+      .request()
+      .post(apiUri.slave + '?busid=0')
+      .send({ slaveid: CHILD_ID, referenceSlaveId: CHILD_ID })
+      .parse(rawText)
+      .expect(HttpErrorsEnum.ErrInvalidParameter)
+  })
+
+  it('POST rejects a chain: the referenced slave must not be a reference itself', async () => {
+    await postRoot()
+    await postChild()
+    try {
+      await ts
+        .request()
+        .post(apiUri.slave + '?busid=0')
+        .send({ slaveid: 33, referenceSlaveId: CHILD_ID })
+        .parse(rawText)
+        .expect(HttpErrorsEnum.ErrInvalidParameter)
+      expect(Bus.getBus(0)!.getSlaveBySlaveId(33)).toBeUndefined()
+    } finally {
+      await cleanup()
+    }
   })
 })

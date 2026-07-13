@@ -100,7 +100,8 @@ export function registerSpecificationRoutes(r: Registrar): void {
       const rc = rd.deleteSpecification(specName)
       Bus.getBusses().forEach((bus) => {
         bus.getSlaves().forEach((slave) => {
-          if (slave.specificationid == specName) {
+          // Referencing slaves inherit the specification; clearing it on their root covers them.
+          if (slave.specificationid == specName && slave.referenceSlaveId == undefined) {
             delete slave.specificationid
             if (slave.pollMode == undefined) slave.pollMode = PollModes.intervall
             bus.writeSlave(slave)

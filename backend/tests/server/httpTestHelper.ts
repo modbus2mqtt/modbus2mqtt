@@ -6,13 +6,7 @@ import { ConfigPersistence } from '../../src/server/persistence/configPersistenc
 import { MqttConnector } from '../../src/server/mqttconnector.js'
 import { MqttSubscriptions } from '../../src/server/mqttsubscriptions.js'
 import { HttpServer } from '../../src/server/index.js'
-import {
-  FakeMqtt,
-  FakeModes,
-  initBussesForTest,
-  setConfigsDirsForTest,
-  setConfigsDirsBackendTCPForTest,
-} from './configsbase.js'
+import { FakeMqtt, FakeModes, initBussesForTest, setConfigsDirsForTest, setConfigsDirsBackendTCPForTest } from './configsbase.js'
 import { TempConfigDirHelper } from './testhelper.js'
 
 /** Environment variables the HTTP server reacts to; snapshotted and restored around each test server */
@@ -46,13 +40,22 @@ export interface TestServerOptions {
 /**
  * supertest parse callback for error responses: the server sends plain text with a
  * json content type, which superagent's default JSON parser refuses to parse.
+ *
+ * superagent types the parser's first argument as its own Response, while it actually passes the
+ * raw IncomingMessage stream. The cast keeps that discrepancy in this one place instead of at each
+ * .parse(rawText) call site.
  */
-export function rawText(res: NodeJS.ReadableStream & { setEncoding(enc: string): void }, cb: (err: Error | null, body: string) => void): void {
+type ParseCallback = Parameters<supertest.Test['parse']>[0]
+
+export const rawText = ((
+  res: NodeJS.ReadableStream & { setEncoding(enc: string): void },
+  cb: (err: Error | null, body: string) => void
+): void => {
   let data = ''
   res.setEncoding('utf8')
   res.on('data', (chunk: string) => (data += chunk))
   res.on('end', () => cb(null, data))
-}
+}) as unknown as ParseCallback
 
 export interface TestServer {
   http: HttpServer

@@ -1,4 +1,4 @@
-import { IBus, IModbusConnection, Islave, Slave } from '../shared/server/index.js'
+import { IBus, IModbusConnection, Islave, OWN_SLAVE_FIELDS, Slave } from '../shared/server/index.js'
 import { ConfigSpecification, Logger, LogLevelEnum } from '../specification/index.js'
 import { getSpecificationI18nEntityName, IidentEntity, Ispecification } from '../shared/specification/index.js'
 
@@ -17,6 +17,16 @@ interface HassioHardwareInfo {
       subsystem?: string
       dev_path: string
     }>
+  }
+}
+
+/** Thrown when a slave that others reference would be deleted. The HTTP layer maps it to 409. */
+export class SlaveReferencedError extends Error {
+  constructor(
+    readonly slaveid: number,
+    readonly referencingSlaveIds: number[]
+  ) {
+    super('Slave ' + slaveid + ' is referenced by slave(s) ' + referencingSlaveIds.join(', '))
   }
 }
 
@@ -77,12 +87,14 @@ export class ConfigBus {
 
     busData.forEach((bus) => {
       ConfigBus.busses.push(bus)
+      // Resolve references in a separate pass: the slave files are read in directory order, so the
+      // referenced slave is not guaranteed to be known while the referencing one is being read.
+      bus.slaves.forEach((slave) => {
+        if (slave.referenceSlaveId != undefined) ConfigBus.resolveReference(bus, slave)
+      })
       bus.slaves.forEach((slave) => {
         ConfigBus.addSpecification(slave)
-        ConfigBus.emitSlaveEvent(
-          ConfigListenerEvent.addSlave,
-          new Slave(bus.busId, slave, Config.getConfiguration().mqttbasetopic)
-        )
+        ConfigBus.emitSlaveEvent(ConfigListenerEvent.addSlave, new Slave(bus.busId, slave, Config.getConfiguration().mqttbasetopic))
       })
     })
 
@@ -157,8 +169,67 @@ export class ConfigBus {
     slave.specification = spec
   }
 
+  /**
+   * Copies every inherited field of the referenced (root) slave into the referencing (child) slave,
+   * so the rest of the system sees a complete Islave (same idea as addSpecification()). The child's
+   * own fields (OWN_SLAVE_FIELDS) survive; anything else it carries is dropped first, so a client
+   * cannot smuggle in values that would silently differ from the root.
+   *
+   * A missing root is tolerated: the child keeps its own fields only, which leaves it without a
+   * specification, so it is neither polled nor discovered. That can only happen when the config was
+   * hand-edited - the API prevents it (see deleteSlave / slaveRoutes).
+   */
+  static resolveReference(bus: IBus, slave: Islave): void {
+    const root = bus.slaves.find((s) => s.slaveid === slave.referenceSlaveId)
+    if (root == undefined) {
+      ConfigBus.stripInheritedFields(slave)
+      log.log(
+        LogLevelEnum.error,
+        'Slave ' + slave.slaveid + ' references unknown slave ' + slave.referenceSlaveId + ' on bus ' + bus.busId
+      )
+      return
+    }
+    ConfigBus.applyInheritance(root, slave)
+  }
+
+  private static stripInheritedFields(slave: Islave): void {
+    for (const prop of Object.keys(slave) as (keyof Islave)[]) {
+      if (!OWN_SLAVE_FIELDS.includes(prop)) delete slave[prop]
+    }
+  }
+
+  /** Overwrites all inherited fields of the child with the root's values. */
+  private static applyInheritance(root: Islave, child: Islave): void {
+    ConfigBus.stripInheritedFields(child)
+    for (const prop of Object.keys(root) as (keyof Islave)[]) {
+      if (!OWN_SLAVE_FIELDS.includes(prop)) (child as unknown as Record<string, unknown>)[prop] = structuredClone(root[prop])
+    }
+  }
+
+  /** All slaves of the bus referencing the given slave. Bus local: a reference never crosses a bus. */
+  static getReferencingSlaves(busid: number, slaveid: number): Islave[] {
+    const bus = ConfigBus.busses.find((b) => b.busId == busid)
+    if (bus == undefined) return []
+    return bus.slaves.filter((s) => s.referenceSlaveId === slaveid)
+  }
+
+  /**
+   * Turns a referencing slave into a standalone one: the inherited values (already materialized in
+   * memory) become its own and are persisted. Used when the user explicitly detaches a slave, and when
+   * a referenced slave is deleted with detachReferences.
+   */
+  static detachSlave(busid: number, slave: Islave): void {
+    delete slave.referenceSlaveId
+    ConfigBus.writeslave(busid, slave)
+  }
+
   static writeslave(busid: number, slave: Islave): void {
     const filename = Config.getFileNameFromSlaveId(slave.slaveid)
+    const bus = ConfigBus.busses.find((b) => b.busId == busid)
+
+    // A referencing slave takes all inherited values from its root - whatever the caller passed for
+    // them is discarded (the persistence layer strips them from the file as well).
+    if (bus != undefined && slave.referenceSlaveId != undefined) ConfigBus.resolveReference(bus, slave)
 
     ConfigBus.ensurePersistence().writeSlave(busid, slave)
 
@@ -167,6 +238,18 @@ export class ConfigBus {
       const o = new Slave(busid, slave, Config.getConfiguration().mqttbasetopic)
       ConfigBus.emitSlaveEvent(ConfigListenerEvent.updateSlave, o)
     } else debug('No Specification found for slave: ' + filename + ' specification: ' + slave.specificationid)
+
+    // The slave just written may be the root of others: re-materialize them and let MQTT discovery
+    // know, otherwise they would keep running with the previous configuration. Their files hold only
+    // the own fields, so they need no rewrite.
+    if (bus == undefined || slave.referenceSlaveId != undefined) return
+    for (const child of bus.slaves) {
+      if (child.referenceSlaveId !== slave.slaveid || child.slaveid === slave.slaveid) continue
+      ConfigBus.applyInheritance(slave, child)
+      ConfigBus.addSpecification(child)
+      if (child.specificationid)
+        ConfigBus.emitSlaveEvent(ConfigListenerEvent.updateSlave, new Slave(busid, child, Config.getConfiguration().mqttbasetopic))
+    }
   }
 
   static getSlave(busid: number, slaveid: number): Islave | undefined {
@@ -190,7 +273,24 @@ export class ConfigBus {
     return rc
   }
 
-  static deleteSlave(busid: number, slaveid: number) {
+  /**
+   * The single choke point for deleting a slave (HTTP route, Bus, tests), so this is where the
+   * referential invariant belongs: a referenced slave is never deleted silently. Without
+   * detachReferences the delete fails; with it, the referencing slaves keep their configuration by
+   * becoming standalone slaves (their inherited values are written to their files) before the root
+   * goes away. Both paths are explicit - the backend never orphans a slave and never rewrites other
+   * slaves unasked.
+   */
+  static deleteSlave(busid: number, slaveid: number, detachReferences: boolean = false) {
+    const referencing = ConfigBus.getReferencingSlaves(busid, slaveid)
+    if (referencing.length > 0) {
+      if (!detachReferences)
+        throw new SlaveReferencedError(
+          slaveid,
+          referencing.map((s) => s.slaveid)
+        )
+      for (const child of referencing) ConfigBus.detachSlave(busid, child)
+    }
     const bus = ConfigBus.busses.find((bus) => bus.busId == busid)
     if (bus != undefined) {
       debug('DELETE /slave slaveid' + busid + '/' + slaveid + ' number of slaves: ' + bus.slaves.length)

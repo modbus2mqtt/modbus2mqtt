@@ -159,6 +159,10 @@ export interface ImodbusStatusForSlave {
 }
 export interface Islave {
   slaveid: number
+  // Inherits every field except slaveid/name/rootTopic from this slave of the same bus. The referenced
+  // slave must not be a reference itself (one level only). Persisted slaves carry only the own fields;
+  // the inherited ones are materialized in memory (see ConfigBus.resolveReference).
+  referenceSlaveId?: number
   specificationid?: string
   name?: string
   pollInterval?: number
@@ -177,6 +181,11 @@ export interface Islave {
   httpPush?: IhttpPush
   modbusStatusForSlave?: ImodbusStatusForSlave
 }
+
+// The only fields a referencing (child) slave owns. Everything else is inherited from the referenced
+// slave and is neither persisted on the child nor accepted from a client. Single source of truth for
+// ConfigBus.resolveReference() and BusPersistence.writeSlave().
+export const OWN_SLAVE_FIELDS: (keyof Islave)[] = ['slaveid', 'name', 'rootTopic', 'referenceSlaveId']
 export interface IidentificationSpecification {
   filename: string
   name?: string

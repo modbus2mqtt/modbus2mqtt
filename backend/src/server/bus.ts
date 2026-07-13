@@ -196,8 +196,8 @@ export class Bus implements IModbusConfiguration {
   getId(): number {
     return this.properties.busId
   }
-  deleteSlave(slaveid: number) {
-    ConfigBus.deleteSlave(this.properties.busId, slaveid)
+  deleteSlave(slaveid: number, detachReferences: boolean = false) {
+    ConfigBus.deleteSlave(this.properties.busId, slaveid, detachReferences)
   }
   static getModbusAddressesForSpec(spec: IfileSpecification, addresses: Set<ImodbusAddress>): void {
     for (const ent of spec.entities) {
@@ -220,6 +220,9 @@ export class Bus implements IModbusConfiguration {
       Bus.getBusses().forEach((bus) => {
         bus.getSlaves().forEach((slave) => {
           debug('updateAllSpecificationsModbusAddresses slaveid: ' + slave.slaveid)
+          // A referencing slave has no specificationid of its own: it follows the slave it references,
+          // which is updated by its own iteration here.
+          if (slave.referenceSlaveId != undefined) return
           if (specificationid == null) slave.specificationid = undefined
           else slave.specificationid = specificationid
           if (slave.specificationid == specificationid) ConfigBus.writeslave(bus.getId(), slave)

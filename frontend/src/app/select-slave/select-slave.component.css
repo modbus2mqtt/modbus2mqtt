@@ -29,3 +29,13 @@ dd {
   font-size: 0.85em;
   opacity: 0.75;
 }
+
+.reference-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 8px 0;
+  font-size: 0.85em;
+  opacity: 0.85;
+}

@@ -557,7 +557,15 @@ function buildDeviceVariableSpec(sn?: string, swv?: string, hwv?: string): Imodb
     filename: 'issue228',
     manufacturer: 'Acme',
     model: 'X1',
-    i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'Acme Device' }, { textId: 'e13', text: 'Power' }] }],
+    i18n: [
+      {
+        lang: 'en',
+        texts: [
+          { textId: 'name', text: 'Acme Device' },
+          { textId: 'e13', text: 'Power' },
+        ],
+      },
+    ],
     entities: [serialEntity, swVersionEntity, hwVersionEntity, power],
   } as any as ImodbusSpecification
   return s
@@ -622,9 +630,10 @@ test('issue #228: republishDiscoveryIfChanged publishes delta after first poll',
   }
 
   // now simulate "first poll completed": values appear on the live spec
-  islave.specification!.entities[0].mqttValue = 'SN-REAL' as any
-  islave.specification!.entities[1].mqttValue = '2.0.0' as any
-  islave.specification!.entities[2].mqttValue = 'RevC' as any
+  const liveEntities = islave.specification!.entities as ImodbusEntity[]
+  liveEntities[0].mqttValue = 'SN-REAL'
+  liveEntities[1].mqttValue = '2.0.0'
+  liveEntities[2].mqttValue = 'RevC'
 
   disc.republishDiscoveryIfChanged(sl)
 
@@ -704,7 +713,11 @@ test('array entity: value_template uses the raw json path, object_id is sanitize
     i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'Arr' }] }],
     entities: [arrEntity, flatEntity],
   } as any as ImodbusSpecification
-  const sl = new Slave(0, { slaveid: 50, specificationid: 'arrtest', specification: s as any } as Islave, Config.getConfiguration().mqttbasetopic)
+  const sl = new Slave(
+    0,
+    { slaveid: 50, specificationid: 'arrtest', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
   const payloads = disc['generateDiscoveryPayloads'](sl, s).map((p) => JSON.parse(p.payload as string))
   const arr = payloads.find((p) => (p.value_template as string).includes('meters'))
   const flat = payloads.find((p) => p.object_id === 'battery_in')
@@ -736,7 +749,11 @@ test('root array entity: value_template has no leading dot', () => {
     i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'RootArr' }] }],
     entities: [rootArr],
   } as any as ImodbusSpecification
-  const sl = new Slave(0, { slaveid: 51, specificationid: 'rootarrtest', specification: s as any } as Islave, Config.getConfiguration().mqttbasetopic)
+  const sl = new Slave(
+    0,
+    { slaveid: 51, specificationid: 'rootarrtest', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
   const payload = JSON.parse(disc['generateDiscoveryPayloads'](sl, s)[0].payload as string)
   expect(payload.value_template).toBe('{{ value_json[0].obis }}')
   expect(payload.object_id).toBe('0_obis')

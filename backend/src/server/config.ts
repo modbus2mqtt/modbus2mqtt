@@ -12,7 +12,8 @@ const CONFIG_VERSION = '0.1'
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
-      HASSIO_TOKEN: string
+      // Optional: set by the Home Assistant supervisor only, and absent in a standalone install.
+      HASSIO_TOKEN?: string
       MODBUS2MQTT_HTTPS_PORT?: string
     }
   }

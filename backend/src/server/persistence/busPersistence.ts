@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { join } from 'path'
 import Debug from 'debug'
-import { IBus, IModbusConnection, Islave } from '../../shared/server/index.js'
+import { IBus, IModbusConnection, Islave, OWN_SLAVE_FIELDS } from '../../shared/server/index.js'
 import { ICollectionPersistence } from './persistence.js'
 
 const debug = Debug('busPersistence')
@@ -38,7 +38,9 @@ export class BusPersistence implements ICollectionPersistence<IBus> {
               if (file.endsWith('.yaml') && file !== 'bus.yaml') {
                 const slaveSrc: string = fs.readFileSync(join(busDir, de.name, file), { encoding: 'utf8' })
                 const o: Islave = parse(slaveSrc)
-                if (o.specificationid && o.specificationid.length) {
+                // A referencing slave has no specificationid of its own - it inherits it from the
+                // slave it references (resolved by ConfigBus.readBusses once all slaves are known).
+                if ((o.specificationid && o.specificationid.length) || o.referenceSlaveId != undefined) {
                   bus.slaves.push(o)
                 }
               }
@@ -99,6 +101,13 @@ export class BusPersistence implements ICollectionPersistence<IBus> {
         if (deletables.includes(prop)) delete (o as never)[prop]
       }
     }
+    // A referencing slave stores its own fields only. The inherited ones live in the referenced
+    // slave's file - persisting them here would freeze a copy that stops following the root.
+    if (o.referenceSlaveId != undefined) {
+      for (const prop of Object.keys(o) as (keyof Islave)[]) {
+        if (!OWN_SLAVE_FIELDS.includes(prop)) delete o[prop]
+      }
+    }
     if (o.noDiscovery != undefined && o.noDiscovery == false) delete o['noDiscovery']
     if (o.noDiscoverEntities != undefined && o.noDiscoverEntities.length == 0) delete o['noDiscoverEntities']
 
@@ -120,9 +129,13 @@ export class BusPersistence implements ICollectionPersistence<IBus> {
   deleteSlaveFile(busId: number, slave: Islave): void {
     const slavePath = this.getSlavePath(busId, slave)
     if (fs.existsSync(slavePath)) {
-      fs.unlink(slavePath, (err) => {
-        if (err) debug(err)
-      })
+      // Synchronous like every other write in this class: the caller (ConfigBus.deleteSlave) removes
+      // the slave from memory and emits the delete event right after, so the file must be gone by then.
+      try {
+        fs.unlinkSync(slavePath)
+      } catch (e) {
+        debug(e)
+      }
     }
   }
 
