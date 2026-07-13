@@ -243,6 +243,9 @@ describe('Select Slave tests (vitest)', () => {
       const child = component.uiSlaves.find((u) => u.slave.slaveid === 7)!
       expect(component.isReference(child.slave)).toBe(true)
       expect(component.referencingSlaves(root.slave).map((s) => s.slaveid)).toEqual([7])
+      // slave id 7 is taken now, so the New Slave card must not keep it (nor the used reference)
+      expect(component.slaveNewForm.get('slaveId')!.value).toBeNull()
+      expect(component.slaveNewForm.get('referenceSlaveId')!.value).toBeNull()
       httpMock.match(() => true).forEach((r) => r.flush([]))
     })
 

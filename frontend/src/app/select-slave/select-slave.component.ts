@@ -750,6 +750,9 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
         const newUiSlave = this.getUiSlave(slave, detectSpec)
         const newUislaves = ([] as IuiSlave[]).concat(this.uiSlaves, [newUiSlave])
         this.uiSlaves = newUislaves
+        // The slave id is now taken (and the reference has served its purpose): clear the card so the
+        // next slave starts from an empty form instead of an id that is no longer addable.
+        newSlaveFormGroup.reset({ slaveId: null, detectSpec: false, referenceSlaveId: null })
         // The value change during loading of selection list is before
         // Initialization of the UI
         // replacing this.uiSlaves with newUiSlaves will initialize and show it
