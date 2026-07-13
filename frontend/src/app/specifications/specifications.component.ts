@@ -15,7 +15,7 @@ import { Iconfiguration, IUserAuthenticationStatus } from '@shared/server'
 import { GalleryItem, ImageItem } from 'ng-gallery'
 import { MatIcon } from '@angular/material/icon'
 import { MatTooltip } from '@angular/material/tooltip'
-import { NgClass } from '@angular/common';
+import { NgClass } from '@angular/common'
 import { MatButton, MatIconButton } from '@angular/material/button'
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card'
 import { InfoboxComponent } from '../infobox/infobox.component'
@@ -38,8 +38,8 @@ interface IspecificationSummaryWithMessages extends IspecificationSummary {
     MatIcon,
     MatIconButton,
     NgClass,
-    InfoboxComponent
-],
+    InfoboxComponent,
+  ],
 })
 export class SpecificationsComponent implements OnInit {
   config: Iconfiguration | undefined
@@ -53,7 +53,7 @@ export class SpecificationsComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     private cdr: ChangeDetectorRef
-  ) { }
+  ) {}
   contributing: boolean = false
   fillSpecifications(specs: IspecificationSummary[]) {
     if (!this.config) return

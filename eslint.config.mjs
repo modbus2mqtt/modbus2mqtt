@@ -6,6 +6,9 @@ import prettierPlugin from 'eslint-plugin-prettier'
 import unusedImportsPlugin from 'eslint-plugin-unused-imports'
 
 export default [
+  // Global ignores: an entry holding nothing but `ignores` applies to every config below.
+  // Angular's build cache holds bundled vendor JS - linting it only produces parse errors.
+  { ignores: ['**/.angular/**', '**/dist/**', '**/node_modules/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,
@@ -84,6 +87,24 @@ export default [
         tsconfigRootDir: process.cwd(),
         sourceType: 'module',
         project: ['frontend/tsconfig.angular.json'],
+      },
+    },
+  },
+  {
+    // Frontend tests live in tsconfig.spec.json, not in tsconfig.angular.json (which excludes *.spec.ts),
+    // so they need their own project or the parser cannot resolve them.
+    files: ['frontend/src/**/*.spec.ts', 'frontend/src/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-expressions': 'off',
+      'unused-imports/no-unused-vars': 'off',
+    },
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        tsconfigRootDir: process.cwd(),
+        sourceType: 'module',
+        project: ['frontend/tsconfig.spec.json'],
       },
     },
   },

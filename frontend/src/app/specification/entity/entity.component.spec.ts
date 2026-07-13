@@ -36,7 +36,7 @@ const baseEntity: ImodbusEntityWithName = {
 const buildSpecificationMethods = () => {
   const copySpy = vi.fn()
   const methods: ISpecificationMethods = {
-    getCurrentMessage: () => ({ type: 0, category: 0 } as any),
+    getCurrentMessage: () => ({ type: 0, category: 0 }) as any,
     getMqttLanguageName: () => 'english',
     getUom: () => 'cm',
     getNonVariableNumberEntities: () => [{ id: 4, name: 'ent 4' }],

@@ -9,23 +9,12 @@ import { MatSelect } from '@angular/material/select'
 import { MatInput } from '@angular/material/input'
 import { MatFormField, MatLabel, MatError } from '@angular/material/form-field'
 
-
 @Component({
   selector: 'app-entity-value-control',
   templateUrl: './entity-value-control.component.html',
   styleUrl: './entity-value-control.component.css',
   standalone: true,
-  imports: [
-    MatFormField,
-    MatLabel,
-    MatInput,
-    FormsModule,
-    ReactiveFormsModule,
-    MatError,
-    MatSelect,
-    MatOption,
-    MatSlideToggle
-],
+  imports: [MatFormField, MatLabel, MatInput, FormsModule, ReactiveFormsModule, MatError, MatSelect, MatOption, MatSlideToggle],
 })
 export class EntityValueControlComponent implements OnInit, OnDestroy, OnChanges {
   @Input({ required: true }) entity: ImodbusEntityWithName | undefined

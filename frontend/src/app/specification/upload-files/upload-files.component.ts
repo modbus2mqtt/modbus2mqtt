@@ -1,19 +1,14 @@
 import { OnChanges, Component, Input, ViewChild, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core'
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms'
 import { GalleryItem, ImageItem, GalleryComponent } from 'ng-gallery'
-import {
-  IimageAndDocumentUrl,
-  SpecificationFileUsage,
-  ImodbusSpecification,
-  FileLocation,
-} from '@shared/specification'
+import { IimageAndDocumentUrl, SpecificationFileUsage, ImodbusSpecification, FileLocation } from '@shared/specification'
 import { MatIconButton } from '@angular/material/button'
 import { MatInput } from '@angular/material/input'
 import { MatFormField, MatLabel } from '@angular/material/form-field'
 import { MatIcon } from '@angular/material/icon'
 import { MatTooltip } from '@angular/material/tooltip'
 import { DragndropDirective } from '../dragndrop/dragndrop.directive'
-import { NgClass } from '@angular/common';
+import { NgClass } from '@angular/common'
 import {
   MatAccordion,
   MatExpansionPanel,
@@ -43,13 +38,11 @@ import {
     MatInput,
     FormsModule,
     ReactiveFormsModule,
-    GalleryComponent
-],
+    GalleryComponent,
+  ],
 })
 export class UploadFilesComponent implements OnInit, OnChanges, OnDestroy {
-  constructor(
-    private fb: FormBuilder
-  ) {
+  constructor(private fb: FormBuilder) {
     this.uploadFilesForm = this.fb.group({
       urlDocument: [null as string | null],
       urlImage: [null as string | null],
@@ -95,13 +88,21 @@ export class UploadFilesComponent implements OnInit, OnChanges, OnDestroy {
   private getMimeType(filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase() || ''
     switch (ext) {
-      case 'jpg': case 'jpeg': return 'image/jpeg'
-      case 'png': return 'image/png'
-      case 'gif': return 'image/gif'
-      case 'svg': return 'image/svg+xml'
-      case 'webp': return 'image/webp'
-      case 'pdf': return 'application/pdf'
-      default: return 'application/octet-stream'
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg'
+      case 'png':
+        return 'image/png'
+      case 'gif':
+        return 'image/gif'
+      case 'svg':
+        return 'image/svg+xml'
+      case 'webp':
+        return 'image/webp'
+      case 'pdf':
+        return 'application/pdf'
+      default:
+        return 'application/octet-stream'
     }
   }
 
@@ -117,7 +118,9 @@ export class UploadFilesComponent implements OnInit, OnChanges, OnDestroy {
     let pending = 0
 
     Array.prototype.forEach.call(files, (file: File) => {
-      const found = specFiles.find((u) => this.getBaseFilename(u.url).toLowerCase() === file.name.toLowerCase() && u.usage === usage)
+      const found = specFiles.find(
+        (u) => this.getBaseFilename(u.url).toLowerCase() === file.name.toLowerCase() && u.usage === usage
+      )
       if (found) return
 
       pending++

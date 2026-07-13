@@ -4,7 +4,13 @@ import { describe, it, expect, vi } from 'vitest'
 
 import { SelectSlaveComponent } from './select-slave.component'
 import { Iconfiguration, IBus, Islave, PollModes } from '@shared/server'
-import { IdentifiedStates, Ispecification, SpecificationStatus, ModbusRegisterType, IidentificationSpecification } from '@shared/specification'
+import {
+  IdentifiedStates,
+  Ispecification,
+  SpecificationStatus,
+  ModbusRegisterType,
+  IidentificationSpecification,
+} from '@shared/specification'
 
 class ApiServiceMock {
   lastPost: { busId: number; slave: Islave } | undefined
@@ -44,7 +50,15 @@ const buildSpec = (): Ispecification => ({
   filename: 'second',
   status: SpecificationStatus.added,
   files: [],
-  i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'Second' }, { textId: 'e1', text: 'entity1' }] }],
+  i18n: [
+    {
+      lang: 'en',
+      texts: [
+        { textId: 'name', text: 'Second' },
+        { textId: 'e1', text: 'entity1' },
+      ],
+    },
+  ],
   entities: [
     {
       id: 1,

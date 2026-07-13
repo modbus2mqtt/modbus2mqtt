@@ -44,9 +44,7 @@ export class AuthService {
 
   async logout(): Promise<void> {
     try {
-      const result = await firstValueFrom(
-        this.http.post<{ redirectUrl: string }>(apiUri.authLogout, {}, { withCredentials: true })
-      )
+      const result = await firstValueFrom(this.http.post<{ redirectUrl: string }>(apiUri.authLogout, {}, { withCredentials: true }))
       window.location.href = result.redirectUrl
     } catch {
       window.location.href = '/'

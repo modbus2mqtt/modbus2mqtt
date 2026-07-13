@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest'
-
 ;(globalThis as any).$localize = (parts: TemplateStringsArray, ...args: any[]) =>
   parts.reduce((acc, p, i) => acc + p + (i < args.length ? args[i] : ''), '')
 

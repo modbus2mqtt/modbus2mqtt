@@ -1,4 +1,4 @@
-import { NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common'
 import { Component, Input, OnDestroy, OnInit } from '@angular/core'
 import { MatIconModule } from '@angular/material/icon'
 import { ImodbusErrorsForSlave, ImodbusStatusForSlave, ModbusErrorStates, ModbusTasks } from '@shared/server'

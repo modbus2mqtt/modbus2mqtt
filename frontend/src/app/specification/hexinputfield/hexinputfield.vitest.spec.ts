@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { ComponentFixture, TestBed } from '@angular/core/testing'
 import { HexinputfieldComponent } from './hexinputfield.test.component'
 import { ensureAngularTesting } from '../../../test-setup'
@@ -15,7 +15,10 @@ function typeAndBlur(input: HTMLInputElement, value: string, fixture: ComponentF
 }
 
 describe('Hexinputfield Component tests (vitest)', () => {
-  async function mount(startValue: number, displayHex: boolean): Promise<{
+  async function mount(
+    startValue: number,
+    displayHex: boolean
+  ): Promise<{
     fixture: ComponentFixture<HexinputfieldComponent>
     input: HTMLInputElement
   }> {

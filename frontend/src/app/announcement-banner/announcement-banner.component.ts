@@ -18,9 +18,7 @@ import { MatTooltip } from '@angular/material/tooltip'
         style({ opacity: 0, height: '0px', overflow: 'hidden' }),
         animate('300ms ease-out', style({ opacity: 1, height: '*' })),
       ]),
-      transition(':leave', [
-        animate('200ms ease-in', style({ opacity: 0, height: '0px', overflow: 'hidden' })),
-      ]),
+      transition(':leave', [animate('200ms ease-in', style({ opacity: 0, height: '0px', overflow: 'hidden' }))]),
     ]),
   ],
 })

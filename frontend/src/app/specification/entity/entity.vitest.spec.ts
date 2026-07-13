@@ -1,13 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
+import { describe, it, expect, afterEach } from 'vitest'
+import { ComponentFixture, TestBed } from '@angular/core/testing'
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing'
 import { provideNoopAnimations } from '@angular/platform-browser/animations'
 import { provideRouter } from '@angular/router'
-import { Observable, Subject } from 'rxjs'
+import { Subject } from 'rxjs'
 import { EntityComponent } from './entity.component'
 import { ISpecificationMethods, ImodbusEntityWithName } from '../../services/specificationInterface'
-import { IdentifiedStates, ImodbusData, ImodbusEntity, Inumber, Iselect, Itext, VariableTargetParameters } from '@shared/specification'
+import {
+  IdentifiedStates,
+  ImodbusData,
+  ImodbusEntity,
+  Inumber,
+  Iselect,
+  Itext,
+  VariableTargetParameters,
+} from '@shared/specification'
 import { ensureAngularTesting } from '../../../test-setup'
 import convertersFixture from '../../../test-fixtures/converters.json'
 

@@ -16,7 +16,7 @@ import { Observable } from 'rxjs'
 import { ActivatedRoute, Router } from '@angular/router'
 import { MatOption } from '@angular/material/core'
 import { MatSelect } from '@angular/material/select'
-import { NgClass } from '@angular/common';
+import { NgClass } from '@angular/common'
 import { MatInput } from '@angular/material/input'
 import { MatFormField, MatLabel, MatError, MatHint } from '@angular/material/form-field'
 import { MatStepLabel } from '@angular/material/stepper'
@@ -52,8 +52,8 @@ const DEFAULT_KEY_FILE = 'privkey.pem'
     MatHint,
     MatSelect,
     MatOption,
-    NgClass
-],
+    NgClass,
+  ],
   standalone: true,
 })
 export class ConfigureComponent implements OnInit {
