@@ -10,6 +10,7 @@ import { ImodbusEntity, ImodbusSpecification } from '../../src/shared/specificat
 import { ConfigPersistence } from '../../src/server/persistence/configPersistence.js'
 import { encryptSecret, decryptSecret } from '../../src/server/secureSecret.js'
 import { HttpPush } from '../../src/server/httpPush.js'
+import { Logger } from '../../src/specification/index.js'
 
 // Minimal spec with one static 'value' entity (obis) and one numeric entity (obis_value).
 function buildSpec(): IfileSpecification {
@@ -519,6 +520,48 @@ describe('HttpPush.pushState error reporting', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled()
     expect(errors[0].state).toBe(ModbusErrorStates.configuration)
     expect(errors[0].message).toContain('No entities selected')
+  })
+
+  it('logs the same failure once, ignoring the poll time in the url', async () => {
+    const logged: string[] = []
+    const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation((_level: any, msg: any) => {
+      logged.push(String(msg))
+    })
+    try {
+      const withPollDate = new Slave(
+        0,
+        { slaveid: 7, name: 'meter', httpPush: { url: 'https://api/x?at={{ pollDate }}', pushEntities: [1] } },
+        'm2m'
+      )
+      globalThis.fetch = jest.fn(
+        async () => ({ ok: false, status: 400, statusText: 'Bad Request', text: async () => '' }) as any
+      ) as any
+
+      // two polls a minute apart: same failure, different poll time in the url
+      await HttpPush.pushState(withPollDate, spec, new Date('2026-07-14T04:50:00Z'))
+      await HttpPush.pushState(withPollDate, spec, new Date('2026-07-14T04:51:00Z'))
+      expect(logged.length).toBe(1)
+      // but every occurrence is recorded, that is what the count in the UI is built from
+      expect(errors.length).toBe(2)
+
+      // a different failure is news and gets logged
+      globalThis.fetch = jest.fn(
+        async () => ({ ok: false, status: 503, statusText: 'Service Unavailable', text: async () => '' }) as any
+      ) as any
+      await HttpPush.pushState(withPollDate, spec, new Date('2026-07-14T04:52:00Z'))
+      expect(logged.length).toBe(2)
+
+      // and a push that works again must not silence the next failure
+      globalThis.fetch = jest.fn(async () => ({ ok: true, status: 200, statusText: 'OK', text: async () => '' }) as any) as any
+      await HttpPush.pushState(withPollDate, spec, new Date('2026-07-14T04:53:00Z'))
+      globalThis.fetch = jest.fn(
+        async () => ({ ok: false, status: 503, statusText: 'Service Unavailable', text: async () => '' }) as any
+      ) as any
+      await HttpPush.pushState(withPollDate, spec, new Date('2026-07-14T04:54:00Z'))
+      expect(logged.length).toBe(3)
+    } finally {
+      logSpy.mockRestore()
+    }
   })
 
   it('counts a successful push instead of recording an error', async () => {

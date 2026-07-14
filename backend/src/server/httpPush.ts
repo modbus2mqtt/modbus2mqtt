@@ -8,6 +8,13 @@ import { countSlaveRequest, recordSlaveError } from './slaveStatus.js'
 const debug = Debug('httppush')
 const log = new Logger('httppush')
 const maxReasonLength = 200
+// A push that fails, fails on every poll. Logging each one buries the log, so the same failure of the
+// same slave is logged once and then only again after this interval - long enough to keep the log
+// readable, short enough that a permanent failure keeps reminding of itself.
+const repeatLogInterval = 60 * 60 * 1000 // 1 hour
+// The poll time in the resolved url differs on every push and must not make two occurrences of the
+// same failure look different. Matches the {{ pollDate }} substitution, encoded ("%3A") or not.
+const pollDateInUrl = /\d{4}-\d{2}-\d{2}T\d{2}(?::|%3A)\d{2}(?::|%3A)\d{2}Z/gi
 
 export class HttpPush {
   // Pushes the slave's selected entity values to the configured URL via HTTP POST.
@@ -47,7 +54,10 @@ export class HttpPush {
         // field", "unknown id"). Throwing that away left the user with a bare "400 Bad Request".
         const reason = await this.readReason(resp)
         this.fail(slave, ModbusErrorStates.httpStatus, resp.status + ' ' + resp.statusText, url + (reason ? ' -> ' + reason : ''))
-      } else countSlaveRequest(slave, ModbusTasks.httpPush)
+      } else {
+        countSlaveRequest(slave, ModbusTasks.httpPush)
+        this.clearFailure(slave)
+      }
     } catch (e: unknown) {
       // fetch() rejects when the endpoint is unreachable (DNS, refused, TLS, abort)
       const msg = e instanceof Error ? e.message : String(e)
@@ -77,9 +87,28 @@ export class HttpPush {
     state: ModbusErrorStates,
     message: string,
     url: string,
-    level: LogLevelEnum = LogLevelEnum.error
+    level: LogLevelEnum = LogLevelEnum.info
   ): void {
-    log.log(level, 'HTTP push failed: ' + message + ' url: ' + url)
+    // Every failure is recorded: the slave's Status & Errors is where the severity and the count
+    // belong. The log only reports it the first time - it repeats on every poll otherwise.
     recordSlaveError(slave, ModbusTasks.httpPush, state, message, url)
+    if (HttpPush.shouldLog(slave, message, url)) log.log(level, 'HTTP push failed: ' + message + ' url: ' + url)
+  }
+
+  // Two failures are the same when the message and the url match - the poll time inside the url is
+  // not part of the identity, it changes on every push. A failure is logged again once the interval
+  // has passed, and immediately when it changes (a 400 turning into a 503 is news).
+  private static readonly loggedFailures = new Map<string, { key: string; time: number }>()
+  private static shouldLog(slave: Slave, message: string, url: string): boolean {
+    const key = message + ' ' + url.replace(pollDateInUrl, '{{ pollDate }}')
+    const last = HttpPush.loggedFailures.get(slave.getKey())
+    const now = Date.now()
+    if (last != undefined && last.key == key && now - last.time < repeatLogInterval) return false
+    HttpPush.loggedFailures.set(slave.getKey(), { key, time: now })
+    return true
+  }
+  // A push that works again must not silence the next failure.
+  private static clearFailure(slave: Slave): void {
+    HttpPush.loggedFailures.delete(slave.getKey())
   }
 }
