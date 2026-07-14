@@ -7,6 +7,7 @@ import { countSlaveRequest, recordSlaveError } from './slaveStatus.js'
 
 const debug = Debug('httppush')
 const log = new Logger('httppush')
+const maxReasonLength = 200
 
 export class HttpPush {
   // Pushes the slave's selected entity values to the configured URL via HTTP POST.
@@ -34,12 +35,29 @@ export class HttpPush {
       }
       debug('HTTP push to ' + url + ' body: ' + body)
       const resp = await fetch(url, { method: 'POST', headers, body })
-      if (!resp.ok) this.fail(slave, ModbusErrorStates.httpStatus, resp.status + ' ' + resp.statusText, url)
-      else countSlaveRequest(slave, ModbusTasks.httpPush)
+      if (!resp.ok) {
+        // An endpoint that rejects a push almost always says why in its response body ("missing
+        // field", "unknown id"). Throwing that away left the user with a bare "400 Bad Request".
+        const reason = await this.readReason(resp)
+        this.fail(slave, ModbusErrorStates.httpStatus, resp.status + ' ' + resp.statusText, url + (reason ? ' -> ' + reason : ''))
+      } else countSlaveRequest(slave, ModbusTasks.httpPush)
     } catch (e: unknown) {
       // fetch() rejects when the endpoint is unreachable (DNS, refused, TLS, abort)
       const msg = e instanceof Error ? e.message : String(e)
       this.fail(slave, ModbusErrorStates.connection, msg, url ?? httpPush.url)
+    }
+  }
+
+  // The endpoint's own explanation of the rejection, shortened. Reading it must never turn a failed
+  // push into a crash, and it must not paste a whole error page into the log, so it is guarded and
+  // truncated.
+  private static async readReason(resp: Response): Promise<string> {
+    try {
+      const text = (await resp.text()).trim().replace(/\s+/g, ' ')
+      if (text.length == 0) return ''
+      return text.length > maxReasonLength ? text.substring(0, maxReasonLength) + '…' : text
+    } catch {
+      return ''
     }
   }
 

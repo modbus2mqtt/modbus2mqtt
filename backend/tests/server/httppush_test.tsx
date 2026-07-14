@@ -411,7 +411,7 @@ describe('HttpPush.pushState (poll process)', () => {
 // A failed push must show up in the slave's Status & Errors panel next to the modbus errors.
 describe('HttpPush.pushState error reporting', () => {
   let originalFetch: typeof globalThis.fetch
-  let errors: { task: ModbusTasks; state: ModbusErrorStates; message: string }[]
+  let errors: { task: ModbusTasks; state: ModbusErrorStates; message: string; detail?: string }[]
   let counted: ModbusTasks[]
   let getBusSpy: ReturnType<typeof jest.spyOn>
 
@@ -431,20 +431,67 @@ describe('HttpPush.pushState error reporting', () => {
     errors = []
     counted = []
     const modbusAPI = {
-      addSlaveError: (_slaveid: number, task: ModbusTasks, state: ModbusErrorStates, message: string) =>
-        errors.push({ task, state, message }),
+      addSlaveError: (_slaveid: number, task: ModbusTasks, state: ModbusErrorStates, message: string, detail?: string) =>
+        errors.push(detail != undefined ? { task, state, message, detail } : { task, state, message }),
       countRequest: (_slaveid: number, task: ModbusTasks) => counted.push(task),
     }
     getBusSpy = jest.spyOn(Bus, 'getBus').mockReturnValue({ getModbusAPI: () => modbusAPI } as any)
   })
 
   it('records a non 2xx response as httpStatus error', async () => {
-    globalThis.fetch = jest.fn(async () => ({ ok: false, status: 503, statusText: 'Service Unavailable' }) as any) as any
+    globalThis.fetch = jest.fn(
+      async () => ({ ok: false, status: 503, statusText: 'Service Unavailable', text: async () => '' }) as any
+    ) as any
     await HttpPush.pushState(slave, spec)
     expect(errors).toEqual([
-      { task: ModbusTasks.httpPush, state: ModbusErrorStates.httpStatus, message: '503 Service Unavailable' },
+      {
+        task: ModbusTasks.httpPush,
+        state: ModbusErrorStates.httpStatus,
+        message: '503 Service Unavailable',
+        detail: 'https://api/x',
+      },
     ])
     expect(counted).toEqual([])
+  })
+
+  it("keeps the endpoint's own explanation of a rejection", async () => {
+    globalThis.fetch = jest.fn(
+      async () =>
+        ({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          text: async () => '{ "error": "unknown reading id 250934682" }',
+        }) as any
+    ) as any
+    await HttpPush.pushState(slave, spec)
+    // the message stays the grouping key, the reason travels with the url in the detail
+    expect(errors[0].message).toBe('400 Bad Request')
+    expect(errors[0].detail).toContain('https://api/x')
+    expect(errors[0].detail).toContain('unknown reading id 250934682')
+  })
+
+  it('shortens a long error page and survives an unreadable body', async () => {
+    globalThis.fetch = jest.fn(
+      async () => ({ ok: false, status: 400, statusText: 'Bad Request', text: async () => 'x'.repeat(500) }) as any
+    ) as any
+    await HttpPush.pushState(slave, spec)
+    expect(errors[0].detail!.length).toBeLessThan(300)
+
+    errors.length = 0
+    globalThis.fetch = jest.fn(
+      async () =>
+        ({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          text: async () => {
+            throw new Error('stream closed')
+          },
+        }) as any
+    ) as any
+    await HttpPush.pushState(slave, spec)
+    expect(errors[0].message).toBe('400 Bad Request')
   })
 
   it('records an unreachable endpoint as connection error', async () => {
@@ -452,7 +499,9 @@ describe('HttpPush.pushState error reporting', () => {
       throw new Error('fetch failed')
     }) as any
     await HttpPush.pushState(slave, spec)
-    expect(errors).toEqual([{ task: ModbusTasks.httpPush, state: ModbusErrorStates.connection, message: 'fetch failed' }])
+    expect(errors).toEqual([
+      { task: ModbusTasks.httpPush, state: ModbusErrorStates.connection, message: 'fetch failed', detail: 'https://api/x' },
+    ])
   })
 
   it('records an unresolvable URL placeholder as configuration error', async () => {
