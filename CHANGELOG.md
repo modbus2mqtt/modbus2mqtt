@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.1](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.32.0...modbus2mqtt-v0.32.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* **ui:** show the failing url in Status & Errors, reject a blank in the push url ([#295](https://github.com/modbus2mqtt/modbus2mqtt/issues/295)) ([9a9e0b5](https://github.com/modbus2mqtt/modbus2mqtt/commit/9a9e0b5e84a3fbee3f722d8014b36321295132e4))
+
 ## [0.32.0](https://github.com/modbus2mqtt/modbus2mqtt/compare/modbus2mqtt-v0.31.0...modbus2mqtt-v0.32.0) (2026-07-13)
 
 
