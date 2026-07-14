@@ -29,6 +29,13 @@ export class HttpPush {
         this.fail(slave, ModbusErrorStates.configuration, 'root path "' + httpPush.root + '" not found', url, LogLevelEnum.warn)
         return
       }
+      // An empty payload means no entity is selected under "Select entities to push". Posting "{}"
+      // is never what anyone wants - the endpoint rejects it (400) or, worse, stores nothing and says
+      // OK. Report it as the configuration mistake it is instead of sending it.
+      if (body == '{}' || body == '[]') {
+        this.fail(slave, ModbusErrorStates.configuration, 'No entities selected to push - nothing to send', url, LogLevelEnum.warn)
+        return
+      }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (httpPush.patEnc && httpPush.patEnc.length > 0) {
         headers['Authorization'] = 'Bearer ' + decryptSecret(httpPush.patEnc)

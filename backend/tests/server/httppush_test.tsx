@@ -512,8 +512,17 @@ describe('HttpPush.pushState error reporting', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 
+  it('does not post an empty payload when no entity is selected', async () => {
+    globalThis.fetch = jest.fn(async () => ({ ok: true, status: 200, statusText: 'OK', text: async () => '' }) as any) as any
+    const noEntities = new Slave(0, { slaveid: 7, httpPush: { url: 'https://api/x', pushEntities: [] } }, 'm2m')
+    await HttpPush.pushState(noEntities, spec)
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(errors[0].state).toBe(ModbusErrorStates.configuration)
+    expect(errors[0].message).toContain('No entities selected')
+  })
+
   it('counts a successful push instead of recording an error', async () => {
-    globalThis.fetch = jest.fn(async () => ({ ok: true, status: 200, statusText: 'OK' }) as any) as any
+    globalThis.fetch = jest.fn(async () => ({ ok: true, status: 200, statusText: 'OK', text: async () => '' }) as any) as any
     await HttpPush.pushState(slave, spec)
     expect(errors).toEqual([])
     expect(counted).toEqual([ModbusTasks.httpPush])
