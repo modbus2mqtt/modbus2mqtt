@@ -158,7 +158,8 @@ export class MqttPoller {
                               entry.slave,
                               ModbusTasks.mqttPublish,
                               ModbusErrorStates.connection,
-                              err.message + ' topic: ' + entry.message.topic
+                              err.message,
+                              'topic: ' + entry.message.topic
                             )
                           else countSlaveRequest(entry.slave, ModbusTasks.mqttPublish)
                         })

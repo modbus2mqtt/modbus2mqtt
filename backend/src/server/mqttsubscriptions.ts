@@ -150,7 +150,7 @@ export class MqttSubscriptions {
       // HttpPush records its own errors, so anything arriving here failed to publish to mqtt.
       const msg = e instanceof Error ? e.message : String(e)
       log.log(LogLevelEnum.error, 'publishState failed: ' + msg)
-      recordSlaveError(slave, ModbusTasks.mqttPublish, ModbusErrorStates.connection, msg + ' topic: ' + topic)
+      recordSlaveError(slave, ModbusTasks.mqttPublish, ModbusErrorStates.connection, msg, 'topic: ' + topic)
       try {
         await this.publishAsync(mqttClient, slave.getAvailabilityTopic(), 'offline', options)
       } catch (e2: unknown) {

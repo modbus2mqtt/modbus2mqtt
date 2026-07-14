@@ -181,6 +181,10 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
       })
       // Anything left over means a brace does not belong to a well formed placeholder.
       if (rest.includes('{') || rest.includes('}')) return { placeholderSyntax: true }
+      // A literal blank survives into the request line ("&c0= {{ slaveName }}" keeps the blank in
+      // front of the resolved name) and every http server answers that with 400 Bad Request. The
+      // resolved values are URL encoded, the text around them is not.
+      if (/\s/.test(rest)) return { urlWhitespace: true }
       if (names.includes('slaveName')) {
         const name = control.parent?.get('name')?.value ?? slave.name
         if (!name || String(name).length == 0) return { slaveNameEmpty: true }
@@ -209,6 +213,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     if (!control || !control.errors) return null
     if (control.errors['placeholderSyntax'])
       return 'Malformed placeholder: every {{ and }} must be doubled, e.g. {{ serialnumber }}.'
+    if (control.errors['urlWhitespace'])
+      return 'The URL contains a blank. It is sent as is and the endpoint answers 400 Bad Request - remove it (e.g. "c0= {{ slaveName }}" must be "c0={{ slaveName }}").'
     if (control.errors['slaveNameEmpty']) return '{{ slaveName }} is used, but this slave has no Slave Name.'
     const unknown = control.errors['unknownPlaceholder']
     if (unknown) {

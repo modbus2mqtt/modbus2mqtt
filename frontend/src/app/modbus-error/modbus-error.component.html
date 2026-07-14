@@ -49,6 +49,11 @@
         @for (e of getErrors(errorlist); track $index) {
           <div>{{ e }}</div>
         }
+        <!-- The url a failing http push was actually sent to, the topic of a failed publish: too
+             volatile to group by, but it is what one needs to act on the failure. -->
+        @if (getLastDetail(errorlist); as detail) {
+          <div class="error-detail">{{ detail }}</div>
+        }
       </div>
     </mat-expansion-panel>
   </ng-template>

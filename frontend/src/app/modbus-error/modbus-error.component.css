@@ -23,3 +23,11 @@
 .indent3 {
   text-indent: 6em;
 }
+/* A push url can be long: wrap it instead of pushing the card wider */
+.error-detail {
+  font-family: monospace;
+  font-size: 0.85em;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+  margin-top: 0.5em;
+}

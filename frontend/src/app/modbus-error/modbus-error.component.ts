@@ -190,6 +190,17 @@ export class ModbusErrorComponent implements OnInit, OnDestroy {
     messages.forEach((m) => rcs.push(m.message + ': ' + m.count))
     return rcs
   }
+  // The detail of the most recent error of the list: the url a failing http push was sent to (with
+  // its placeholders resolved), the topic of a failed publish. Only the newest one, because a detail
+  // can differ per occurrence - that is exactly why it is not part of the grouping message.
+  getLastDetail(inValue: ImodbusErrorsForSlave[]): string | null {
+    if (inValue == undefined || inValue.length == 0) return null
+    let last: ImodbusErrorsForSlave = inValue[0]
+    inValue.forEach((e) => {
+      if (e.date > last.date) last = e
+    })
+    return last.detail != undefined && last.detail.length > 0 ? last.detail : null
+  }
   getSinceTimeString(errorList: ImodbusErrorsForSlave[]): string {
     if (errorList == undefined) return 'XX'
     const delta = this.getCurrentDate() - errorList[errorList.length - 1].date

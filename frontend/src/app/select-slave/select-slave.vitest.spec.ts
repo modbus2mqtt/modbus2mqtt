@@ -190,6 +190,15 @@ describe('Select Slave tests (vitest)', () => {
       httpMock.match(() => true).forEach((r) => r.flush([]))
     })
 
+    it('rejects a blank in the URL', async () => {
+      await mount()
+      // exactly the typo that produced a 400 Bad Request in the field: the blank stays literal
+      const error = await validate('https://api/r?c0= {{ slaveName }}')
+      expect(error).toContain('blank')
+      expect(await validate('https://api/r?c0={{ slaveName }}')).toBeNull()
+      httpMock.match(() => true).forEach((r) => r.flush([]))
+    })
+
     it('rejects an unknown name and lists the available ones', async () => {
       await mount()
       const error = await validate('https://api/r/{{ serialnumber }}')

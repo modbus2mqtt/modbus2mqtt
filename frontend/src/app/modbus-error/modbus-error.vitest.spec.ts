@@ -29,8 +29,20 @@ describe('ModbusErrorComponent (vitest)', () => {
   // The transport tasks have no register address, they carry a message instead
   const buildHttpPushErrors = (): ImodbusStatusForSlave => ({
     errors: [
-      { task: ModbusTasks.httpPush, date: date, state: ModbusErrorStates.httpStatus, message: '503 Service Unavailable' },
-      { task: ModbusTasks.httpPush, date: date, state: ModbusErrorStates.httpStatus, message: '503 Service Unavailable' },
+      {
+        task: ModbusTasks.httpPush,
+        date: date - 1000,
+        state: ModbusErrorStates.httpStatus,
+        message: '503 Service Unavailable',
+        detail: 'https://api/readings/1?at=2026-07-14T04%3A46%3A00Z',
+      },
+      {
+        task: ModbusTasks.httpPush,
+        date: date,
+        state: ModbusErrorStates.httpStatus,
+        message: '503 Service Unavailable',
+        detail: 'https://api/readings/1?at=2026-07-14T04%3A47%3A00Z',
+      },
     ],
     requestCount: [0, 0, 0, 0, 0, 0, 0, 0, 0, 7],
     queueLength: 0,
@@ -82,5 +94,11 @@ describe('ModbusErrorComponent (vitest)', () => {
     expect(text).toContain('(7 processed calls)')
     expect(text).toContain('HTTP Error Status')
     expect(f.componentInstance.getErrors(buildHttpPushErrors().errors)).toEqual(['503 Service Unavailable: 2'])
+    // the url stays out of the grouping message (it carries the poll time and would split every
+    // failure into a group of its own), but the newest one is shown - that is what one acts on
+    expect(f.componentInstance.getLastDetail(buildHttpPushErrors().errors)).toBe(
+      'https://api/readings/1?at=2026-07-14T04%3A47%3A00Z'
+    )
+    expect(text).toContain('at=2026-07-14T04%3A47%3A00Z')
   })
 })

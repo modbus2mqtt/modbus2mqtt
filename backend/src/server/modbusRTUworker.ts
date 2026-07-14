@@ -409,8 +409,15 @@ export class ModbusRTUWorker extends ModbusWorker {
   // Records a failure of a task which doesn't talk modbus (mqttPublish, httpPush). It has no
   // register address, the message describes the failure instead. Shares the slave's error list,
   // so a poll cycle failing at any stage shows up in the slave's Status & Errors panel.
-  public addSlaveError(slaveId: number, task: ModbusTasks, state: ModbusErrorStates, message: string, date: Date = new Date()) {
-    this.pushError(slaveId, new ModbusErrorDescription({ task, state, message }, date))
+  public addSlaveError(
+    slaveId: number,
+    task: ModbusTasks,
+    state: ModbusErrorStates,
+    message: string,
+    detail?: string,
+    date: Date = new Date()
+  ) {
+    this.pushError(slaveId, new ModbusErrorDescription({ task, state, message, detail }, date))
   }
   // Counts a successfully processed call of a non modbus task. The modbus tasks are counted in
   // processOneEntry(); without this the UI would report "0 processed calls" for mqtt and http push.

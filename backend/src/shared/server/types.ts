@@ -182,6 +182,10 @@ export interface ImodbusErrorsForSlave {
   address?: ImodbusAddress
   state: ModbusErrorStates
   message?: string
+  // Everything needed to act on the failure but too volatile to group by: the resolved push url of
+  // an http push (it may carry the poll time), the topic of a failed publish. The UI groups the
+  // errors by message and shows the detail of the most recent one.
+  detail?: string
 }
 export interface ImodbusStatusForSlave {
   requestCount: number[]

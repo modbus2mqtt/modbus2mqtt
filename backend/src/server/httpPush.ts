@@ -43,9 +43,10 @@ export class HttpPush {
     }
   }
 
-  // Logs the url the push was actually sent to (placeholders resolved) - the template is of no use
-  // when diagnosing a failing request. The recorded error keeps the plain message: a resolved url
-  // may contain the poll time, which would make every single failure a group of its own in the UI.
+  // The url the push was actually sent to (placeholders resolved) - the template is of no use when
+  // diagnosing a failing request, and the add-on log has usually scrolled past it by the time anyone
+  // looks. It travels as the error's detail, not in its message: a resolved url may carry the poll
+  // time, and the UI groups the errors by message.
   private static fail(
     slave: Slave,
     state: ModbusErrorStates,
@@ -54,6 +55,6 @@ export class HttpPush {
     level: LogLevelEnum = LogLevelEnum.error
   ): void {
     log.log(level, 'HTTP push failed: ' + message + ' url: ' + url)
-    recordSlaveError(slave, ModbusTasks.httpPush, state, message)
+    recordSlaveError(slave, ModbusTasks.httpPush, state, message, url)
   }
 }
