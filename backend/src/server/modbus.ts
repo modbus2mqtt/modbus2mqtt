@@ -19,7 +19,7 @@ export class Modbus {
   constructor() {}
 
   static writeEntityModbus(modbusAPI: IconsumerModbusAPI, slaveid: number, entity: Ientity, modbusValue: number[]): Promise<void> {
-    if (entity.modbusAddress && entity.registerType) {
+    if (entity.modbusAddress !== undefined && entity.modbusAddress !== null && entity.registerType) {
       return modbusAPI.writeModbusRegister(slaveid, entity.modbusAddress, entity.registerType, modbusValue, {
         task: ModbusTasks.writeEntity,
         errorHandling: {},
@@ -64,7 +64,7 @@ export class Modbus {
     entityId: number
   ): Promise<ImodbusEntity> {
     const entity = spec.entities.find((ent) => ent.id == entityId)
-    if (entity && entity.modbusAddress && entity.registerType) {
+    if (entity && entity.modbusAddress !== undefined && entity.modbusAddress !== null && entity.registerType) {
       const converter = ConverterMap.getConverter(entity)
       if (converter) {
         const addresses = new Set<ImodbusAddress>()

@@ -206,4 +206,42 @@ describe('Entity Component tests (vitest)', () => {
     component.stringPropertiesFormGroup.get('textSwapBytes')!.setValue(true)
     fixture.detectChanges()
   })
+
+  it('correctly handles entity with modbusAddress 0', async () => {
+    const entity = createSelectEntity()
+    entity.modbusAddress = 0
+    entity.name = 'zero address entity'
+    entity.mqttname = 'zero_address'
+
+    ;(window as any).configuration = { rootUrl: '/' }
+    specMethods = createSpecificationMethods()
+
+    await TestBed.configureTestingModule({
+      imports: [EntityComponent],
+      providers: [
+        provideNoopAnimations(),
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    }).compileComponents()
+
+    httpMock = TestBed.inject(HttpTestingController)
+    fixture = TestBed.createComponent(EntityComponent)
+    component = fixture.componentInstance
+    component.specificationMethods = specMethods
+    component.entity = entity
+    component.disabled = false
+    component.displayHex = false
+    fixture.detectChanges()
+
+    const req = httpMock.expectOne((r) => r.url.includes('converters'))
+    req.flush(convertersFixture)
+    fixture.detectChanges()
+
+    expect(component.entityFormGroup.get('modbusAddress')!.value).toBe('0')
+    expect(component.entityFormGroup.get('modbusAddress')!.valid).toBe(true)
+    expect(component.entityFormGroup.valid).toBe(true)
+  })
 })
+

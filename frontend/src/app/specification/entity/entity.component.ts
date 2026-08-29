@@ -398,19 +398,12 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
     }
 
     this.entityFormGroup.get('registerType')!.setValue({ registerType: entity.registerType, name: 'unknown' })
-    converterFormControl.setValue(entity.converter)
+    converterFormControl.setValue(entity.converter !== undefined ? entity.converter : null)
     modbusAddressFormControl.setValue(
-      entity.modbusAddress != undefined ? HexFormaterDirective.convertNumberToInput(entity.modbusAddress, this.displayHex) : null
+      entity.modbusAddress != undefined && entity.modbusAddress != -1
+        ? HexFormaterDirective.convertNumberToInput(entity.modbusAddress, this.displayHex)
+        : null
     )
-
-    if (converterFormControl.value !== entity.converter || modbusAddressFormControl.value !== entity.modbusAddress) {
-      converterFormControl.setValue(entity.converter !== undefined ? entity.converter : null)
-      modbusAddressFormControl.setValue(
-        entity.modbusAddress && entity.modbusAddress != -1
-          ? HexFormaterDirective.convertNumberToInput(entity.modbusAddress, this.displayHex)!
-          : null
-      )
-    }
 
     if (!entity.converterParameters) {
       entity.converterParameters = {}
