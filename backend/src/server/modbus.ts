@@ -20,17 +20,10 @@ export class Modbus {
 
   static writeEntityModbus(modbusAPI: IconsumerModbusAPI, slaveid: number, entity: Ientity, modbusValue: number[]): Promise<void> {
     if (entity.modbusAddress !== undefined && entity.modbusAddress !== null && entity.registerType) {
-      return modbusAPI.writeModbusRegister(
-        slaveid,
-        entity.modbusAddress,
-        entity.registerType,
-        modbusValue,
-        {
-          task: ModbusTasks.writeEntity,
-          errorHandling: {},
-        },
-        entity.writeFunctionCode
-      )
+      return modbusAPI.writeModbusRegister(slaveid, entity.modbusAddress, entity.registerType, modbusValue, {
+        task: ModbusTasks.writeEntity,
+        errorHandling: {},
+      })
     }
     throw new Error('No modbusaddress or registerType passed')
   }
@@ -54,17 +47,10 @@ export class Modbus {
       if (entity.modbusAddress !== undefined && entity.registerType && converter) {
         const modbusValue = converter?.mqtt2modbus(spec, entityid, mqttValue)
         if (modbusValue && modbusValue.length > 0) {
-          return modbusAPI.writeModbusRegister(
-            slaveid,
-            entity.modbusAddress,
-            entity.registerType,
-            modbusValue,
-            {
-              task: ModbusTasks.writeEntity,
-              errorHandling: {},
-            },
-            entity.writeFunctionCode
-          )
+          return modbusAPI.writeModbusRegister(slaveid, entity.modbusAddress, entity.registerType, modbusValue, {
+            task: ModbusTasks.writeEntity,
+            errorHandling: {},
+          })
           // TODO:Migrate converter
         } else throw new Error('No modbus address or function code or converter not found for entity ' + entityid + ' ')
       } else throw new Error('No modbus address or function code for entity ' + entityid + ' ')

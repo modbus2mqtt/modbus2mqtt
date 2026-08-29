@@ -456,22 +456,6 @@ export class ModbusRTUWorker extends ModbusWorker {
       const cacheEntry = this.cache.get(current.slaveId)
       cacheEntry!.requestCount[current.options.task][dt.getMinutes()]++
       if (current.address.write) {
-        if (
-          current.address.registerType === ModbusRegisterType.Coils &&
-          current.address.writeFunctionCode === 5 &&
-          this.modbusAPI.writeCoil
-        ) {
-          return this.modbusAPI
-            .writeCoil(current.slaveId, current.address.address, current.address.write[0] === 1)
-            .then(() => {
-              current.onResolve(current, current.address.write)
-              return this.processOneEntry()
-            })
-            .catch((e) => {
-              current.onError(current, e)
-              return this.processOneEntry()
-            })
-        }
         const fct = this.functionCodeWriteMap.get(current.address.registerType)
         if (fct)
           return fct(current.slaveId, current.address.address, current.address.write)

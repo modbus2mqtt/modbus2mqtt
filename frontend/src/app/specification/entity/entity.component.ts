@@ -209,7 +209,6 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       ],
       registerType: [null as IRegisterType | null, Validators.required],
       readonly: [null as boolean | null],
-      writeFC5: [false],
       entityCategory: [''],
       icon: [null as string | null],
       forceUpdate: [false],
@@ -396,8 +395,6 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       this.entityFormGroup.get('value_template')!.setValue(entity.value_template)
       this.entityFormGroup.get('entityCategory')!.setValue(entity.entityCategory)
       this.entityFormGroup.get('readonly')!.setValue(entity.readonly)
-      this.entityFormGroup.get('writeFC5')!.setValue(entity.writeFunctionCode === 5)
-      this.updateWriteFC5DisabledState()
     }
 
     this.entityFormGroup.get('registerType')!.setValue({ registerType: entity.registerType, name: 'unknown' })
@@ -598,17 +595,11 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
     } else {
       this.entityFormGroup.get('readonly')?.enable()
     }
-    this.updateWriteFC5DisabledState()
     this.entity.readonly = true
     this.readFromModbus()
   }
   isAnalogInput(): boolean {
     return this.entity.registerType == ModbusRegisterType.AnalogInputs
-  }
-  isCoil(): boolean {
-    const regType = this.entityFormGroup.get('registerType')?.value
-    const val = typeof regType === 'object' && regType !== null ? regType.registerType : regType
-    return val === ModbusRegisterType.Coils
   }
   form2Entity() {
     // copies all values which are not relevant to
@@ -624,35 +615,15 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
     if (this.entityFormGroup.get('entityCategory')!.value != null && this.entityFormGroup.get('entityCategory')!.value.length > 0)
       this.entity.entityCategory = this.entityFormGroup.get('entityCategory')!.value
     else delete this.entity.entityCategory
-    if (this.isCoil()) {
-      const writeFC5 = this.entityFormGroup.get('writeFC5')?.value
-      if (writeFC5) {
-        this.entity.writeFunctionCode = 5
-      } else {
-        delete this.entity.writeFunctionCode
-      }
-    } else {
-      delete this.entity.writeFunctionCode
-    }
     switch (this.getParameterTypeFromConverterFormControl()) {
       case 'Inumber':
         break
     }
-    this.updateWriteFC5DisabledState()
     this.setEntitiesTouched()
   }
   onConverterValueChange() {
     this.onConverterValueChangeLocal()
     this.readFromModbus()
-  }
-  updateWriteFC5DisabledState() {
-    const writeFC5Control = this.entityFormGroup?.get('writeFC5')
-    if (!writeFC5Control) return
-    if (this.disabled || this.entityFormGroup.get('readonly')?.value === true) {
-      writeFC5Control.disable({ emitEvent: false })
-    } else {
-      writeFC5Control.enable({ emitEvent: false })
-    }
   }
   updateReadonly() {
     const category = this.entityFormGroup.get('entityCategory')!.value
@@ -666,7 +637,6 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       default:
         break
     }
-    this.updateWriteFC5DisabledState()
   }
   updateCategory() {
     let category = this.entityFormGroup.get('entityCategory')!.value
@@ -674,7 +644,6 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       category = this.entityFormGroup.get('readonly')!.value ? 'diagnostic' : 'config'
       this.entityFormGroup.get('entityCategory')!.setValue(category)
     }
-    this.updateWriteFC5DisabledState()
   }
 
   private onConverterValueChangeLocal() {

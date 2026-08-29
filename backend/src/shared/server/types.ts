@@ -159,7 +159,6 @@ export interface ImodbusAddress {
   registerType: ModbusRegisterType
   write?: number[]
   length?: number
-  writeFunctionCode?: number
 }
 export enum ModbusTasks {
   deviceDetection = 0,

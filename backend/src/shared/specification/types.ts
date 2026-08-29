@@ -143,7 +143,6 @@ export interface Ientity extends IidentEntity {
   icon?: string
   forceUpdate?: boolean
   entityCategory?: string
-  writeFunctionCode?: number
   converterParameters?: ConverterParameter
 }
 export function getParameterType(entity: Ientity): string | undefined
