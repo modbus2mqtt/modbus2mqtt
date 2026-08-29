@@ -204,6 +204,15 @@
             (change)="form2Entity(); updateCategory()"
             >Read Only</mat-slide-toggle
           >
+          @if (isCoil()) {
+            <mat-slide-toggle
+              class="width50 toggleField"
+              formControlName="writeFC5"
+              matTooltip="Write single coil using FC 5 instead of default FC 15 (Write Multiple Coils)"
+              (change)="form2Entity()"
+              >Write FC 5</mat-slide-toggle
+            >
+          }
           <mat-form-field class="smallfield width150pt">
             <mat-label>Category</mat-label>
             <mat-select

@@ -240,6 +240,11 @@ export class FakeBus implements IModbusAPI {
       reject(new Error('Error'))
     })
   }
+  writeCoil(): Promise<void> {
+    return new Promise<void>((_resolve, reject) => {
+      reject(new Error('Error'))
+    })
+  }
   defaultRC = (resolve: (result: IModbusResultWithDuration) => void) => {
     resolve({ data: [0], duration: 199 })
   }

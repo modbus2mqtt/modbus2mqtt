@@ -18,6 +18,7 @@ declare module 'modbus-serial' {
     readCoils(address: number, length: number): Promise<ReadCoilResult>
     writeRegisters(address: number, data: number[]): Promise<void>
     writeCoils(address: number, data: number[]): Promise<void>
+    writeCoil(address: number, state: boolean): Promise<void>
   }
 
   const ModbusRTU: {

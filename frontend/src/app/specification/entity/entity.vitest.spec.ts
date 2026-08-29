@@ -14,6 +14,7 @@ import {
   Inumber,
   Iselect,
   Itext,
+  ModbusRegisterType,
   VariableTargetParameters,
 } from '@shared/specification'
 import { ensureAngularTesting } from '../../../test-setup'
@@ -243,5 +244,67 @@ describe('Entity Component tests (vitest)', () => {
     expect(component.entityFormGroup.get('modbusAddress')!.valid).toBe(true)
     expect(component.entityFormGroup.valid).toBe(true)
   })
+
+  it('handles Coil entity writeFC5 toggle and disabled state when readonly', async () => {
+    const entity = createSelectEntity()
+    entity.registerType = ModbusRegisterType.Coils
+    entity.name = 'coil entity'
+    entity.mqttname = 'coil_entity'
+    entity.readonly = false
+    entity.writeFunctionCode = 5
+
+    ;(window as any).configuration = { rootUrl: '/' }
+    specMethods = createSpecificationMethods()
+
+    await TestBed.configureTestingModule({
+      imports: [EntityComponent],
+      providers: [
+        provideNoopAnimations(),
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    }).compileComponents()
+
+    httpMock = TestBed.inject(HttpTestingController)
+    fixture = TestBed.createComponent(EntityComponent)
+    component = fixture.componentInstance
+    component.specificationMethods = specMethods
+    component.entity = entity
+    component.disabled = false
+    component.displayHex = false
+    fixture.detectChanges()
+
+    const req = httpMock.expectOne((r) => r.url.includes('converters'))
+    req.flush(convertersFixture)
+    fixture.detectChanges()
+
+    // Should recognize entity as Coil
+    expect(component.isCoil()).toBe(true)
+    // Form control should be initialized to true because writeFunctionCode is 5
+    expect(component.entityFormGroup.get('writeFC5')!.value).toBe(true)
+
+    // Turning writeFC5 off should remove writeFunctionCode (default FC15)
+    component.entityFormGroup.get('writeFC5')!.setValue(false)
+    component.form2Entity()
+    expect(component.entity.writeFunctionCode).toBeUndefined()
+
+    // Turning writeFC5 on should set writeFunctionCode to 5
+    component.entityFormGroup.get('writeFC5')!.setValue(true)
+    component.form2Entity()
+    expect(component.entity.writeFunctionCode).toBe(5)
+
+    // When readonly is set, the coil is readonly and writeFC5 should be disabled
+    component.entityFormGroup.get('readonly')!.setValue(true)
+    component.form2Entity()
+    expect(component.entityFormGroup.get('readonly')?.value).toBe(true)
+    expect(component.entityFormGroup.get('writeFC5')?.disabled).toBe(true)
+
+    // When readonly is cleared, writeFC5 should be enabled
+    component.entityFormGroup.get('readonly')!.setValue(false)
+    component.form2Entity()
+    expect(component.entityFormGroup.get('writeFC5')?.disabled).toBe(false)
+  })
 })
+
 

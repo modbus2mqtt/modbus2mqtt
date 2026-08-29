@@ -386,6 +386,7 @@ class FlakyApi implements IModbusAPI {
   readInputRegisters = this.read
   writeHoldingRegisters = () => Promise.resolve()
   writeCoils = () => Promise.resolve()
+  writeCoil = () => Promise.resolve()
 }
 
 function poll(worker: ModbusRTUWorker, queue: ModbusRTUQueue, task: ModbusTasks): Promise<number[] | Error> {

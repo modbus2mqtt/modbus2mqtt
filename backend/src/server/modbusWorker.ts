@@ -12,6 +12,7 @@ export interface IModbusAPI {
   readInputRegisters: TModbusReadFunction
   writeHoldingRegisters: TModbusWriteFunction
   writeCoils: TModbusWriteFunction
+  writeCoil?: (slaveid: number, dataaddress: number, state: boolean) => Promise<void>
   reconnectRTU: (task: string) => Promise<void>
   getCacheId(): string
 }
@@ -48,18 +49,34 @@ export class ModbusWorker {
   run(): void {
     let current: IQueueEntry | undefined = undefined
     while (undefined != (current = this.queue.dequeue())) {
-      if (current.address.write)
-        this.functionCodeWriteMap.get(current.address.registerType)!(
-          current.slaveId,
-          current.address.address,
-          current.address.write
-        )
-          .then(() => {
-            current!.onResolve(current!, [])
-          })
-          .catch((e) => {
-            current!.onError(current!, e)
-          })
+      if (current.address.write) {
+        if (
+          current.address.registerType === ModbusRegisterType.Coils &&
+          current.address.writeFunctionCode === 5 &&
+          this.modbusAPI.writeCoil
+        ) {
+          this.modbusAPI
+            .writeCoil(current.slaveId, current.address.address, current.address.write[0] === 1)
+            .then(() => {
+              current!.onResolve(current!, [])
+            })
+            .catch((e) => {
+              current!.onError(current!, e)
+            })
+        } else {
+          this.functionCodeWriteMap.get(current.address.registerType)!(
+            current.slaveId,
+            current.address.address,
+            current.address.write
+          )
+            .then(() => {
+              current!.onResolve(current!, [])
+            })
+            .catch((e) => {
+              current!.onError(current!, e)
+            })
+        }
+      }
       else
         this.functionCodeReadMap.get(current.address.registerType)!(
           current.slaveId,
