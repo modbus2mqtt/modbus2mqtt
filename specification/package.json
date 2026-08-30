@@ -27,13 +27,13 @@
     "test": "bash ./test-spec-install.sh"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.5.18",
     "async-mutex": "^0.5.0",
-    "commander": "^14.0.2",
-    "debug": "^4.3.7",
+    "commander": "^14.0.3",
+    "debug": "^4.4.3",
     "rxjs": "^7.8.2",
-    "yaml": "^2.5.0",
-    "winston": "^3.18.3"
+    "winston": "^3.19.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
