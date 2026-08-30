@@ -13,6 +13,7 @@ export interface IModbusAPI {
   writeHoldingRegisters: TModbusWriteFunction
   writeCoils: TModbusWriteFunction
   writeCoil?: (slaveid: number, dataaddress: number, state: boolean) => Promise<void>
+  writeRegister?: (slaveid: number, dataaddress: number, value: number) => Promise<void>
   reconnectRTU: (task: string) => Promise<void>
   getCacheId(): string
 }

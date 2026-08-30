@@ -204,11 +204,11 @@
             (change)="form2Entity(); updateCategory()"
             >Read Only</mat-slide-toggle
           >
-          @if (isCoil()) {
+          @if (canUseSingleWrite()) {
             <mat-slide-toggle
               class="width50 toggleField"
-              formControlName="writeFC5"
-              matTooltip="Write single coil using FC 5 instead of default FC 15 (Write Multiple Coils)"
+              formControlName="useSingleWrite"
+              matTooltip="Use single write function code (FC 5 for coils, FC 6 for holding registers) instead of multiple write (FC 15 / FC 16)"
               (change)="form2Entity()"
               >Use Single Write</mat-slide-toggle
             >

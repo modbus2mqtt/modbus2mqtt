@@ -245,7 +245,7 @@ describe('Entity Component tests (vitest)', () => {
     expect(component.entityFormGroup.valid).toBe(true)
   })
 
-  it('handles Coil entity writeFC5 toggle and disabled state when readonly', async () => {
+  it('handles Coil entity useSingleWrite toggle and disabled state when readonly', async () => {
     const entity = createSelectEntity()
     entity.registerType = ModbusRegisterType.Coils
     entity.name = 'coil entity'
@@ -279,31 +279,83 @@ describe('Entity Component tests (vitest)', () => {
     req.flush(convertersFixture)
     fixture.detectChanges()
 
-    // Should recognize entity as Coil
+    // Should recognize entity as Coil and canUseSingleWrite
     expect(component.isCoil()).toBe(true)
+    expect(component.canUseSingleWrite()).toBe(true)
     // Form control should be initialized to true because writeFunctionCode is 5
-    expect(component.entityFormGroup.get('writeFC5')!.value).toBe(true)
+    expect(component.entityFormGroup.get('useSingleWrite')!.value).toBe(true)
 
-    // Turning writeFC5 off should remove writeFunctionCode (default FC15)
-    component.entityFormGroup.get('writeFC5')!.setValue(false)
+    // Turning useSingleWrite off should remove writeFunctionCode (default FC15)
+    component.entityFormGroup.get('useSingleWrite')!.setValue(false)
     component.form2Entity()
     expect(component.entity.writeFunctionCode).toBeUndefined()
 
-    // Turning writeFC5 on should set writeFunctionCode to 5
-    component.entityFormGroup.get('writeFC5')!.setValue(true)
+    // Turning useSingleWrite on should set writeFunctionCode to 5 for Coil
+    component.entityFormGroup.get('useSingleWrite')!.setValue(true)
     component.form2Entity()
     expect(component.entity.writeFunctionCode).toBe(5)
 
-    // When readonly is set, the coil is readonly and writeFC5 should be disabled
+    // When readonly is set, the coil is readonly and useSingleWrite should be disabled
     component.entityFormGroup.get('readonly')!.setValue(true)
     component.form2Entity()
     expect(component.entityFormGroup.get('readonly')?.value).toBe(true)
-    expect(component.entityFormGroup.get('writeFC5')?.disabled).toBe(true)
+    expect(component.entityFormGroup.get('useSingleWrite')?.disabled).toBe(true)
 
-    // When readonly is cleared, writeFC5 should be enabled
+    // When readonly is cleared, useSingleWrite should be enabled
     component.entityFormGroup.get('readonly')!.setValue(false)
     component.form2Entity()
-    expect(component.entityFormGroup.get('writeFC5')?.disabled).toBe(false)
+    expect(component.entityFormGroup.get('useSingleWrite')?.disabled).toBe(false)
+  })
+
+  it('handles Holding Register entity useSingleWrite toggle (FC6)', async () => {
+    const entity = createSelectEntity()
+    entity.registerType = ModbusRegisterType.HoldingRegister
+    entity.name = 'holding reg entity'
+    entity.mqttname = 'holding_reg_entity'
+    entity.readonly = false
+    entity.writeFunctionCode = 6
+
+    ;(window as any).configuration = { rootUrl: '/' }
+    specMethods = createSpecificationMethods()
+
+    await TestBed.configureTestingModule({
+      imports: [EntityComponent],
+      providers: [
+        provideNoopAnimations(),
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    }).compileComponents()
+
+    httpMock = TestBed.inject(HttpTestingController)
+    fixture = TestBed.createComponent(EntityComponent)
+    component = fixture.componentInstance
+    component.specificationMethods = specMethods
+    component.entity = entity
+    component.disabled = false
+    component.displayHex = false
+    fixture.detectChanges()
+
+    const req = httpMock.expectOne((r) => r.url.includes('converters'))
+    req.flush(convertersFixture)
+    fixture.detectChanges()
+
+    // Should recognize entity as HoldingRegister and canUseSingleWrite
+    expect(component.isHoldingRegister()).toBe(true)
+    expect(component.canUseSingleWrite()).toBe(true)
+    // Form control should be initialized to true because writeFunctionCode is 6
+    expect(component.entityFormGroup.get('useSingleWrite')!.value).toBe(true)
+
+    // Turning useSingleWrite off should remove writeFunctionCode (default FC16)
+    component.entityFormGroup.get('useSingleWrite')!.setValue(false)
+    component.form2Entity()
+    expect(component.entity.writeFunctionCode).toBeUndefined()
+
+    // Turning useSingleWrite on should set writeFunctionCode to 6 for Holding Register
+    component.entityFormGroup.get('useSingleWrite')!.setValue(true)
+    component.form2Entity()
+    expect(component.entity.writeFunctionCode).toBe(6)
   })
 })
 

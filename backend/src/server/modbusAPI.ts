@@ -305,6 +305,27 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
     })
     return rc
   }
+  writeRegister(slaveid: number, dataaddress: number, value: number): Promise<void> {
+    const rc = new Promise<void>((resolve, reject) => {
+      if (this.modbusClient == undefined) {
+        log.log(LogLevelEnum.error, 'modbusClient is undefined')
+        return
+      } else {
+        const start = Date.now()
+        this.modbusClient!.setID(slaveid)
+        this.modbusClient!.setTimeout((this.modbusConfiguration.getModbusConnection() as IRTUConnection).timeout)
+        this.modbusClient!.writeRegister(dataaddress, value)
+          .then(() => {
+            this.modbusClientTimedOut = false
+            resolve()
+          })
+          .catch((e) => {
+            this.setModbusTimout(reject, e, start)
+          })
+      }
+    })
+    return rc
+  }
 
   setModbusTimout(reject: (e: ErrorWithErrnoAndDuration) => void, e: ErrorWithErrnoAndDuration, start: number) {
     this.modbusClientTimedOut = e && e.errno != undefined && e.errno == 'ETIMEDOUT'

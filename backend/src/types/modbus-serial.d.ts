@@ -17,6 +17,7 @@ declare module 'modbus-serial' {
     readDiscreteInputs(address: number, length: number): Promise<ReadCoilResult>
     readCoils(address: number, length: number): Promise<ReadCoilResult>
     writeRegisters(address: number, data: number[]): Promise<void>
+    writeRegister(address: number, value: number): Promise<void>
     writeCoils(address: number, data: number[]): Promise<void>
     writeCoil(address: number, state: boolean): Promise<void>
   }

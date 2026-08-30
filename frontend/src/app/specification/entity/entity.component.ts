@@ -209,7 +209,7 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       ],
       registerType: [null as IRegisterType | null, Validators.required],
       readonly: [null as boolean | null],
-      writeFC5: [false],
+      useSingleWrite: [false],
       entityCategory: [''],
       icon: [null as string | null],
       forceUpdate: [false],
@@ -396,8 +396,8 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       this.entityFormGroup.get('value_template')!.setValue(entity.value_template)
       this.entityFormGroup.get('entityCategory')!.setValue(entity.entityCategory)
       this.entityFormGroup.get('readonly')!.setValue(entity.readonly)
-      this.entityFormGroup.get('writeFC5')!.setValue(entity.writeFunctionCode === 5)
-      this.updateWriteFC5DisabledState()
+      this.entityFormGroup.get('useSingleWrite')!.setValue(entity.writeFunctionCode === 5 || entity.writeFunctionCode === 6)
+      this.updateSingleWriteDisabledState()
     }
 
     this.entityFormGroup.get('registerType')!.setValue({ registerType: entity.registerType, name: 'unknown' })
@@ -598,7 +598,7 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       this.entityFormGroup.get('readonly')?.enable()
       this.entity.readonly = this.entityFormGroup.get('readonly')?.value ?? false
     }
-    this.updateWriteFC5DisabledState()
+    this.updateSingleWriteDisabledState()
     this.readFromModbus()
   }
   isAnalogInput(): boolean {
@@ -608,6 +608,14 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
     const regType = this.entityFormGroup?.get('registerType')?.value
     const val = typeof regType === 'object' && regType !== null ? regType.registerType : regType
     return val === ModbusRegisterType.Coils
+  }
+  isHoldingRegister(): boolean {
+    const regType = this.entityFormGroup?.get('registerType')?.value
+    const val = typeof regType === 'object' && regType !== null ? regType.registerType : regType
+    return val === ModbusRegisterType.HoldingRegister
+  }
+  canUseSingleWrite(): boolean {
+    return this.isCoil() || this.isHoldingRegister()
   }
   form2Entity() {
     // copies all values which are not relevant to
@@ -623,10 +631,14 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
     if (this.entityFormGroup.get('entityCategory')!.value != null && this.entityFormGroup.get('entityCategory')!.value.length > 0)
       this.entity.entityCategory = this.entityFormGroup.get('entityCategory')!.value
     else delete this.entity.entityCategory
-    if (this.isCoil()) {
-      const writeFC5 = this.entityFormGroup.get('writeFC5')?.value
-      if (writeFC5) {
-        this.entity.writeFunctionCode = 5
+    if (this.canUseSingleWrite()) {
+      const useSingleWrite = this.entityFormGroup.get('useSingleWrite')?.value
+      if (useSingleWrite) {
+        if (this.isCoil()) {
+          this.entity.writeFunctionCode = 5
+        } else if (this.isHoldingRegister()) {
+          this.entity.writeFunctionCode = 6
+        }
       } else {
         delete this.entity.writeFunctionCode
       }
@@ -637,20 +649,20 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       case 'Inumber':
         break
     }
-    this.updateWriteFC5DisabledState()
+    this.updateSingleWriteDisabledState()
     this.setEntitiesTouched()
   }
   onConverterValueChange() {
     this.onConverterValueChangeLocal()
     this.readFromModbus()
   }
-  updateWriteFC5DisabledState() {
-    const writeFC5Control = this.entityFormGroup?.get('writeFC5')
-    if (!writeFC5Control) return
+  updateSingleWriteDisabledState() {
+    const control = this.entityFormGroup?.get('useSingleWrite')
+    if (!control) return
     if (this.disabled || this.entityFormGroup.get('readonly')?.value === true) {
-      writeFC5Control.disable({ emitEvent: false })
+      control.disable({ emitEvent: false })
     } else {
-      writeFC5Control.enable({ emitEvent: false })
+      control.enable({ emitEvent: false })
     }
   }
   updateReadonly() {
@@ -665,7 +677,7 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       default:
         break
     }
-    this.updateWriteFC5DisabledState()
+    this.updateSingleWriteDisabledState()
   }
   updateCategory() {
     let category = this.entityFormGroup.get('entityCategory')!.value
@@ -673,7 +685,7 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
       category = this.entityFormGroup.get('readonly')!.value ? 'diagnostic' : 'config'
       this.entityFormGroup.get('entityCategory')!.setValue(category)
     }
-    this.updateWriteFC5DisabledState()
+    this.updateSingleWriteDisabledState()
   }
 
   private onConverterValueChangeLocal() {

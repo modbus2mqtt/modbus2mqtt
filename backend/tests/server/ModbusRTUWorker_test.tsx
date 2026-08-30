@@ -385,6 +385,7 @@ class FlakyApi implements IModbusAPI {
   readDiscreteInputs = this.read
   readInputRegisters = this.read
   writeHoldingRegisters = () => Promise.resolve()
+  writeRegister = () => Promise.resolve()
   writeCoils = () => Promise.resolve()
   writeCoil = () => Promise.resolve()
 }

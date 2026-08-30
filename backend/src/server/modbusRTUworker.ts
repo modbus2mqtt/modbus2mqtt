@@ -472,6 +472,22 @@ export class ModbusRTUWorker extends ModbusWorker {
               return this.processOneEntry()
             })
         }
+        if (
+          current.address.registerType === ModbusRegisterType.HoldingRegister &&
+          current.address.writeFunctionCode === 6 &&
+          this.modbusAPI.writeRegister
+        ) {
+          return this.modbusAPI
+            .writeRegister(current.slaveId, current.address.address, current.address.write[0])
+            .then(() => {
+              current.onResolve(current, current.address.write)
+              return this.processOneEntry()
+            })
+            .catch((e) => {
+              current.onError(current, e)
+              return this.processOneEntry()
+            })
+        }
         const fct = this.functionCodeWriteMap.get(current.address.registerType)
         if (fct)
           return fct(current.slaveId, current.address.address, current.address.write)
