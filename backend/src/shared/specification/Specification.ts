@@ -52,7 +52,7 @@ export interface Imessage {
   referencedEntity?: number
   additionalInformation?: string | string[]
 }
-export const editableConverters: string[] = ['binary_sensor', 'number', 'text', 'select', 'button']
+export const editableConverters: string[] = ['binary_sensor', 'binary', 'switch', 'number', 'text', 'select', 'button']
 
 export function validateTranslation(spec: Ispecification, language: string, msgs: Imessage[]) {
   const en = spec.i18n.find((l: { lang: string }) => l.lang === language)

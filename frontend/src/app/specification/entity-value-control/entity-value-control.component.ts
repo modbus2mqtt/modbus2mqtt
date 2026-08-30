@@ -50,7 +50,7 @@ export class EntityValueControlComponent implements OnInit, OnDestroy, OnChanges
           })
   }
   onButton() {
-    if (this.toggleFormControl.value && this.entity) {
+    if (this.toggleFormControl.value !== null && this.toggleFormControl.value !== undefined && this.entity) {
       const val = this.toggleFormControl.value ? 'ON' : 'OFF'
       this.specificationMethods &&
         this.specificationMethods.postModbusWriteMqtt(this.entity, val).subscribe((newValue) => {

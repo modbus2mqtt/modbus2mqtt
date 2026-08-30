@@ -36,10 +36,10 @@
     </mat-select>
   </mat-form-field>
 }
-@if (['button', 'binary'].includes(getConverterName())) {
-  <mat-slide-toggle [formControl]="toggleFormControl" (toggleChange)="onButton()"></mat-slide-toggle>
+@if (['button', 'binary', 'switch'].includes(getConverterName())) {
+  <mat-slide-toggle [formControl]="toggleFormControl" (change)="onButton()"></mat-slide-toggle>
 }
-@if (entity!.readonly && !['number', 'binary'].includes(getConverterName())) {
+@if (entity!.readonly && !['number', 'binary', 'switch'].includes(getConverterName())) {
   <mat-form-field class="width100pt">
     <mat-label>MQTT Value</mat-label>
     <input matInput [formControl]="textFormControl" />

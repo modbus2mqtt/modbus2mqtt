@@ -109,7 +109,7 @@ export function registerModbusRoutes(r: Registrar): void {
     const bus = Bus.getBus(busid)!
     const mqttValue = ctx.query['mqttValue']
     const entityid = ctx.query['entityid'] ? Number.parseInt(ctx.query['entityid']) : undefined
-    if (entityid && mqttValue) {
+    if (entityid !== undefined && !Number.isNaN(entityid) && mqttValue !== undefined) {
       try {
         await Modbus.writeEntityMqtt(bus.getModbusAPI(), slaveid, ctx.body, entityid, mqttValue)
         return created('')
