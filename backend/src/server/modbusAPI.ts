@@ -40,7 +40,8 @@ export interface IconsumerModbusAPI {
     address: number,
     registerType: ModbusRegisterType,
     data: number[],
-    options: IQueueOptions
+    options: IQueueOptions,
+    writeFunctionCode?: number
   ) => Promise<void>
   readModbusRegister: (slaveId: number, addresses: Set<ImodbusAddress>, options: IexecuteOptions) => Promise<ImodbusValues>
   addSlaveError: (slaveid: number, task: ModbusTasks, state: ModbusErrorStates, message: string, detail?: string) => void
@@ -114,10 +115,17 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
     address: number,
     registerType: ModbusRegisterType,
     data: number[],
-    options: IexecuteOptions
+    options: IexecuteOptions,
+    writeFunctionCode?: number
   ): Promise<void> {
     const executeWrite = (onResolve: () => void, onReject: (e: unknown) => void) => {
-      const addr: ImodbusAddress = { address: address, length: data.length, registerType: registerType, write: data }
+      const addr: ImodbusAddress = {
+        address: address,
+        length: data.length,
+        registerType: registerType,
+        write: data,
+        writeFunctionCode: writeFunctionCode,
+      }
       this.modbusRTUQueue.enqueue(slaveId, addr, onResolve, onReject, options)
     }
     if (this.modbusClient && this.modbusClient.isOpen)
@@ -265,6 +273,27 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
         const dataNums: number[] = data.map((d) => (d === 1 ? 1 : 0))
         // Always use writeCoils; for single value pass array of one element
         this.modbusClient!.writeCoils(dataaddress, dataNums)
+          .then(() => {
+            this.modbusClientTimedOut = false
+            resolve()
+          })
+          .catch((e) => {
+            this.setModbusTimout(reject, e, start)
+          })
+      }
+    })
+    return rc
+  }
+  writeCoil(slaveid: number, dataaddress: number, state: boolean): Promise<void> {
+    const rc = new Promise<void>((resolve, reject) => {
+      if (this.modbusClient == undefined) {
+        log.log(LogLevelEnum.error, 'modbusClient is undefined')
+        return
+      } else {
+        const start = Date.now()
+        this.modbusClient!.setID(slaveid)
+        this.modbusClient!.setTimeout((this.modbusConfiguration.getModbusConnection() as IRTUConnection).timeout)
+        this.modbusClient!.writeCoil(dataaddress, state)
           .then(() => {
             this.modbusClientTimedOut = false
             resolve()

@@ -12,6 +12,7 @@ export interface IModbusAPI {
   readInputRegisters: TModbusReadFunction
   writeHoldingRegisters: TModbusWriteFunction
   writeCoils: TModbusWriteFunction
+  writeCoil?: (slaveid: number, dataaddress: number, state: boolean) => Promise<void>
   reconnectRTU: (task: string) => Promise<void>
   getCacheId(): string
 }
