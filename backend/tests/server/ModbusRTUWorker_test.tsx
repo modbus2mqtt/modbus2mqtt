@@ -438,3 +438,169 @@ describe('failing reads keep the last known value (issue #229)', () => {
     expect(await poll(worker, queue, ModbusTasks.poll)).toBeInstanceOf(Error)
   })
 })
+
+describe('ModbusRTUWorker single write handling (FC5 and FC6)', () => {
+  it('calls writeCoil when Coil write has writeFunctionCode 5', async () => {
+    let writeCoilCalled = false
+    let writeCoilsCalled = false
+    const api: any = {
+      readHoldingRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      readCoils: () => Promise.resolve({ data: [0], duration: 1 }),
+      readDiscreteInputs: () => Promise.resolve({ data: [0], duration: 1 }),
+      readInputRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      writeHoldingRegisters: () => Promise.resolve(),
+      writeRegister: () => Promise.resolve(),
+      writeCoils: () => {
+        writeCoilsCalled = true
+        return Promise.resolve()
+      },
+      writeCoil: (_slaveid: number, dataaddress: number, state: boolean) => {
+        writeCoilCalled = true
+        expect(dataaddress).toBe(1)
+        expect(state).toBe(true)
+        return Promise.resolve()
+      },
+      reconnectRTU: () => Promise.resolve(),
+      getCacheId: () => 'test-fc5',
+    }
+    const queue = new ModbusRTUQueue()
+    const worker = new ModbusRTUWorker(api, queue)
+
+    await new Promise<void>((resolve, reject) => {
+      queue.enqueue(
+        102,
+        { registerType: ModbusRegisterType.Coils, address: 1, write: [1], writeFunctionCode: 5 },
+        () => resolve(),
+        (e) => reject(e),
+        { task: ModbusTasks.writeEntity, errorHandling: {} }
+      )
+      worker.run()
+    })
+
+    expect(writeCoilCalled).toBe(true)
+    expect(writeCoilsCalled).toBe(false)
+  })
+
+  it('calls writeCoils (FC15) when Coil write has no writeFunctionCode', async () => {
+    let writeCoilCalled = false
+    let writeCoilsCalled = false
+    const api: any = {
+      readHoldingRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      readCoils: () => Promise.resolve({ data: [0], duration: 1 }),
+      readDiscreteInputs: () => Promise.resolve({ data: [0], duration: 1 }),
+      readInputRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      writeHoldingRegisters: () => Promise.resolve(),
+      writeRegister: () => Promise.resolve(),
+      writeCoils: (_slaveid: number, dataaddress: number, data: number[]) => {
+        writeCoilsCalled = true
+        expect(dataaddress).toBe(1)
+        expect(data).toEqual([1])
+        return Promise.resolve()
+      },
+      writeCoil: () => {
+        writeCoilCalled = true
+        return Promise.resolve()
+      },
+      reconnectRTU: () => Promise.resolve(),
+      getCacheId: () => 'test-fc15',
+    }
+    const queue = new ModbusRTUQueue()
+    const worker = new ModbusRTUWorker(api, queue)
+
+    await new Promise<void>((resolve, reject) => {
+      queue.enqueue(
+        102,
+        { registerType: ModbusRegisterType.Coils, address: 1, write: [1] },
+        () => resolve(),
+        (e) => reject(e),
+        { task: ModbusTasks.writeEntity, errorHandling: {} }
+      )
+      worker.run()
+    })
+
+    expect(writeCoilsCalled).toBe(true)
+    expect(writeCoilCalled).toBe(false)
+  })
+
+  it('calls writeRegister when HoldingRegister write has writeFunctionCode 6', async () => {
+    let writeRegisterCalled = false
+    let writeHoldingRegistersCalled = false
+    const api: any = {
+      readHoldingRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      readCoils: () => Promise.resolve({ data: [0], duration: 1 }),
+      readDiscreteInputs: () => Promise.resolve({ data: [0], duration: 1 }),
+      readInputRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      writeHoldingRegisters: () => {
+        writeHoldingRegistersCalled = true
+        return Promise.resolve()
+      },
+      writeRegister: (_slaveid: number, dataaddress: number, value: number) => {
+        writeRegisterCalled = true
+        expect(dataaddress).toBe(3)
+        expect(value).toBe(255)
+        return Promise.resolve()
+      },
+      writeCoils: () => Promise.resolve(),
+      writeCoil: () => Promise.resolve(),
+      reconnectRTU: () => Promise.resolve(),
+      getCacheId: () => 'test-fc6',
+    }
+    const queue = new ModbusRTUQueue()
+    const worker = new ModbusRTUWorker(api, queue)
+
+    await new Promise<void>((resolve, reject) => {
+      queue.enqueue(
+        102,
+        { registerType: ModbusRegisterType.HoldingRegister, address: 3, write: [255], writeFunctionCode: 6 },
+        () => resolve(),
+        (e) => reject(e),
+        { task: ModbusTasks.writeEntity, errorHandling: {} }
+      )
+      worker.run()
+    })
+
+    expect(writeRegisterCalled).toBe(true)
+    expect(writeHoldingRegistersCalled).toBe(false)
+  })
+
+  it('calls writeHoldingRegisters (FC16) when HoldingRegister write has no writeFunctionCode', async () => {
+    let writeRegisterCalled = false
+    let writeHoldingRegistersCalled = false
+    const api: any = {
+      readHoldingRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      readCoils: () => Promise.resolve({ data: [0], duration: 1 }),
+      readDiscreteInputs: () => Promise.resolve({ data: [0], duration: 1 }),
+      readInputRegisters: () => Promise.resolve({ data: [0], duration: 1 }),
+      writeHoldingRegisters: (_slaveid: number, dataaddress: number, data: number[]) => {
+        writeHoldingRegistersCalled = true
+        expect(dataaddress).toBe(3)
+        expect(data).toEqual([255])
+        return Promise.resolve()
+      },
+      writeRegister: () => {
+        writeRegisterCalled = true
+        return Promise.resolve()
+      },
+      writeCoils: () => Promise.resolve(),
+      writeCoil: () => Promise.resolve(),
+      reconnectRTU: () => Promise.resolve(),
+      getCacheId: () => 'test-fc16',
+    }
+    const queue = new ModbusRTUQueue()
+    const worker = new ModbusRTUWorker(api, queue)
+
+    await new Promise<void>((resolve, reject) => {
+      queue.enqueue(
+        102,
+        { registerType: ModbusRegisterType.HoldingRegister, address: 3, write: [255] },
+        () => resolve(),
+        (e) => reject(e),
+        { task: ModbusTasks.writeEntity, errorHandling: {} }
+      )
+      worker.run()
+    })
+
+    expect(writeHoldingRegistersCalled).toBe(true)
+    expect(writeRegisterCalled).toBe(false)
+  })
+})
