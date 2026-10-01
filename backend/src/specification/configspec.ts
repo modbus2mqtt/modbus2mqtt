@@ -1,4 +1,5 @@
 import { join } from 'path'
+import * as fs from 'fs'
 import { LogLevelEnum, Logger } from './log.js'
 import {
   IimportMessages,
@@ -61,6 +62,32 @@ export class ConfigSpecification {
   // Reads all specifications from public + local directories via persistence layer.
   // Status comes from JSON attribute (local) or is 'published' (public).
   // For legacy YAML specs without status, it is derived from publicNames during read.
+  /**
+   * Seeds bundled local specifications (shipped in the package under
+   * "specifications/" next to the dist output) into the runtime local specs
+   * directory on first start, so templates are selectable in the webui without
+   * a manual import. Idempotent: existing local templates are never overwritten.
+   */
+  static seedLocalSpecifications(packageRoot?: string): void {
+    try {
+      const bundledDir = packageRoot ? join(packageRoot, 'specifications') : ''
+      if (!bundledDir || !fs.existsSync(bundledDir)) return
+      const localDir = ConfigSpecification.getLocalDir()
+      const localSpecDir = join(localDir, 'specifications')
+      const bundled = fs.readdirSync(bundledDir).filter((f) => f.endsWith('.yaml'))
+      if (!bundled.length) return
+      for (const f of bundled) {
+        const target = join(localSpecDir, f)
+        if (fs.existsSync(target)) continue // never overwrite existing local templates
+        if (!fs.existsSync(localSpecDir)) fs.mkdirSync(localSpecDir, { recursive: true })
+        fs.copyFileSync(join(bundledDir, f), target)
+        log.log(LogLevelEnum.info, 'Seeded local specification: ' + f)
+      }
+    } catch (e) {
+      log.log(LogLevelEnum.error, 'seedLocalSpecifications failed: ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
   readYaml(): void {
     try {
       const persistence = ConfigSpecification.ensurePersistence()
@@ -186,21 +213,37 @@ export class ConfigSpecification {
 
     const persistence = ConfigSpecification.ensurePersistence()
 
-    // 1. Handle file renames (all in persistence)
+    // 1. Handle file renames (all in persistence).
+    //    A save under a different name is either a plain rename of a local
+    //    (added/new) spec, or a *clone* of a published/cloned source: the
+    //    public template is never renamed, we copy its files and write a new
+    //    local spec. Contributed specs (a PR is attached) stay immutable.
     if (spec.status != SpecificationStatus.new && !originalFilename) {
       throw new Error(spec.status + ' !=' + SpecificationStatus.new + ' and no originalfilename')
     } else if (originalFilename && originalFilename != spec.filename) {
-      if (
-        spec.status == SpecificationStatus.cloned ||
-        spec.status == SpecificationStatus.published ||
-        spec.status == SpecificationStatus.contributed
-      )
-        throw new Error('Cannot rename a published file')
+      if (spec.status == SpecificationStatus.contributed) throw new Error('Cannot rename a contributed file')
+      // When cloning away from a public template, first make the files local
+      // (copy from the public dir), then rename the local copy to the new name.
+      if (spec.status == SpecificationStatus.published || persistence.hasPublicSpec(originalFilename)) {
+        persistence.copyPublicFiles(originalFilename)
+      }
       persistence.renameSpec(spec.filename, originalFilename)
+      // Rewrite local file references to the new spec dir: the physical files
+      // moved to specifications/files/<newName>/ — keep the stored url in sync
+      // so images/datasheets keep resolving without a reload cycle.
+      if (spec.files && spec.files.length) {
+        const oldPrefix = filesUrlPrefix + '/' + originalFilename.replace(/\.yaml$/, '') + '/'
+        const newPrefix = filesUrlPrefix + '/' + spec.filename.replace(/\.yaml$/, '') + '/'
+        spec.files.forEach((f) => {
+          if (f.fileLocation == 0 && f.url && f.url.startsWith(oldPrefix)) {
+            f.url = newPrefix + f.url.substring(oldPrefix.length)
+          }
+        })
+      }
     }
-
-    // 2. Copy public files if needed
-    if (spec.files && spec.files.length && [SpecificationStatus.published].includes(spec.status)) {
+    // 2. Copy public files if the saved spec is still published (non-renamed
+    //    public template -> first clone into the local dir).
+    if (spec.files && spec.files.length && spec.status == SpecificationStatus.published && originalFilename == spec.filename) {
       persistence.copyPublicFiles(spec.filename)
     }
 

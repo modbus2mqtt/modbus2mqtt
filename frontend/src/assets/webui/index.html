@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modbus2MQTT · Web Configurator</title>
+<script>
+  /* Resolve the theme before first paint to avoid a flash of the wrong
+     mode: explicit choice in localStorage wins, otherwise follow the OS. */
+  (function () {
+    try {
+      var saved = localStorage.getItem('m2m-theme');
+      var theme = saved === 'light' || saved === 'dark'
+        ? saved
+        : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.dataset.theme = theme;
+    } catch (e) {
+      document.documentElement.dataset.theme = 'dark';
+    }
+  })();
+</script>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/png" href="assets/images/icon.png">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">
+          <img src="assets/images/icon.png" alt="Modbus2MQTT" width="30" height="30">
+        </div>
+        <div>
+          <h1>Modbus2MQTT</h1>
+          <span class="subtitle" data-i18n="subtitle">Web Configurator</span>
+        </div>
+      </div>
+      <div class="gateway">
+        <span class="pill" id="gw-status"><span class="dot"></span><span data-i18n="gateway">Busses</span></span>
+        <button type="button" class="pill pill-btn" id="mqtt-status" title="MQTT" aria-label="MQTT"><span class="dot"></span>MQTT</button>
+        <button type="button" class="theme-toggle" id="btn-top-config" title="Configuration" aria-label="Configuration">⚙</button>
+        <select class="lang-select" id="lang-select" title="Language / Sprache / Langue / Lingua" aria-label="Language">
+          <option value="en">EN</option>
+          <option value="de">DE</option>
+          <option value="fr">FR</option>
+          <option value="it">IT</option>
+        </select>
+        <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light / dark mode">
+          <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+          <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- Add connection / device / template -->
+    <section class="card">
+      <div class="card-header">
+        <h2 data-i18n="add_device">Add device</h2>
+        <span class="card-sub" data-i18n="add_sub">Choose what to add</span>
+      </div>
+      <div class="add-options">
+        <div class="add-option" id="add-opt-bus" data-addcat="bus">
+          <div class="add-option-icon">🔌</div>
+          <div class="add-option-text"><b data-i18n="add_bus">Modbus connection</b><span class="add-option-desc" data-i18n="desc_bus">New RTU / TCP connection</span></div>
+          <button type="button" class="btn btn-primary" data-addcat="bus" data-i18n="add">Add</button>
+        </div>
+        <div class="add-option" id="add-opt-slave" data-addcat="slave">
+          <div class="add-option-icon">📟</div>
+          <div class="add-option-text"><b data-i18n="add_slave">Modbus device</b><span class="add-option-desc" data-i18n="desc_slave">Device from a template</span></div>
+          <button type="button" class="btn btn-primary" data-addcat="slave" data-i18n="add">Add</button>
+        </div>
+        <div class="add-option" id="add-opt-template" data-addcat="template">
+          <div class="add-option-icon">🧩</div>
+          <div class="add-option-text"><b data-i18n="add_template">Modbus template</b><span class="add-option-desc" data-i18n="desc_template">New template / specification</span></div>
+          <button type="button" class="btn btn-primary" data-addcat="template" data-i18n="add">Add</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Connections / Devices -->
+    <section class="card">
+      <div class="card-header">
+        <h2 data-i18n="devices">Connections &amp; devices</h2>
+        <span class="card-sub" id="device-count">0 devices</span>
+      </div>
+      <div class="bus-list" id="bus-list">
+        <div class="empty-row-inline" id="bus-empty">No connections configured yet.</div>
+      </div>
+    </section>
+
+    <!-- Templates -->
+    <section class="card">
+      <div class="card-header">
+        <h2 data-i18n="templates">Templates</h2>
+        <span class="card-sub" id="template-count" data-i18n="templates_sub">Available specifications</span>
+      </div>
+      <div class="template-table-wrap">
+        <table class="sensor-table">
+          <thead>
+            <tr>
+              <th data-i18n="col_img">Image</th>
+              <th data-i18n="col_name">Name</th>
+              <th data-i18n="col_model">Model</th>
+              <th data-i18n="col_manufacturer">Manufacturer</th>
+              <th data-i18n="col_doc">Datasheet</th>
+              <th data-i18n="col_status">Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="template-body">
+            <tr class="empty-row"><td colspan="5">No templates available yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span id="footer-info" data-i18n="footer_info">Modbus2MQTT web configurator</span>
+      <span class="footer-links">
+        <a href="https://github.com/modbus2mqtt/modbus2mqtt" target="_blank" rel="noopener">GitHub</a>
+        <span class="footer-sep">·</span>
+        <a href="https://github.com/modbus2mqtt/modbus2mqtt/blob/main/LICENSE" target="_blank" rel="noopener">Licence</a>
+        <span class="footer-sep">·</span>
+        <a href="https://www.modbus.org/file/secure/modbusprotocolspecification.pdf" target="_blank" rel="noopener" data-i18n="footer_specs">Modbus specification</a>
+      </span>
+      <span id="footer-error" class="error-text"></span>
+    </footer>
+  </main>
+</div>
+
+<!-- Confirm dialog -->
+<div class="modal-overlay" id="modal-overlay" hidden>
+  <div class="modal">
+    <h3 id="modal-title">Remove?</h3>
+    <p id="modal-body">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-danger" id="modal-ok" data-i18n="remove">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- MQTT server popup (separate from main config; accessed via the MQTT pill in the header) -->
+<div class="modal-overlay" id="mqttedit-overlay" hidden>
+  <div class="modal modal-config">
+    <h3 data-i18n="mqtt_server">MQTT server</h3>
+    <div class="config-grid" id="mqtt-grid"></div>
+    <div class="modal-actions">
+      <button class="btn" id="mqttedit-cancel" data-i18n="cancel">Cancel</button>
+      <button class="btn" id="mqttedit-test" data-i18n="mqtt_test">Test connection</button>
+      <button class="btn btn-primary" id="mqttedit-save" data-i18n="save_config">Save configuration</button>
+    </div>
+    <div class="mqtt-test-result" id="mqtt-test-result" hidden></div>
+  </div>
+</div>
+
+<!-- Config edit popup (general settings only; MQTT lives in its own popup) -->
+<div class="modal-overlay" id="configedit-overlay" hidden>
+  <div class="modal modal-config">
+    <h3 data-i18n="edit_config">Edit configuration</h3>
+    <div class="config-grid" id="config-grid"></div>
+    <div class="modal-actions">
+      <button class="btn" id="configedit-cancel" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-primary" id="configedit-save" data-i18n="save_config">Save configuration</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit connection modal -->
+<div class="modal-overlay" id="busedit-overlay" hidden>
+  <div class="modal modal-wide">
+    <h3 id="busedit-title" data-i18n="edit_bus">Edit Modbus connection</h3>
+    <div id="bus-discovered" class="discovered-box" hidden>
+      <span class="discovered-info" id="bus-discovered-info" data-i18n="bus_discovered_info">Modbus TCP Server found at address</span>
+      <span class="discovered-addr" id="bus-discovered-addr"></span>
+      <div class="discovered-actions">
+        <button class="btn btn-sm btn-primary" id="bus-discovered-add" data-i18n="add_server">Add Server</button>
+        <button class="btn btn-sm" id="bus-discovered-ignore" data-i18n="ignore">Ignore</button>
+      </div>
+    </div>
+    <div class="add-form add-stack">
+      <div class="field"><label data-i18n="bus_type">Type</label>
+        <select id="be-type">
+          <option value="tcp">TCP</option>
+          <option value="rtu">RTU (serial)</option>
+        </select>
+      </div>
+      <div class="field be-tcp" id="be-tcp-host-f"><label data-i18n="host">Host</label><input type="text" id="be-host" placeholder="192.168.1.100"></div>
+      <div class="field be-tcp" id="be-tcp-port-f"><label data-i18n="port">Port</label><input type="text" id="be-port" placeholder="502"></div>
+      <div class="field be-rtu" id="be-rtu-port-f"><label data-i18n="serial_port">Serial port</label><input type="text" id="be-serialport" placeholder="/dev/ttyUSB0"></div>
+      <div class="field be-rtu" id="be-rtu-baud-f"><label data-i18n="baudrate">Baud rate</label><select id="be-baudrate">
+        <option>300</option><option>1200</option><option>2400</option><option>4800</option>
+        <option>9600</option><option>19200</option><option>38400</option><option>57600</option><option>115200</option>
+      </select></div>
+      <div class="field be-rtu" id="be-rtu-framing-f"><label data-i18n="framing">Framing</label>
+        <select id="be-framing">
+          <option value="8N1">8N1</option><option value="8E1">8E1</option><option value="8N2">8N2</option><option value="7E1">7E1</option>
+        </select>
+      </div>
+      <div class="field" style="min-width:90px"><label data-i18n="timeout">Timeout (ms)</label><input type="text" id="be-timeout" placeholder="1000"></div>
+      <div class="field be-rtu" id="be-rtu-bridge-f" style="min-width:110px"><label data-i18n="tcp_bridge">TCP bridge port</label><input type="text" id="be-tcpbridge" placeholder="502"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="busedit-cancel" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-primary" id="busedit-ok" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit device modal (same as add, prefilled) -->
+<div class="modal-overlay" id="slaveedit-overlay" hidden>
+  <div class="modal modal-xlg">
+    <h3 id="slaveedit-title" data-i18n="add_slave">Add Modbus device</h3>
+    <div class="add-form add-stack">
+      <div class="field"><label data-i18n="bus_select">Modbus connection</label>
+        <select id="se-busselect"></select>
+      </div>
+      <div class="field"><label data-i18n="slave_id">Slave ID</label>
+        <div class="eep-combo">
+          <input type="text" id="se-slaveid" placeholder="1" list="se-slave-scan-list">
+          <datalist id="se-slave-scan-list"></datalist>
+          <button type="button" class="btn btn-sm" id="se-scan-slaves" title="Scan bus for slaves" data-i18n="scan_slaves">Scan</button>
+        </div>
+      </div>
+      <div class="field"><label data-i18n="name">Name</label><input type="text" id="se-name" placeholder="device name" data-ph="device_name_ph"></div>
+      <div class="field"><label data-i18n="template_label">Template (specification)</label>
+        <div class="eep-combo">
+          <input type="text" id="se-template-search" data-ph="template_placeholder" placeholder="sdm120, template…" autocomplete="off">
+          <div class="eep-dropdown" id="se-template-drop" hidden><ul id="se-template-list"></ul></div>
+        </div>
+      </div>
+      <div class="field"><label data-i18n="poll_mode">Poll mode</label>
+        <select id="se-pollmode">
+          <option value="0">Interval</option>
+          <option value="2">Interval + trigger</option>
+          <option value="1">Trigger only</option>
+          <option value="3">No polling</option>
+          <option value="4">HTTP Push (no MQTT)</option>
+        </select>
+      </div>
+      <div class="field" id="se-pollinterval-f"><label data-i18n="poll_interval">Poll interval (ms)</label><input type="text" id="se-pollinterval" placeholder="1000"></div>
+      <div class="field"><label data-i18n="root_topic">MQTT root topic</label><input type="text" id="se-roottopic" placeholder="optional"></div>
+      <div class="field"><label data-i18n="qos">QoS</label>
+        <select id="se-qos">
+          <option value="-1">Auto</option><option value="1">1 - at least once</option><option value="2">2 - exactly once</option>
+        </select>
+      </div>
+      <div class="field"><label data-i18n="max_registers">Max registers per request</label><input type="text" id="se-maxreg" placeholder="125"></div>
+      <div class="field"><label data-i18n="config_url">Configuration URL</label><input type="text" id="se-configurl" placeholder="http://device:8080"></div>
+      <div class="field" id="se-reference-f"><label data-i18n="reference">Take settings from (reference)</label>
+        <select id="se-reference"></select>
+      </div>
+    </div>
+    <hr class="modal-divider">
+    <h4 class="config-section-title" data-i18n="device_registers">Registers / entities</h4>
+    <div class="reg-table-wrap">
+      <table class="reg-table" id="se-reg-table">
+        <thead>
+          <tr>
+            <th data-i18n="reg_name">Name</th>
+            <th data-i18n="reg_type">Type</th>
+            <th data-i18n="reg_addr">Address</th>
+            <th data-i18n="reg_rw">R/W</th>
+            <th data-i18n="reg_converter">Converter</th>
+            <th data-i18n="reg_uom">Unit</th>
+            <th data-i18n="reg_category">Category</th>
+            <th data-i18n="reg_value">Value</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="se-reg-body"><tr class="empty-row"><td colspan="8" data-i18n="reg_none">No registers yet</td></tr></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="se-reg-add" data-i18n="reg_add">Add register</button>
+      <button class="btn" id="slaveedit-cancel" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-primary" id="slaveedit-ok" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit template modal -->
+<div class="modal-overlay" id="tpledit-overlay" hidden>
+  <div class="modal modal-xlg">
+    <h3 id="tpledit-title" data-i18n="add_template">Add Modbus template</h3>
+    <div class="tpl-lang-row">
+      <label data-i18n="tpl_lang_label" for="te-lang-select">Template language</label>
+      <select id="te-lang-select">
+        <option value="en">English</option>
+        <option value="de">Deutsch</option>
+        <option value="fr">Français</option>
+        <option value="it">Italiano</option>
+      </select>
+      <span class="field-hint" data-i18n="tpl_lang_hint">The popup's own language - switch to edit names in each language. All languages are saved together.</span>
+    </div>
+    <div class="add-form add-stack">
+      <div class="field"><label data-i18n="template_name">Template name</label><input type="text" id="te-name" data-ph="template_name_ph" placeholder="thevios" autocomplete="off"></div>
+      <div class="field"><label data-i18n="template_model">Model</label><input type="text" id="te-model" data-ph="template_model_ph" placeholder="thevios" autocomplete="off"></div>
+      <div class="field"><label data-i18n="template_manufacturer">Manufacturer</label><input type="text" id="te-manufacturer" data-ph="template_manufacturer_ph" placeholder="thermokon" autocomplete="off"></div>
+    </div>
+    <hr class="modal-divider">
+    <h4 class="config-section-title" data-i18n="tpl_media">Image & datasheets</h4>
+    <div class="tpl-media">
+      <div class="field tpl-img-field">
+        <label data-i18n="tpl_image">Image</label>
+        <div class="tpl-media-row">
+          <input type="text" id="te-img-url" data-ph="tpl_img_url_ph" placeholder="https://…/image.jpg" autocomplete="off">
+          <span class="tpl-media-or">or</span>
+          <input type="file" id="te-img-file" accept="image/*" class="tpl-file-input">
+          <label class="btn btn-sm tpl-file-btn" for="te-img-file" data-i18n="tpl_upload">Upload</label>
+          <button type="button" class="btn btn-sm tpl-img-clear" data-i18n="tpl_remove">Remove</button>
+        </div>
+        <div class="tpl-img-preview" id="te-img-preview"></div>
+        <span class="field-hint" data-i18n="tpl_image_hint">Image shown next to the template. Provide a URL or upload a file (images are not language-specific).</span>
+      </div>
+      <hr class="modal-divider">
+      <div class="field tpl-docs-field">
+        <label data-i18n="tpl_datasheets">Datasheets</label>
+        <div class="tpl-doc-rows" id="te-doc-rows"></div>
+        <span class="field-hint" data-i18n="tpl_datasheets_hint">Datasheet per language. The link in the template list opens the datasheet of the current UI language; missing languages fall back to English, then the first one available.</span>
+      </div>
+    </div>
+    <hr class="modal-divider">
+    <h4 class="config-section-title" data-i18n="template_registers">Registers / entities</h4>
+    <div class="reg-table-wrap">
+      <table class="reg-table" id="te-reg-table">
+        <thead>
+          <tr>
+            <th data-i18n="reg_name">Name</th>
+            <th data-i18n="reg_type">Type</th>
+            <th data-i18n="reg_addr">Address</th>
+            <th data-i18n="reg_rw">R/W</th>
+            <th data-i18n="reg_converter">Converter</th>
+            <th data-i18n="reg_uom">Unit</th>
+            <th data-i18n="reg_category">Category</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="te-reg-body"><tr class="empty-row"><td colspan="7" data-i18n="reg_none">No registers yet</td></tr></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="te-reg-add" data-i18n="reg_add">Add register</button>
+      <button class="btn" id="tpledit-cancel" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-primary" id="tpledit-ok" data-i18n="save_template">Save template</button>
+    </div>
+  </div>
+</div>
+
+<!-- register (entity) editor modal -->
+<div class="modal-overlay" id="regedit-overlay" hidden>
+  <div class="modal modal-xlg">
+    <h3 id="regedit-title" data-i18n="reg_edit">Edit register</h3>
+    <div class="add-form add-stack in-regedit" id="regedit-form">
+      <div class="field"><label data-i18n="reg_name">Name</label><input type="text" id="re-name" placeholder="English"></div>
+      <div class="field i18n-names" id="re-i18n-names">
+        <label data-i18n="reg_name_translated">Translated names</label>
+        <div class="i18n-name-grid">
+          <span class="i18n-lang">EN</span><input type="text" id="re-name-en" placeholder="English" data-i18n-ph="reg_name_en">
+          <span class="i18n-lang">DE</span><input type="text" id="re-name-de" placeholder="Deutsch" data-i18n-ph="reg_name_de">
+          <span class="i18n-lang">FR</span><input type="text" id="re-name-fr" placeholder="Français" data-i18n-ph="reg_name_fr">
+          <span class="i18n-lang">IT</span><input type="text" id="re-name-it" placeholder="Italiano" data-i18n-ph="reg_name_it">
+        </div>
+        <span class="field-hint" data-i18n="reg_name_translated_hint">Shown in the register list according to the UI language. English is used as the technical name.</span>
+      </div>
+      <div class="field"><label data-i18n="reg_mqtt_id">MQTT ID</label><input type="text" id="re-mqttname"></div>
+      <div class="field"><label data-i18n="reg_type">Type</label>
+        <select id="re-registertype">
+          <option value="3">Holding register</option>
+          <option value="4">Input register</option>
+          <option value="1">Coil</option>
+          <option value="2">Discrete input</option>
+        </select>
+      </div>
+      <div class="field"><label data-i18n="reg_addr">Modbus address</label><input type="text" id="re-modbusaddress" placeholder="0"></div>
+      <div class="field config-bool"><label data-i18n="reg_readonly">Readonly</label><input type="checkbox" id="re-readonly"></div>
+      <div class="field"><label data-i18n="reg_category">Category</label>
+        <select id="re-category">
+          <option value="value">value</option>
+          <option value="diagnostic">diagnostic</option>
+          <option value="config">config</option>
+        </select>
+        <span class="field-hint" data-i18n="reg_category_hint">value → MQTT/HA · config → device configuration (not published)</span>
+      </div>
+      <div class="field reg-condition"><label data-i18n="reg_cond">Condition (optional)</label>
+        <div class="reg-condition-rows" id="re-cond-rows"><!-- one row per condition, populated by JS --></div>
+        <button type="button" class="btn btn-sm" id="re-cond-add" data-i18n="add_condition">Add condition</button>
+        <span class="field-hint" data-i18n="reg_cond_hint">Register is only available when ALL conditions match. E.g. 501.0 = 1 → active if bit 0 of register 501 is set. Multiple conditions are AND-combined.</span>
+      </div>
+      <div class="field"><label data-i18n="reg_value_desc">Value description</label><input type="text" id="re-value-desc" placeholder="e.g. Temperature in °C / 0=off 1=on"></div>
+      <div class="field"><label data-i18n="reg_converter">Converter</label>
+        <select id="re-converter">
+          <option value="number">number</option>
+          <option value="text">text</option>
+          <option value="select">select</option>
+          <option value="binary">binary</option>
+          <option value="value">value</option>
+        </select>
+      </div>
+      <div class="reg-conv reg-conv-number" id="reg-conv-number">
+        <div class="field"><label data-i18n="reg_multiplier">Multiplier</label><input type="text" id="re-multiplier" placeholder="1"></div>
+        <div class="field"><label data-i18n="reg_offset">Offset</label><input type="text" id="re-offset" placeholder="0"></div>
+        <div class="field"><label data-i18n="reg_decimals">Decimals</label><input type="text" id="re-decimals" placeholder="1"></div>
+        <div class="field"><label data-i18n="reg_number_format">Number format</label>
+          <select id="re-numberformat">
+            <option value="0">default</option>
+            <option value="1">float32</option>
+            <option value="2">signedInt16</option>
+            <option value="3">signedInt32</option>
+            <option value="4">unsignedInt32</option>
+          </select>
+        </div>
+        <div class="field"><label data-i18n="reg_uom">Unit</label><input type="text" id="re-uom" placeholder="V"></div>
+        <div class="field"><label data-i18n="reg_device_class">Device class</label><input type="text" id="re-deviceclass" placeholder="voltage"></div>
+        <div class="field"><label data-i18n="reg_state_class">State class</label>
+          <select id="re-stateclass">
+            <option value="">—</option>
+            <option value="1">measurement</option>
+            <option value="2">total</option>
+            <option value="3">total_increasing</option>
+          </select>
+        </div>
+        <div class="field"><label data-i18n="reg_min">Min (identification)</label><input type="text" id="re-min" placeholder=""></div>
+        <div class="field"><label data-i18n="reg_max">Max (identification)</label><input type="text" id="re-max" placeholder=""></div>
+        <div class="field"><label data-i18n="reg_step">Step</label><input type="text" id="re-step" placeholder=""></div>
+        <div class="field config-bool"><label data-i18n="reg_swap_words">Swap words</label><input type="checkbox" id="re-swapwords"></div>
+        <div class="field config-bool"><label data-i18n="reg_swap_bytes">Swap bytes</label><input type="checkbox" id="re-swapbytes"></div>
+      </div>
+      <div class="reg-conv reg-conv-text" id="reg-conv-text">
+        <div class="field"><label data-i18n="reg_stringlength">String length</label><input type="text" id="re-stringlength" placeholder="2"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="regedit-cancel" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-primary" id="regedit-ok" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="img-pop" class="img-pop" hidden>
+  <img id="img-pop-img" src="" alt="">
+</div>
+
+<!-- Server file browser: pick a certificate/key file from the ssl directory -->
+<div class="modal-overlay" id="filebrowse-overlay" hidden>
+  <div class="modal modal-config modal-sm">
+    <h3 id="filebrowse-title" data-i18n="cfg_browse_files">Browse server files</h3>
+    <div class="filebrowse-list" id="filebrowse-list"></div>
+    <div class="modal-actions">
+      <button class="btn" id="filebrowse-cancel" data-i18n="cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="lang/en.js"></script>
+<script src="lang/de.js"></script>
+<script src="lang/fr.js"></script>
+<script src="lang/it.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

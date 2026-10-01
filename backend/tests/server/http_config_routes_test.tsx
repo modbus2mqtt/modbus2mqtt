@@ -63,25 +63,22 @@ describe(apiUri.configuration, () => {
 })
 
 describe('GET ' + apiUri.sslFiles, () => {
-  it('lists files in the ssl directory', async () => {
+  it('lists files with the browsed root', async () => {
     const response = await ts.request().get(apiUri.sslFiles).expect(200)
-    expect(Array.isArray(response.body)).toBeTruthy()
+    expect(Array.isArray(response.body.files)).toBeTruthy()
+    expect(typeof response.body.root).toBe('string')
+    expect(response.body.root.length).toBeGreaterThan(0)
   })
-  it('returns 404 when no ssl directory is configured', async () => {
+  it('falls back to config dir when no ssl directory is configured', async () => {
     const oldSslDir = ConfigPersistence.sslDir
     ConfigPersistence.sslDir = ''
     try {
-      // body is plain text ('not found') despite the json content type — parse raw
-      await ts
-        .request()
-        .get(apiUri.sslFiles)
-        .parse((res, cb) => {
-          let data = ''
-          res.setEncoding('utf8')
-          res.on('data', (chunk) => (data += chunk))
-          res.on('end', () => cb(null, data))
-        })
-        .expect(HttpErrorsEnum.ErrNotFound)
+      const response = await ts.request().get(apiUri.sslFiles).expect(200)
+      // Test server runs with a populated config-dir fixture, so the fallback
+      // must surface real files rather than a 404 or an empty list.
+      expect(Array.isArray(response.body.files)).toBeTruthy()
+      expect(response.body.files.length).toBeGreaterThan(0)
+      expect(response.body.root).toContain('config-dir')
     } finally {
       ConfigPersistence.sslDir = oldSslDir
     }
@@ -115,4 +112,53 @@ test('POST ' + apiUri.translate + ' is not implemented', async () => {
 test('GET ' + apiUri.serialDevices + ' returns a device list', async () => {
   const response = await ts.request().get(apiUri.serialDevices).expect(200)
   expect(Array.isArray(response.body)).toBeTruthy()
+})
+
+test('POST configuration with changed mqttdiscoverylanguage republishes discovery immediately', async () => {
+  // Spy on the discovery republish so we can assert it gets invoked for the
+  // subscribed slaves without depending on the exact fixture topics.
+  const disc = (await import('../../src/server/mqttdiscover.js')).MqttDiscover
+  const republishSpy = vi.spyOn(disc.getInstance(), 'republishDiscoveryIfChanged').mockImplementation(() => {})
+
+  const oldConfig = Config.getConfiguration()
+  try {
+    const config = { ...oldConfig, mqttdiscoverylanguage: oldConfig.mqttdiscoverylanguage === 'de' ? 'en' : 'de' }
+    await ts.request().post(apiUri.configuration).send(config).expect(HttpErrorsEnum.OkNoContent)
+    expect(Config.getConfiguration().mqttdiscoverylanguage).toBe(config.mqttdiscoverylanguage)
+    expect(republishSpy).toHaveBeenCalled()
+  } finally {
+    republishSpy.mockRestore()
+    new Config().writeConfiguration(oldConfig)
+  }
+})
+
+test('POST configuration without language change does not republish discovery', async () => {
+  const disc = (await import('../../src/server/mqttdiscover.js')).MqttDiscover
+  const republishSpy = vi.spyOn(disc.getInstance(), 'republishDiscoveryIfChanged').mockImplementation(() => {})
+
+  const oldConfig = Config.getConfiguration()
+  try {
+    const config = { ...oldConfig } // same language
+    await ts.request().post(apiUri.configuration).send(config).expect(HttpErrorsEnum.OkNoContent)
+    expect(republishSpy).not.toHaveBeenCalled()
+  } finally {
+    republishSpy.mockRestore()
+    new Config().writeConfiguration(oldConfig)
+  }
+})
+
+test('POST configuration persists debugComponents string round-trip', async () => {
+  const oldConfig = Config.getConfiguration()
+  try {
+    const config = { ...oldConfig, debugComponents: 'mqtt,modbus,discovery' }
+    await ts.request().post(apiUri.configuration).send(config).expect(HttpErrorsEnum.OkNoContent)
+    // Re-reading must succeed (no secret-corruption YAML error) and the value
+    // must round-trip. Regression: saving any config used to corrupt
+    // mqttuser/password with embedded quotes, breaking the next read.
+    const fresh = new Config()
+    await fresh.readYamlAsync()
+    expect(Config.getConfiguration().debugComponents).toBe('mqtt,modbus,discovery')
+  } finally {
+    new Config().writeConfiguration(oldConfig)
+  }
 })

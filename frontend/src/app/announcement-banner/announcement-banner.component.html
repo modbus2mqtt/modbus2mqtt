@@ -19,7 +19,7 @@
               <div class="announcement-message" [innerHTML]="announcement.messageHtml"></div>
             </div>
             <div class="announcement-close">
-              <button mat-icon-button matTooltip="Dismiss" (click)="dismiss(announcement.id)">
+              <button mat-icon-button [matTooltip]="t('ann.dismiss')" (click)="dismiss(announcement.id)">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -29,7 +29,7 @@
     }
     @if (announcements.length > 1) {
       <div class="dismiss-all">
-        <button mat-icon-button matTooltip="Dismiss all announcements" (click)="dismissAll()">
+        <button mat-icon-button [matTooltip]="t('ann.dismissAll')" (click)="dismissAll()">
           <mat-icon>done_all</mat-icon>
         </button>
       </div>

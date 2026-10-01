@@ -27,29 +27,78 @@ afterAll(() => {
 
 describe('listSslFiles (recursive)', () => {
   it('lists top-level certificate files', () => {
-    const files = new ConfigPersistence().listSslFiles()
+    const r = new ConfigPersistence().listSslFiles()
+    const files = r.files
     expect(files).toContain('fullchain.pem')
     expect(files).toContain('privkey.pem')
   })
 
   it('lists certificates in subdirectories as relative forward-slash paths', () => {
-    const files = new ConfigPersistence().listSslFiles()
+    const r = new ConfigPersistence().listSslFiles()
+    const files = r.files
     expect(files).toContain('mtls/client.pem')
     expect(files).toContain('mtls/client.key')
   })
 
   it('does not include directory entries themselves', () => {
-    const files = new ConfigPersistence().listSslFiles()
+    const r = new ConfigPersistence().listSslFiles()
+    const files = r.files
     expect(files).not.toContain('mtls')
   })
 
-  it('returns empty array when sslDir is not set', () => {
-    const saved = ConfigPersistence.sslDir
-    ConfigPersistence.sslDir = ''
+  it('follows symlinks to files (Home Assistant /ssl style)', () => {
+    fs.symlinkSync(join(tempSslDir, 'fullchain.pem'), join(tempSslDir, 'alias.pem'))
+    fs.symlinkSync('/etc/hostname', join(tempSslDir, 'hostlink'))
     try {
-      expect(new ConfigPersistence().listSslFiles()).toEqual([])
+      const r = new ConfigPersistence().listSslFiles()
+    const files = r.files
+      expect(files).toContain('alias.pem')
+      expect(files).toContain('hostlink')
     } finally {
-      ConfigPersistence.sslDir = saved
+      fs.rmSync(join(tempSslDir, 'alias.pem'), { force: true })
+      fs.rmSync(join(tempSslDir, 'hostlink'), { force: true })
+    }
+  })
+
+  it('skips dangling symlinks without crashing', () => {
+    fs.symlinkSync(join(tempSslDir, 'missing-target.pem'), join(tempSslDir, 'dangling.pem'))
+    try {
+      const r = new ConfigPersistence().listSslFiles()
+    const files = r.files
+      expect(files).not.toContain('dangling.pem')
+    } finally {
+      fs.rmSync(join(tempSslDir, 'dangling.pem'), { force: true })
+    }
+  })
+
+  it('does not loop forever on a symlink cycle', () => {
+    fs.mkdirSync(join(tempSslDir, 'loop'), { recursive: true })
+    fs.symlinkSync(tempSslDir, join(tempSslDir, 'loop', 'back'))
+    try {
+      // Must terminate and still list the real files.
+      const r = new ConfigPersistence().listSslFiles()
+    const files = r.files
+      expect(files).toContain('fullchain.pem')
+    } finally {
+      fs.rmSync(join(tempSslDir, 'loop'), { recursive: true, force: true })
+    }
+  })
+
+  it('falls back to config dir when sslDir is empty', () => {
+    const savedSsl = ConfigPersistence.sslDir
+    const savedConfig = ConfigPersistence.configDir
+    ConfigPersistence.sslDir = ''
+    // The config dir from the test fixtures always has files (modbus2mqtt.yaml etc).
+    ConfigPersistence.configDir = join(tempSslDir, 'cfg')
+    fs.mkdirSync(ConfigPersistence.configDir, { recursive: true })
+    fs.writeFileSync(join(ConfigPersistence.configDir, 'modbus2mqtt.yaml'), 'x: 1')
+    try {
+      const r = new ConfigPersistence().listSslFiles()
+      expect(r.files).toContain('modbus2mqtt.yaml')
+      expect(r.root).toBe(ConfigPersistence.configDir)
+    } finally {
+      ConfigPersistence.sslDir = savedSsl
+      ConfigPersistence.configDir = savedConfig
     }
   })
 })

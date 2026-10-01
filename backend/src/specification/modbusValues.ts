@@ -12,6 +12,7 @@ import {
 } from '../shared/specification/index.js'
 import { ConfigSpecification } from './configspec.js'
 import { ConverterMap } from './convertermap.js'
+import { entityConditions, isEntityActiveByValues } from './conditions.js'
 import { LogLevelEnum, Logger } from './log.js'
 
 const log = new Logger('m2mSpecification')
@@ -105,6 +106,16 @@ export function copyModbusDataToEntity(spec: Ispecification, entityId: number, v
   const entity = spec.entities.find((ent) => entityId == ent.id)
   if (entity) {
     const rc: ImodbusEntity = structuredClone(entity) as ImodbusEntity
+    // A conditional entity that is NOT active on the device (any of its
+    // conditions not met) must be reported as inactive even when the register it
+    // maps to shares an address with an active variant (e.g. the WRF06
+    // temperature register 0 selected by register 400 = SI/Imperial).
+    if (entityConditions(entity).length > 0 && !isEntityActiveByValues(entity, values)) {
+      rc.mqttValue = ''
+      rc.modbusValue = []
+      rc.identified = IdentifiedStates.notIdentified
+      return rc
+    }
     const converter = ConverterMap.getConverter(entity)
     if (converter) {
       if (entity.modbusAddress != undefined) {

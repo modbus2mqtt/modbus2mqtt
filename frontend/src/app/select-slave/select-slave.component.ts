@@ -12,6 +12,7 @@ import {
 import { MatListModule } from '@angular/material/list'
 
 import { ApiService } from '../services/api-service'
+import { TranslationService } from '../services/translation.service'
 import {
   getSpecificationI18nName,
   SpecificationStatus,
@@ -226,6 +227,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
 
   // Common schedules offered in the preset dropdown ('' = no schedule, use the interval).
   readonly pollScheduleCustom = '__custom__'
+  t = (key: string) => this.translation.map()[key] ?? key
   readonly pollSchedulePresets: { label: string; value: string }[] = [
     { label: 'No schedule (use interval)', value: '' },
     { label: 'Every 5 min (:00, :05, …)', value: '*/5 * * * *' },
@@ -234,7 +236,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     { label: 'Every full hour (:00)', value: '0 * * * *' },
     { label: 'Every 6 h (00, 06, 12, 18:00)', value: '0 */6 * * *' },
     { label: 'Every day at 06:00', value: '0 6 * * *' },
-    { label: 'Every day at midnight', value: '0 0 * * *' },
+    { label: this.t('slave.everyDayMidnight'), value: '0 0 * * *' },
   ]
 
   // Maps a cron string to the matching preset value, or the "custom" sentinel for anything else.
@@ -302,7 +304,7 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     return this.slaveNewForm.get('detectSpec')?.value == true
       ? 'If there is exactly one specification matching to the modbus data for this slave, ' +
           'the specification will be selected automatically'
-      : 'Please set the specification for the new slave after adding it'
+      : this.t('slave.setSpecAfterAdd')
   }
   keyDown(event: Event, fg: FormGroup) {
     if ((event.target as HTMLInputElement).name == 'slaveId') this.addSlave(fg)
@@ -319,7 +321,8 @@ export class SelectSlaveComponent extends SessionStorage implements OnInit {
     private route: ActivatedRoute,
     private entityApiService: ApiService,
     private routes: Router,
-    private clipboard: Clipboard
+    private clipboard: Clipboard,
+    private translation: TranslationService
   ) {
     super()
     this.slaveNewForm = this._formBuilder.group({

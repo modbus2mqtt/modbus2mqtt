@@ -239,8 +239,20 @@ describe('POST ' + apiUri.uploadSpec, () => {
 })
 
 describe('POST ' + apiUri.specfication, () => {
-  it('fails without busid/slaveid', async () => {
-    await ts.request().post(apiUri.specfication).send(spec).parse(rawText).expect(HttpErrorsEnum.ErrBadRequest)
+  it('saves a template without busid/slaveid (public template clone / standalone edit)', async () => {
+    const standalone: ImodbusSpecification = {
+      ...spec,
+      filename: 'standalone-template',
+      status: SpecificationStatus.new,
+    }
+    await ts
+      .request()
+      .post(apiUri.specfication + '?originalFilename=standalone-template')
+      .send(standalone)
+      .expect(HttpErrorsEnum.OkCreated)
+    const written = ConfigSpecification.getSpecificationByFilename('standalone-template')
+    expect(written).toBeDefined()
+    expect(written!.entities.length).toBe(1)
   })
   it('add new Specification rename device.specification', async () => {
     ConfigBus['listeners'] = []
@@ -291,14 +303,31 @@ describe('DELETE ' + apiUri.specfication, () => {
   it('fails without spec parameter', async () => {
     await ts.request().delete(apiUri.specfication).parse(rawText).expect(HttpErrorsEnum.ErrBadRequest)
   })
-  it('deletes a specification and clears slave references', async () => {
-    // create a spec to delete
+  it('blocks deletion of a spec that is in use by a slave (409)', async () => {
+    const specToDelete: ImodbusSpecification = { ...spec, filename: 'inuse-test' }
+    // attach it to slave 2 of bus 0 (clone-on-save from the device editor)
+    await ts
+      .request()
+      .post(apiUri.specfication + '?busid=0&slaveid=2&originalFilename=inuse-test')
+      .send(specToDelete)
+      .expect(HttpErrorsEnum.OkCreated)
+    const res = await ts
+      .request()
+      .delete(apiUri.specfication + '?spec=inuse-test')
+      .parse(rawText)
+      .expect(HttpErrorsEnum.ErrConflict)
+    expect(String(res.body)).toContain('in use')
+    // spec still exists
+    expect(ConfigSpecification.getSpecificationByFilename('inuse-test')).toBeDefined()
+  })
+  it('deletes a specification that is not in use', async () => {
     const specToDelete: ImodbusSpecification = { ...spec, filename: 'deletetest' }
     await ts
       .request()
-      .post(apiUri.specfication + '?busid=0&slaveid=2&originalFilename=deletetest')
+      .post(apiUri.specfication + '?originalFilename=deletetest')
       .send(specToDelete)
       .expect(HttpErrorsEnum.OkCreated)
     await ts.request().delete(apiUri.specfication + '?spec=deletetest').expect(200)
+    expect(ConfigSpecification.getSpecificationByFilename('deletetest')).toBeUndefined()
   })
 })

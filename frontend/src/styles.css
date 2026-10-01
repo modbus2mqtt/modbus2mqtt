@@ -1,270 +1,805 @@
-@import '@angular/material/prebuilt-themes/deeppurple-amber.css';
+/* ============================================================
+   Modbus2MQTT — Cosmos-style UI (dark + light)
+   Design tokens mirror HA_enoceanmqtt, which in turn
+   mirrors Cosmos Cloud (azukaar/Cosmos-Server):
+   - dark background #141414 / cards rgba(30,30,30,0.65) glass
+   - light background #f4f5f7 / white cards
+   - accents (Asera brand): primary #B01419, secondary #690C0F
+   - radius 8-12px, Public Sans typography
+   The active theme is selected with data-theme on <html>; a tiny
+   inline script in index.html picks it from localStorage or
+   prefers-color-scheme.
+   ============================================================ */
+@import '@angular/material/prebuilt-themes/azure-blue.css';
 @import 'https://fonts.googleapis.com/icon?family=Material+Icons';
 
-/* You can add global styles to this file, and also import other style files */
+/* ============================ tokens ============================ */
+/* Design tokens used across the whole app (mirror HA_enoceanmqtt) */
+:root,
+:root[data-theme="dark"] {
+  --bg: #141414;
+  --bg-paper: rgba(30, 30, 30, 0.65);
+  --bg-hover: rgba(40, 40, 40, 0.85);
+  --bg-surface: rgba(255, 255, 255, 0.04);
+  --bg-elevated: #1e1e1e;
+  --bg-input: rgba(0, 0, 0, 0.35);
+  --bg-topbar: rgba(20, 20, 20, 0.85);
+  --overlay: rgba(0, 0, 0, 0.6);
+  --slider-bg: rgba(255, 255, 255, 0.12);
+  --slider-knob: #fff;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #ffffff;
+  --text-secondary: #bfbfbf;
+  --text-muted: #8c8c8c;
+  --primary: #b01419;
+  --secondary: #690c0f;
+  --primary-text: #ff8890;   /* light red for dark bg (readable text/icon on primary-fill) */
+  --primary-contrast: #ffffff; /* white text on filled primary buttons */
+  --gradient: linear-gradient(135deg, #b01419, #690c0f);
+  --success: #54d62c;
+  --danger: #ff4d4f;
+  --warning: #faad14;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f5f7;
+  --bg-paper: rgba(255, 255, 255, 0.85);
+  --bg-hover: rgba(0, 0, 0, 0.05);
+  --bg-surface: rgba(0, 0, 0, 0.04);
+  --bg-elevated: #ffffff;
+  --bg-input: rgba(255, 255, 255, 0.8);
+  --bg-topbar: rgba(255, 255, 255, 0.85);
+  --overlay: rgba(0, 0, 0, 0.4);
+  --slider-bg: rgba(0, 0, 0, 0.18);
+  --slider-knob: #fff;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --text: #1c1c1e;
+  --text-secondary: #55555a;
+  --text-muted: #8e8e93;
+  --primary: #b01419;
+  --secondary: #690c0f;
+  --primary-text: #b01419;   /* dark red text on light bg */
+  --primary-contrast: #ffffff;
+  --gradient: linear-gradient(135deg, #b01419, #690c0f);
+  --success: #2e9e2e;
+  --danger: #e03131;
+  --warning: #b8870b;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ============ Angular Material M3 token remapping ============
+   Azure-blue is the base (light) theme. We re-map ALL of its
+   --mat-sys-* tokens to the Cosmos/Asera palette, and additionally
+   provide a dark token set for [data-theme="dark"]. */
+:root,
+:root[data-theme="light"] {
+  --mat-sys-background: #f4f5f7;
+  --mat-sys-on-background: #1c1c1e;
+  --mat-sys-surface: #f4f5f7;
+  --mat-sys-on-surface: #1c1c1e;
+  --mat-sys-on-surface-variant: #55555a;
+  --mat-sys-surface-dim: #e9eaec;
+  --mat-sys-surface-bright: #f4f5f7;
+  --mat-sys-surface-container-lowest: #ffffff;
+  --mat-sys-surface-container-low: #f0f1f3;
+  --mat-sys-surface-container: #ececee;
+  --mat-sys-surface-container-high: #e6e6e8;
+  --mat-sys-surface-container-highest: #e0e0e3;
+  --mat-sys-surface-variant: #e4e4e7;
+  --mat-sys-surface-tint: #b01419;
+  --mat-sys-primary: #b01419;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #f8d8d9;
+  --mat-sys-on-primary-container: #690c0f;
+  --mat-sys-primary-fixed: #f8d8d9;
+  --mat-sys-primary-fixed-dim: #e6a9ac;
+  --mat-sys-on-primary-fixed: #3d0608;
+  --mat-sys-on-primary-fixed-variant: #690c0f;
+  --mat-sys-inverse-primary: #ffb3b7;
+  --mat-sys-inverse-on-surface: #f4f5f7;
+  --mat-sys-inverse-surface: #2a2a2c;
+  --mat-sys-secondary: #690c0f;
+  --mat-sys-on-secondary: #ffffff;
+  --mat-sys-secondary-container: #f3d3d4;
+  --mat-sys-on-secondary-container: #3d0608;
+  --mat-sys-secondary-fixed: #f3d3d4;
+  --mat-sys-secondary-fixed-dim: #dfa7a9;
+  --mat-sys-on-secondary-fixed: #3d0608;
+  --mat-sys-on-secondary-fixed-variant: #690c0f;
+  --mat-sys-tertiary: #8a5a00;
+  --mat-sys-on-tertiary: #ffffff;
+  --mat-sys-tertiary-container: #ffdf9f;
+  --mat-sys-on-tertiary-container: #4a2f00;
+  --mat-sys-tertiary-fixed: #ffdf9f;
+  --mat-sys-tertiary-fixed-dim: #e6b95e;
+  --mat-sys-on-tertiary-fixed: #4a2f00;
+  --mat-sys-on-tertiary-fixed-variant: #6d4800;
+  --mat-sys-error: #e03131;
+  --mat-sys-on-error: #ffffff;
+  --mat-sys-error-container: #ffdad6;
+  --mat-sys-on-error-container: #7a0e0e;
+  --mat-sys-outline: #7a7678;
+  --mat-sys-outline-variant: #d0c8ca;
+  --mat-sys-scrim: rgba(0, 0, 0, 0.4);
+  --mat-sys-shadow: #000000;
+  --mat-sys-neutral-variant20: #8e8e93;
+  --mat-sys-neutral10: #1c1c1e;
+}
+
+:root[data-theme="dark"] {
+  --mat-sys-background: #141414;
+  --mat-sys-on-background: #ffffff;
+  --mat-sys-surface: #141414;
+  --mat-sys-on-surface: #ffffff;
+  --mat-sys-on-surface-variant: #bfbfbf;
+  --mat-sys-surface-dim: #141414;
+  --mat-sys-surface-bright: #2a2a2c;
+  --mat-sys-surface-container-lowest: #0d0d0d;
+  --mat-sys-surface-container-low: #1e1e1e;
+  --mat-sys-surface-container: #242426;
+  --mat-sys-surface-container-high: #2a2a2c;
+  --mat-sys-surface-container-highest: #323234;
+  --mat-sys-surface-variant: #323234;
+  --mat-sys-surface-tint: #ff6f74;
+  --mat-sys-primary: #ff8890;
+  --mat-sys-on-primary: #4a0a0c;
+  --mat-sys-primary-container: #690c0f;
+  --mat-sys-on-primary-container: #ffd9db;
+  --mat-sys-primary-fixed: #ff8890;
+  --mat-sys-primary-fixed-dim: #f2555b;
+  --mat-sys-on-primary-fixed: #4a0a0c;
+  --mat-sys-on-primary-fixed-variant: #690c0f;
+  --mat-sys-inverse-primary: #b01419;
+  --mat-sys-inverse-on-surface: #1c1c1e;
+  --mat-sys-inverse-surface: #f0f1f2;
+  --mat-sys-secondary: #ffb3b7;
+  --mat-sys-on-secondary: #5b0d10;
+  --mat-sys-secondary-container: #690c0f;
+  --mat-sys-on-secondary-container: #ffd9db;
+  --mat-sys-secondary-fixed: #ffb3b7;
+  --mat-sys-secondary-fixed-dim: #d97f84;
+  --mat-sys-on-secondary-fixed: #5b0d10;
+  --mat-sys-on-secondary-fixed-variant: #690c0f;
+  --mat-sys-tertiary: #eebb66;
+  --mat-sys-on-tertiary: #462c00;
+  --mat-sys-tertiary-container: #5a3f0a;
+  --mat-sys-on-tertiary-container: #ffdf9f;
+  --mat-sys-tertiary-fixed: #eebb66;
+  --mat-sys-tertiary-fixed-dim: #cf9c42;
+  --mat-sys-on-tertiary-fixed: #462c00;
+  --mat-sys-on-tertiary-fixed-variant: #5a3f0a;
+  --mat-sys-error: #ff6b6b;
+  --mat-sys-on-error: #5c0a0a;
+  --mat-sys-error-container: #8a1a1a;
+  --mat-sys-on-error-container: #ffdad6;
+  --mat-sys-outline: #8f8a8c;
+  --mat-sys-outline-variant: #4a4547;
+  --mat-sys-scrim: rgba(0, 0, 0, 0.6);
+  --mat-sys-shadow: #000000;
+  --mat-sys-neutral-variant20: #8c8c8c;
+  --mat-sys-neutral10: #ffffff;
+}
+
+/* ================= global ================= */
+* { box-sizing: border-box; }
+
+html,
 body {
-  margin: 10px;
-  padding: 10px;
-  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Public Sans', 'Segoe UI', Roboto, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
 }
 
-.full-width {
-  width: 100%;
+/* Typography: Public Sans everywhere — no element falls back to a
+   different font stack (buttons, inputs, selects, tables, etc). */
+*,
+*::before,
+*::after {
+  font-family: inherit;
 }
 
-.full-height {
-  height: 100%;
+body,
+button,
+input,
+select,
+textarea,
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-outlined-button,
+.mat-mdc-icon-button,
+.mat-mdc-input-element,
+.mat-mdc-select,
+.mat-mdc-option,
+.mat-mdc-table,
+.mat-mdc-cell,
+.mat-mdc-header-cell,
+.mat-mdc-card-title,
+.mat-mdc-card-subtitle,
+.mat-tooltip {
+  font-family: 'Public Sans', 'Segoe UI', Roboto, -apple-system, sans-serif;
+}
+/* Force Material 3 typography tokens to Public Sans (Material's prebuilt
+   azure-blue.css sets them to Roboto; overriding here makes every
+   component — selects, menus, dialog titles, buttons — use our font). */
+:root {
+  --mat-sys-body-large-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-body-medium-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-body-small-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-title-large-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-title-medium-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-title-small-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-label-large-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-label-medium-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-label-small-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-headline-large-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-headline-medium-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-headline-small-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-display-large-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-display-medium-font: 'Public Sans', Roboto, sans-serif;
+  --mat-sys-display-small-font: 'Public Sans', Roboto, sans-serif;
 }
 
-.flex-auto {
-  flex: auto;
+.mat-mdc-select-trigger,
+.mat-mdc-form-field,
+.mat-mdc-dialog-title,
+.mat-mdc-dialog-content,
+.mat-mdc-dialog-actions,
+.mat-mdc-menu-item,
+.mat-mdc-tab,
+.mat-mdc-paginator {
+  font-family: 'Public Sans', 'Segoe UI', Roboto, -apple-system, sans-serif;
 }
 
-.flex-align {
-  align-self: stretch;
+/* slim scrollbars in dark mode */
+:root[data-theme="dark"] * {
+  scrollbar-color: #444 #141414;
 }
 
-.full-number {
-  width: 20%;
+/* ================= Material polish ================= */
+.mat-mdc-card {
+  background: var(--bg-paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  color: var(--text);
 }
 
-.width50pt {
-  width: 50px;
+.mat-mdc-card-title,
+.mat-mdc-card-subtitle {
+  color: var(--text);
 }
 
-.width80pt {
-  width: 80px;
+.mat-mdc-card-subtitle {
+  color: var(--text-secondary);
 }
 
-.width100pt {
-  width: 100px;
+.mat-mdc-card-header {
+  color: var(--text);
 }
 
-.width130pt {
-  width: 100px;
+.mat-expansion-panel {
+  background: var(--bg-paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
 }
 
-.width150pt {
-  width: 150px;
+.mat-expansion-panel-header {
+  color: var(--text);
 }
 
-.width200pt {
-  width: 200px;
+.mat-expansion-panel-header:hover {
+  background: var(--bg-hover);
 }
 
-.width250pt {
-  width: 250px;
+.mat-expansion-panel-body {
+  color: var(--text);
 }
 
-.width300pt {
-  width: 300px;
+.mat-mdc-form-field .mat-mdc-text-field-wrapper {
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
 }
 
-.width350pt {
-  width: 350px;
+.mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
+  border-color: var(--primary);
 }
 
-.width550pt {
-  width: 550px;
+.mat-mdc-input-element,
+.mat-mdc-form-field input,
+.mat-mdc-form-field textarea,
+.mat-mdc-select {
+  color: var(--text);
 }
 
-.clickable {
-  cursor: pointer;
+.mat-mdc-select-panel,
+.mat-mdc-menu-panel {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text);
 }
 
-.centered {
-  margin: 10pt;
-  position: relative;
-  left: 25%;
+.mat-mdc-option {
+  color: var(--text);
 }
 
-.field {
-  margin-left: 10pt;
-  margin-right: 10pt;
-  padding-left: 10pt;
-  padding-right: 10pt;
-  gap: unset;
+.mat-mdc-option.mat-mdc-option-active,
+.mat-mdc-option:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
-.toggleField {
-  margin-top: 10pt;
-  margin-bottom: 20pt;
+.mat-mdc-option.mdc-list-item--selected {
+  color: var(--primary);
 }
 
-.smallfield {
-  margin-left: 1pt;
-  margin-right: 1pt;
-  padding-left: 3pt;
-  padding-right: 3pt;
-  gap: unset;
+/* tables */
+.mat-mdc-table {
+  background: transparent;
+  color: var(--text);
 }
 
-.nodistance {
-  margin: 0pt;
-  padding: 0pt;
-  gap: unset;
+.mat-mdc-row {
+  border-top-color: var(--border);
+  border-bottom-color: var(--border);
 }
 
-.flexrows {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  column-gap: 10pt;
+.mat-mdc-row:hover {
+  background: var(--bg-hover);
 }
 
-.flexrowsWrapWhenSmall {
-  display: flex;
-  flex-direction: row;
+.mat-mdc-header-cell {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 11.5px;
+  letter-spacing: 0.5px;
 }
 
-.flexrowsNoWrap {
-  display: flex;
-  flex-direction: row;
+.mat-mdc-cell {
+  color: var(--text);
+  border-bottom-color: var(--border);
 }
 
-@media (max-width: 800pt) {
-  .flexrows {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .flexrowsWrapWhenSmall {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
+.mat-sort-header-arrow {
+  color: var(--text-muted);
 }
 
-.card-header-buttons {
-  right: 0;
-  top: -1pt;
-  position: absolute;
-  z-index: 7;
+/* tabs */
+.mat-mdc-tab-bar {
+  background: transparent;
 }
 
-.card {
-  column-gap: 30pt;
-  margin: 5pt;
+.mat-mdc-tab {
+  color: var(--text-secondary);
 }
 
-.flexcolumns {
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  width: 100%;
-  flex-wrap: nowrap;
+.mat-mdc-tab.mat-mdc-tab--active,
+.mat-mdc-tab:hover {
+  color: var(--text);
 }
 
-.flexcols {
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  width: auto;
+.mat-mdc-tab-indicator .mat-mdc-tab-indicator__content--underline {
+  border-color: var(--primary);
 }
 
-.nextButton {
-  position: fixed;
-  bottom: 10pt;
-  right: 10pt;
-  z-index: 3;
-}
-
-.border {
-  margin: 10pt;
-  height: 23pt;
-  width: 150pt;
-}
-.bordervisible {
-  border-color: lightgray;
-}
-.downloadLabel {
-  color: white;
-  width: 180pt;
-  height: 44px;
-  text-align: left;
-  border-radius: 21.5px;
-  background-color: #db202f;
-  padding: 8px 16px;
-  cursor: pointer;
-  text-align: center;
-  align-items: center;
-}
-.downloadLink {
-  margin: 10pt;
-}
-.backButton {
-  position: fixed;
-  bottom: 5pt;
-  left: 10pt;
-  z-index: 3;
-}
-
-.saveCancel {
-  display: flex;
-  flex-direction: row;
-  margin-top: 1px;
-  margin-right: 2px;
-  position: fixed;
-  z-index: 11;
-  top: 0.5em;
-  right: 0;
-}
-
-.errorText {
-  color: red;
-  font-weight: bold;
-  animation: blinker 2s linear infinite;
-}
-
-.errorTextNoBlink {
-  color: red;
-  font-weight: bold;
-  overflow-wrap: anywhere;
-}
-
-@keyframes blinker {
-  50% {
-    opacity: 0;
-  }
-}
-
-.menuButton {
-  display: flex;
-  flex-direction: row;
-}
-
-.greenIcon {
-  color: green;
-  margin-right: 10pt;
-}
-
-.redIcon {
-  color: red;
-  margin-right: 10pt;
-}
-
-.waitCursor {
-  cursor: wait;
-}
-
-.inline {
-  display: inline-block;
-}
-
-.gallery {
-  width: 220pt;
-}
-
-.margins {
-  margin-top: 5pt;
-  margin-bottom: 10pt;
-}
-
-.marginsall {
-  margin: 15pt;
-}
-
-.tooltip-class {
+/* tooltips */
+.mat-mdc-tooltip,
+.mat-tooltip {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
   white-space: pre-line;
 }
+
+/* dialog / snackbar */
+.mat-mdc-dialog-container,
+.mat-mdc-dialog-surface {
+  background: var(--bg-elevated) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.mat-snack-bar-container,
+.mat-mdc-snack-bar-container {
+  background: var(--bg-elevated) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* ================= buttons =================
+   Consistent height, radius and typography. Filled primary buttons use
+   the readable on-primary contrast colour (white), flat/text primary
+   uses --primary-text (light red in dark mode) so nothing is unreadable.
+*/
+.mat-mdc-icon-button,
+.mat-mdc-button {
+  color: var(--text-secondary);
+  border-radius: var(--radius);
+}
+
+.mat-mdc-icon-button.mat-primary,
+.mat-mdc-button.mat-primary {
+  color: var(--primary-text);
+}
+
+.mat-mdc-icon-button.mat-warn,
+.mat-mdc-button.mat-warn {
+  color: var(--danger);
+}
+
+.mat-mdc-unelevated-button.mat-primary,
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-fab.mat-primary,
+.mat-mdc-extended-fab.mat-primary {
+  color: var(--primary-contrast);
+  background: var(--primary);
+}
+
+.mat-mdc-unelevated-button.mat-primary:hover,
+.mat-mdc-raised-button.mat-primary:hover,
+.mat-mdc-fab.mat-primary:hover {
+  background: var(--secondary);
+}
+
+.mat-mdc-unelevated-button.mat-warn,
+.mat-mdc-raised-button.mat-warn {
+  color: #ffffff;
+  background: var(--danger);
+}
+
+.mat-mdc-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-raised-button,
+.mat-mdc-outlined-button {
+  min-height: 36px;
+  font-size: 13.5px;
+  letter-spacing: 0;
+  border-radius: var(--radius);
+}
+
+/* ================= inputs / selects ================= */
+input,
+select,
+textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  line-height: 1.4;
+  min-height: 40px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(176, 20, 25, 0.18);
+}
+
+select option {
+  background-color: var(--bg-elevated);
+  color: var(--text);
+}
+
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* Material form field polish — taller, consistent, breathing room.
+   The wrapper (the visible box) gets padding so the text/control never
+   touches the 1px border ("fields encroaching the box border"). */
+.mat-mdc-form-field {
+  display: block;
+  margin: 0 0 18px;
+  width: 100%;
+}
+
+.mat-mdc-form-field .mat-mdc-text-field-wrapper {
+  padding: 0 12px;
+  border-radius: var(--radius);
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-infix {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  min-height: 48px;
+}
+
+.mat-mdc-form-field-subscript-wrapper {
+  min-height: 0;
+}
+
+.mat-mdc-form-field .mat-mdc-floating-label {
+  font-size: 13.5px;
+}
+
+.mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
+  border-color: var(--primary);
+}
+
+.mat-mdc-form-field .mat-mdc-input-element,
+.mat-mdc-form-field .mat-mdc-select {
+  padding: 2px 0;
+}
+
+/* Layout spacing — HA_enoceanmqtt cards: radius-lg, generous padding.
+   NOTE: no backdrop-filter here — it forces a GPU re-blur of every card
+   on each focus interaction, causing input lag on low-end devices. */
+.mat-mdc-card,
+.mat-expansion-panel {
+  margin: 0 0 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-paper);
+  box-shadow: var(--shadow);
+}
+
+.mat-mdc-card:hover {
+  border-color: var(--primary);
+}
+
+.mat-mdc-card-header {
+  padding: 18px 22px 6px;
+}
+
+.mat-mdc-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.mat-mdc-card-content {
+  padding: 24px;
+}
+
+.mat-mdc-card-actions {
+  padding: 8px 22px 20px;
+  gap: 10px;
+}
+
+/* Buttons inside card actions get clean separation */
+.mat-mdc-card-actions button,
+.mat-mdc-card-actions .mat-mdc-button,
+.mat-mdc-card-actions .mat-mdc-icon-button {
+  margin-left: 6px;
+}
+
+/* make grid/flex rows not touch edges, give fields breathing room */
+.flexrows,
+.flexcolumns,
+.mat-mdc-card-content > div,
+.mat-mdc-card-content form > div {
+  gap: 16px;
+}
+
+.mat-mdc-card-content .mat-mdc-form-field,
+.mat-mdc-card-content mat-form-field {
+  margin-bottom: 18px;
+}
+
+/* switch */
+.mat-mdc-switch {
+  --mdc-switch-selected-track-color: var(--primary);
+  --mdc-switch-selected-handle-color: #fff;
+  --mdc-switch-unselected-track-color: var(--slider-bg);
+  --mdc-switch-unselected-handle-color: var(--slider-knob);
+}
+
+/* ================= original utility classes ================= */
+.full-width { width: 100%; }
+.full-height { height: 100%; }
+.flex-auto { flex: auto; }
+.flex-align { align-self: stretch; }
+.full-number { width: 20%; }
+.width50pt { width: 50px; }
+.width80pt { width: 80px; }
+.width100pt { width: 100px; }
+.width130pt { width: 100px; }
+.width150pt { width: 150px; }
+.width200pt { width: 200px; }
+.width250pt { width: 250px; }
+.width300pt { width: 300px; }
+.width350pt { width: 350px; }
+.width550pt { width: 550px; }
+.clickable { cursor: pointer; }
+.centered { margin: 10pt; position: relative; left: 25%; }
+.field { margin-left: 10pt; margin-right: 10pt; padding-left: 10pt; padding-right: 10pt; gap: unset; }
+
+/* Small fixed-width fields (150/200/250px) inside cards/panels: add
+   consistent gaps so they never sit flush or overlap. */
+.mat-mdc-form-field.width150pt,
+.mat-mdc-form-field.width200pt,
+.mat-mdc-form-field.width250pt,
+.mat-mdc-form-field.width300pt {
+  margin-right: 12px;
+}
+
+/* ONLY in the slave-settings card: expansion panel body uses flex wrap
+   so the small fields flow with gaps instead of edge-to-edge. */
+app-select-slave .mat-expansion-panel-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  row-gap: 8px;
+  column-gap: 4px;
+  padding-top: 8px;
+}
+.toggleField { margin-top: 10pt; margin-bottom: 20pt; }
+.smallfield { margin-left: 1pt; margin-right: 1pt; padding-left: 3pt; padding-right: 3pt; gap: unset; }
+.nodistance { margin: 0pt; padding: 0pt; gap: unset; }
+.flexrows { display: flex; flex-direction: row; flex-wrap: wrap; column-gap: 10pt; }
+.flexrowsWrapWhenSmall { display: flex; flex-direction: row; }
+.flexrowsNoWrap { display: flex; flex-direction: row; }
+
+@media (max-width: 800pt) {
+  .flexrows { display: flex; flex-direction: row; flex-wrap: wrap; }
+  .flexrowsWrapWhenSmall { display: flex; flex-direction: row; flex-wrap: wrap; }
+}
+
+.card-header-buttons { right: 0; top: -1pt; position: absolute; z-index: 7; }
+.card { column-gap: 30pt; margin: 5pt; }
+.flexcolumns { display: flex; flex-direction: column; height: auto; width: 100%; flex-wrap: nowrap; }
+.flexcols { display: flex; flex-direction: column; height: auto; width: auto; }
+.nextButton { position: fixed; bottom: 10pt; right: 10pt; z-index: 3; }
+.border { margin: 10pt; height: 23pt; width: 150pt; }
+.bordervisible { border-color: lightgray; }
+.downloadLabel { color: white; width: 180pt; height: 44px; text-align: left; border-radius: 21.5px; background-color: #db202f; padding: 8px 16px; cursor: pointer; text-align: center; align-items: center; }
+.downloadLink { margin: 10pt; }
+.backButton { position: fixed; bottom: 5pt; left: 10pt; z-index: 3; }
+.saveCancel { display: flex; flex-direction: row; margin-top: 1px; margin-right: 2px; position: fixed; z-index: 11; top: 0.5em; right: 0; }
+.errorText { color: var(--danger); font-weight: bold; animation: blinker 2s linear infinite; }
+.errorTextNoBlink { color: var(--danger); font-weight: bold; overflow-wrap: anywhere; }
+
+@keyframes blinker {
+  50% { opacity: 0; }
+}
+
+.menuButton { display: flex; flex-direction: row; }
+.greenIcon { color: var(--success); margin-right: 10pt; }
+.redIcon { color: var(--danger); margin-right: 10pt; }
+.waitCursor { cursor: wait; }
+.inline { display: inline-block; }
+.gallery { width: 220pt; }
+.margins { margin-top: 5pt; margin-bottom: 10pt; }
+.marginsall { margin: 15pt; }
+.tooltip-class { white-space: pre-line; }
+
+/* ================= layout & typography polish ================= */
+/* Consistent heading scales */
+h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  margin: 1.25rem 1rem 1rem;
+}
+
+h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 1rem 0 0.75rem;
+}
+
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.5rem;
+}
+
+p {
+  line-height: 1.5;
+}
+
+/* Give the router outlet content a bit more breathing room */
+.topmargin {
+  height: 12px;
+}
+
+/* Cards inside a grid / flex wrap shouldn't stack flush */
+.flexrows {
+  gap: 14px;
+  padding: 0 8px;
+}
+
+/* List rows: comfortable height & hover */
+app-select-modbus mat-card,
+app-select-slave mat-card {
+  margin: 8px;
+}
+
+.mat-mdc-list-item,
+.mat-mdc-row {
+  min-height: 48px;
+}
+
+/* Datatable cells get right padding so text doesn't hug the next column */
+.mat-mdc-cell,
+.mat-mdc-header-cell {
+  padding: 14px 16px;
+  border-bottom-color: var(--border);
+}
+
+.mat-mdc-header-cell {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Dialogs: keep comfortable padding */
+.mat-mdc-dialog-content {
+  padding: 20px 24px;
+}
+
+.mat-mdc-dialog-title {
+  padding: 20px 24px 0;
+}
+
+/* Buttons inside toolbar/card actions get a little separation */
+.mat-mdc-card-actions button,
+.mat-mdc-card-actions .mat-mdc-button,
+.mat-mdc-card-actions .mat-mdc-icon-button {
+  margin-left: 4px;
+}
+
+/* Selection: option spacing */
+.mat-mdc-option {
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+/* Ensure dialog fields always have space below them */
+.mat-mdc-dialog-content mat-form-field {
+  margin-bottom: 24px !important;
+  display: block;
+}
+/* Force a clean "outline" look that prevents label/input overlap */
+.mat-mdc-form-field.mat-form-field-appearance-fill .mat-mdc-text-field-wrapper {
+  background: transparent !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius);
+  padding: 8px 12px !important;
+  min-height: 52px !important;
+}
+
+.mat-mdc-form-field.mat-form-field-appearance-fill .mat-mdc-floating-label {
+  top: 12px !important;
+  color: var(--text-secondary) !important;
+}
+
+.mat-mdc-form-field.mat-form-field-appearance-fill.mat-form-field-should-float .mat-mdc-floating-label {
+  top: 0px !important;
+  font-size: 12px;
+  background: var(--bg-paper);
+  padding: 0 4px;
+}
+

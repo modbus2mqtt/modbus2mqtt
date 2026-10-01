@@ -1,6 +1,7 @@
 import { Slave, PollModes, ModbusTasks, ModbusErrorStates } from '../shared/server/index.js'
 import Debug from 'debug'
 import { LogLevelEnum, Logger } from '../specification/index.js'
+import { ImodbusSpecification } from '../shared/specification/index.js'
 import { Bus } from './bus.js'
 import { Config } from './config.js'
 import { Modbus } from './modbus.js'
@@ -138,7 +139,7 @@ export class MqttPoller {
                   // only have mqttValue after the Modbus read — republish discovery if it
                   // changed so HA sees the real values instead of empty device fields.
                   try {
-                    MqttDiscover.getInstance().republishDiscoveryIfChanged(bs)
+                    MqttDiscover.getInstance().republishDiscoveryIfChanged(bs, spec as ImodbusSpecification)
                   } catch (e) {
                     debug('republishDiscoveryIfChanged failed: ' + (e instanceof Error ? e.message : String(e)))
                   }

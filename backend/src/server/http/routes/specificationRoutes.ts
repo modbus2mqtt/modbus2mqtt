@@ -13,9 +13,9 @@ import {
   IspecificationSummary,
   SpecificationStatus,
 } from '../../../shared/specification/index.js'
-import { Islave, PollModes, apiUri } from '../../../shared/server/index.js'
+import { Islave, apiUri } from '../../../shared/server/index.js'
 import { sendResult } from '../sendResult.js'
-import { ApiError, Registrar, created, ok, requireBusSlave, requireQuery, stripSpecFileData } from '../routeHelpers.js'
+import { ApiError, Registrar, created, ok, requireQuery, stripSpecFileData } from '../routeHelpers.js'
 
 const debug = Debug('httpserver')
 const log = new Logger('httpserver')
@@ -41,7 +41,7 @@ export function registerSpecificationRoutes(r: Registrar): void {
         filename: spec.filename,
         model: spec.model,
         manufacturer: spec.manufacturer,
-        files: spec.files.map((f) => ({ url: f.url, usage: f.usage })),
+        files: spec.files.map((f) => ({ url: f.url, usage: f.usage, lang: f.lang })),
         status: spec.status,
         i18n: spec.i18n,
         pullUrl: spec.pullUrl,
@@ -67,15 +67,15 @@ export function registerSpecificationRoutes(r: Registrar): void {
   r.post(apiUri.specfication, (ctx) => {
     debug('POST /specification: ' + String(ctx.query['busid']) + '/' + String(ctx.query['slaveid']))
     const rd = new ConfigSpecification()
-    let ids: { busid: number; slaveid: number }
-    try {
-      ids = requireBusSlave(ctx)
-    } catch (e) {
-      // this route wraps the validation message in a pseudo JSON object
-      throw new ApiError(HttpErrorsEnum.ErrBadRequest, "{message: '" + (e as Error).message + "'}")
-    }
-    const bus: Bus | undefined = Bus.getBus(ids.busid)
-    const slave: Islave | undefined = bus ? bus.getSlaveBySlaveId(ids.slaveid) : undefined
+    // busid/slaveid are optional: a template can be saved (and a public template
+    // cloned into the local dir) even when no modbus connection/device exists yet.
+    // When given, the referenced slave is repointed to the saved specification —
+    // exactly what the device-register editor needs when cloning a per-device spec.
+    const busidRaw = ctx.query['busid']
+    const slaveidRaw = ctx.query['slaveid']
+    const bus: Bus | undefined = busidRaw !== undefined && busidRaw !== '' ? Bus.getBus(Number.parseInt(busidRaw)) : undefined
+    const slave: Islave | undefined =
+      bus != undefined && slaveidRaw !== undefined && slaveidRaw !== '' ? bus.getSlaveBySlaveId(Number.parseInt(slaveidRaw)) : undefined
 
     const originalFilename: string | null =
       ctx.query['originalFilename'] !== undefined ? String(ctx.query['originalFilename']) : null
@@ -97,17 +97,27 @@ export function registerSpecificationRoutes(r: Registrar): void {
     const rd = new ConfigSpecification()
     if (ctx.query['spec']) {
       const specName = String(ctx.query['spec'])
-      const rc = rd.deleteSpecification(specName)
+      // Block deletion while the template is in use by a device (slave). A slave
+      // uses the spec directly via specificationid, or indirectly when it
+      // references another slave (referenceSlaveId) that carries it.
+      const inUse: string[] = []
       Bus.getBusses().forEach((bus) => {
         bus.getSlaves().forEach((slave) => {
-          // Referencing slaves inherit the specification; clearing it on their root covers them.
-          if (slave.specificationid == specName && slave.referenceSlaveId == undefined) {
-            delete slave.specificationid
-            if (slave.pollMode == undefined) slave.pollMode = PollModes.intervall
-            bus.writeSlave(slave)
+          const owns = slave.specificationid === specName
+          if (owns) {
+            inUse.push('bus ' + bus.getId() + ' / slave ' + slave.slaveid)
+            return
+          }
+          if (slave.referenceSlaveId != undefined) {
+            const ref = bus.getSlaveBySlaveId(slave.referenceSlaveId)
+            if (ref && ref.specificationid === specName) inUse.push('bus ' + bus.getId() + ' / slave ' + slave.slaveid + ' (via ' + ref.slaveid + ')')
           }
         })
       })
+      if (inUse.length > 0) {
+        throw new ApiError(HttpErrorsEnum.ErrConflict, 'Template is in use by: ' + inUse.join(', '))
+      }
+      const rc = rd.deleteSpecification(specName)
       return ok(rc)
     }
     throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'No specification passed')

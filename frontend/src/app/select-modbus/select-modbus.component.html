@@ -1,11 +1,11 @@
-<h1>List of Modbus Controllers</h1>
+<h1>{{ t('bus.listTitle') }}</h1>
 <form [formGroup]="configureModbusFormGroup" novalidate>
   <ng-container formArrayName="bussesFormArray">
     <div class="flexrows">
       @for (bus of busses.data; track $index; let i = $index) {
         <mat-card [formGroup]="getBusFormGroup(i)">
           <mat-card-header
-            ><mat-card-title matTooltip="List or Add Slaves" (click)="listSlaves(i)" class="clickable">{{
+            ><mat-card-title [matTooltip]="t('bus.listSlaves')" (click)="listSlaves(i)" class="clickable">{{
               getConnectionTitle(i)
             }}</mat-card-title>
             <div class="card-header-buttons">
@@ -14,7 +14,7 @@
                   <button
                     mat-icon-button
                     class="material-icons app-toolbar-menu save-button"
-                    matTooltip="Save Changes"
+                    [matTooltip]="t('bus.saveChanges')"
                     (click)="saveBus(i)"
                     color="primary"
                     [disabled]="!needsSaving(i)"
@@ -24,7 +24,7 @@
                   <button
                     mat-icon-button
                     class="material-icons app-toolbar-menu cancel-button"
-                    matTooltip="Cancel Changes"
+                    [matTooltip]="t('bus.cancelChanges')"
                     color="warn"
                     [disabled]="!needsSaving(i)"
                     (click)="cancelBus(i)"
@@ -37,7 +37,7 @@
                     mat-icon-button
                     type="button"
                     class="width100pt material-icons app-toolbar-menu delete-button"
-                    matTooltip="Delete"
+                    [matTooltip]="t('common.delete')"
                     color="warn"
                     (click)="deleteBus(bus)"
                     [disabled]="needsSaving(i)"
@@ -49,7 +49,7 @@
                     type="submit"
                     class="material-icons app-toolbar-menu delete-button"
                     [disabled]="needsSaving(i)"
-                    matTooltip="List or add Slaves"
+                    [matTooltip]="t('bus.listSlaves')"
                     color="primary"
                     (click)="listSlaves(i)"
                   >
@@ -61,7 +61,7 @@
                 <button
                   mat-icon-button
                   class="material-icons app-toolbar-menu cancel-button"
-                  matTooltip="Add Modbus Controller"
+                  [matTooltip]="t('bus.addController')"
                   color="primary"
                   (click)="saveBus(i)"
                   [disabled]="!needsSaving(i) || !addEnabled(i)"
@@ -73,17 +73,17 @@
           </mat-card-header>
           <mat-card-content>
             <mat-tab-group (selectedTabChange)="selectedTypeChanged($event, i)" [selectedIndex]="isRTU(i) ? 0 : 1">
-              <mat-tab label="RTU" formGroupName="rtu">
+              <mat-tab [label]="t('bus.rtu')" formGroupName="rtu">
                 <div class="flexcolumns">
                   <div>
                     @if (getSerialDevices().length == 0) {
                       <mat-form-field>
-                        <mat-label>Modbus Serial Device</mat-label>
+                        <mat-label>{{ t('bus.serialDevice') }}</mat-label>
                         <input #serial matInput formControlName="serial" />
                       </mat-form-field>
                     } @else {
                       <mat-form-field>
-                        <mat-label>Serial Port</mat-label>
+                        <mat-label>{{ t('bus.serialPort') }}</mat-label>
                         <mat-select matInput formControlName="serial">
                           @for (device of getSerialDevices(bus); track $index) {
                             <mat-option [value]="device">{{ device }}</mat-option>
@@ -94,7 +94,7 @@
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>Baud Rate</mat-label>
+                      <mat-label>{{ t('bus.baudRate') }}</mat-label>
                       <mat-select matInput formControlName="selectBaudRate">
                         @for (baudRate of baudRates; track $index) {
                           <mat-option [value]="baudRate">{{ baudRate }}</mat-option>
@@ -104,7 +104,7 @@
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>Data Bits</mat-label>
+                      <mat-label>{{ t('bus.dataBits') }}</mat-label>
                       <mat-select
                         matInput
                         formControlName="dataBits"
@@ -118,7 +118,7 @@
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>Parity</mat-label>
+                      <mat-label>{{ t('bus.parity') }}</mat-label>
                       <mat-select
                         matInput
                         formControlName="parity"
@@ -132,7 +132,7 @@
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>Stop Bits</mat-label>
+                      <mat-label>{{ t('bus.stopBits') }}</mat-label>
                       <mat-select matInput formControlName="stopBits">
                         @for (stopBits of stopBitsOptions; track $index) {
                           <mat-option [value]="stopBits">{{ stopBits }}</mat-option>
@@ -142,40 +142,40 @@
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>Timeout</mat-label>
+                      <mat-label>{{ t('bus.timeout') }}</mat-label>
                       <input type="number" matInput formControlName="timeout" />
                     </mat-form-field>
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>TCP Bridge Port</mat-label>
+                      <mat-label>{{ t('bus.tcpBridgePort') }}</mat-label>
                       <input
                         type="number"
                         matInput
                         formControlName="tcpBridgePort"
-                        matTooltip="Leer lassen, um die TCP-Bridge zu deaktivieren"
+                        [matTooltip]="t('bus.tcpBridgeHint')"
                       />
                     </mat-form-field>
                   </div>
                 </div>
               </mat-tab>
-              <mat-tab label="TCP" formGroupName="tcp">
+              <mat-tab [label]="t('bus.tcp')" formGroupName="tcp">
                 <div class="flexcolumns">
                   <div>
                     <mat-form-field>
-                      <mat-label>Host</mat-label>
+                      <mat-label>{{ t('bus.host') }}</mat-label>
                       <input #host matInput formControlName="host" />
                     </mat-form-field>
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>Port</mat-label>
+                      <mat-label>{{ t('bus.port') }}</mat-label>
                       <input #port matInput formControlName="port" />
                     </mat-form-field>
                   </div>
                   <div>
                     <mat-form-field>
-                      <mat-label>Timeout</mat-label>
+                      <mat-label>{{ t('bus.timeout') }}</mat-label>
                       <input type="number" matInput formControlName="timeout" />
                     </mat-form-field>
                   </div>

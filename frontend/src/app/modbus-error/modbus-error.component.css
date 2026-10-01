@@ -3,15 +3,15 @@
   display: flex;
 }
 .red {
-  color: red;
+  color: var(--danger);
   transform: scale(0.5);
 }
 .yellow {
-  color: yellow;
+  color: var(--warning);
   transform: scale(0.5);
 }
 .green {
-  color: green;
+  color: var(--success);
   transform: scale(0.5);
 }
 .indent {

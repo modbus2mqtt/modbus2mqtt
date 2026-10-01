@@ -20,6 +20,7 @@
     "adm-zip": "^0.5.16",
     "assert": "^2.1.0",
     "async-mutex": "^0.5.0",
+    "bonjour-service": "^1.4.4",
     "bootstrap": "^5.3.3",
     "commander": "^14.0.2",
     "debug": "^4.3.6",
@@ -31,6 +32,7 @@
     "node-html-parser": "^7.0.1",
     "openid-client": "^6.8.3",
     "rxjs": "^7.8.2",
+    "serialport": "^12.0.0",
     "url-parse": "^1.5.10",
     "winston": "^3.18.3",
     "yaml": "^2.5.0"

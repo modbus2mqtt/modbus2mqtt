@@ -14,6 +14,7 @@ import {
 import { Clipboard } from '@angular/cdk/clipboard'
 import { MatSelectionList } from '@angular/material/list'
 import { ApiService } from '../services/api-service'
+import { TranslationService } from '../services/translation.service'
 import { MatTableDataSource } from '@angular/material/table'
 import {
   IBus,
@@ -69,7 +70,8 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
     private entityApiService: ApiService,
     private route: ActivatedRoute,
     private routes: Router,
-    private clipBoard: Clipboard
+    private clipBoard: Clipboard,
+    private translation: TranslationService
   ) {
     this._formBuilder.array([])
     this.bussesObservable = this.entityApiService.getBusses()
@@ -78,6 +80,7 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
       bussesFormArray: this.bussesFormArray,
     })
   }
+  t = (key: string) => this.translation.map()[key] ?? key
   displayedBusIdColumns: string[] = ['select', 'busid', 'connectionData', 'deviceCount']
   busname: string | undefined = undefined
   paramSubscription: Subscription | undefined = undefined

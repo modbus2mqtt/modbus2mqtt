@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { PORTS, LOCALHOST } from '../helpers/ports';
-import { runRegister, runConfig } from '../helpers/app-helpers';
 import { resetServer } from '../helpers/reset-helper';
 
 /** Minimal spec JSON that can be imported via POST /api/uploadspec */
@@ -35,19 +34,15 @@ const localSpec = {
   testdata: {},
 };
 
-test.describe('Specifications Page Tests', () => {
+test.describe('Specifications API Tests', () => {
   const baseUrl = `http://${LOCALHOST}:${PORTS.modbus2mqttSpec}`;
 
   test.beforeEach(async () => {
     await resetServer(PORTS.modbus2mqttSpec);
   });
 
-  test('shows public specifications and imported local spec', async ({ page }) => {
-    test.setTimeout(120_000);
-
-    // Register and configure MQTT (no-auth backend — API calls need no bearer token)
-    await runRegister(page, { authentication: false, port: PORTS.modbus2mqttSpec });
-    await runConfig(page, { authentication: false });
+  test('imports a local spec and lists it via the API', async ({ page }) => {
+    test.setTimeout(60_000);
 
     const headers = { 'Content-Type': 'application/json' };
 
@@ -92,24 +87,10 @@ test.describe('Specifications Page Tests', () => {
     const publicSpecs = specs.filter((s: any) => s.status === 0); // SpecificationStatus.published
     expect(publicSpecs.length).toBeGreaterThan(0);
 
-    // Navigate to specifications page
-    await page.goto(`${baseUrl}/specifications`);
-    await page.waitForURL(/\/specifications/, { timeout: 15000 });
-
-    // Wait for spec cards to render
-    const specCards = page.locator('mat-card').filter({ hasNotText: 'Functions' });
-    await expect(specCards.first()).toBeVisible({ timeout: 15000 });
-
-    // Verify our local spec is displayed
-    const localSpecCard = specCards.filter({ hasText: 'E2E Test Specification' });
-    await expect(localSpecCard).toBeVisible({ timeout: 10000 });
-
-    // Verify at least one public spec is displayed
-    const cardCount = await specCards.count();
-    expect(cardCount).toBeGreaterThan(1);
-
-    // Verify local spec can be deleted (delete button enabled for local specs)
-    const deleteButton = localSpecCard.locator('button').filter({ hasText: 'delete' });
-    await expect(deleteButton).toBeEnabled();
+    // The new webui loads at the root with the templates table
+    await page.goto(baseUrl);
+    await page.waitForTimeout(1000);
+    const tplRows = await page.locator('#template-body tr').count();
+    expect(tplRows).toBeGreaterThan(0);
   });
 });

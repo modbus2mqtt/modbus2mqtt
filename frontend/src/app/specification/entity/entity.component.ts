@@ -935,7 +935,9 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
         const e = this.specificationMethods
           .getNonVariableNumberEntities()
           .find((e) => e.id == this.entity.variableConfiguration!.entityId)
-        return e ? '=>' + e.name : ''
+        if (!e) return ''
+        const localized = this.specificationMethods.getEntityName?.(e.id)
+        return '=>' + (localized || e.name)
       }
     }
     return ''
@@ -946,6 +948,13 @@ export class EntityComponent extends SessionStorage implements AfterViewInit, On
   }
   xxx = [{ id: 4, name: 'ent 4' }]
   getVariableTypeOrEntityNameLabel(): string {
+    // Prefer the localized (i18n) entity name in the current MQTT discovery
+    // language — the spec carries en/de/fr/it texts under 'e<id>', and the raw
+    // `entity.name` is only the English fallback used when no text exists.
+    if (this.entity.id != null && this.specificationMethods) {
+      const localized = this.specificationMethods.getEntityName?.(this.entity.id)
+      if (localized) return localized
+    }
     if (this.entity.name) return this.entity.name
     else if (this.isVariableType()) {
       const type = this.variableTypes.find((e) => e.id == this.entity.variableConfiguration!.targetParameter)

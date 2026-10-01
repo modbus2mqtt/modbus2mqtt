@@ -99,12 +99,44 @@ export class MqttConnector {
         callback(valid, message)
       }
       client.on('error', (e) => {
-        settle(false, connectionData.mqttserverurl + ': ' + e.toString())
+        settle(false, this.humanizeMqttError(e, connectionData.mqttserverurl!))
       })
       client.on('connect', () => {
         settle(true, 'OK')
       })
     } else callback(false, 'no mqttserverlurl passed')
+  }
+
+  /** Map a raw MQTT connection error to a short, human-understandable message. */
+  humanizeMqttError(e: Error, url: string): string {
+    const raw = String(e && (e.message || e)).toLowerCase()
+    const code = (e as NodeJS.ErrnoException).code
+    // Broker rejected the CONNECT with a CONNACK return code.
+    const connackMatch = raw.match(/connection refused: (.+)$/)
+    if (connackMatch) {
+      const reason = connackMatch[1]
+      if (/(bad user|password|not authorized)/.test(reason)) {
+        return `Authentication failed: ${reason.replace(/\.$/, '')}. Check the username and password.`
+      }
+      if (/server unavailable/.test(reason)) return `The broker is temporarily unavailable (${reason}). Try again later.`
+      return `Connection rejected by the broker: ${reason}`
+    }
+    if (code === 'ECONNREFUSED' || raw.includes('econnrefused')) {
+      return `Connection refused at ${url} — the broker is not reachable or is not running on that port.`
+    }
+    if (code === 'ENOTFOUND' || raw.includes('enotfound')) {
+      return `Host not found: ${url}. Check the server address or DNS.`
+    }
+    if (code === 'ETIMEDOUT' || raw.includes('etimedout') || raw.includes('timeout')) {
+      return `Connection timed out at ${url} — no response within 5s. Check the address, port and firewall.`
+    }
+    if (code === 'EHOSTUNREACH' || raw.includes('ehostunreach')) {
+      return `Host unreachable: ${url}. Check the network route to the broker.`
+    }
+    if (raw.includes('protocol')) {
+      return `Protocol error: ${url} does not look like a valid MQTT broker (check mqtt:// vs mqtts:// and the port).`
+    }
+    return `Could not connect to MQTT broker: ${e && e.message ? e.message : e}`
   }
 
   isConnected(): boolean {

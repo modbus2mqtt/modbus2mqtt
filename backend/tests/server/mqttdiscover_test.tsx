@@ -606,6 +606,65 @@ test('issue #228: hw_version is written when deviceHWversion entity has mqttValu
   expect(payload.device.hw_version).toBe('RevB')
 })
 
+test('generateDiscoveryPayloads skips inactive conditional entities (empty mqttValue)', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const active: ImodbusEntity = {
+    id: 21,
+    mqttname: 'temperature',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: 24,
+    identified: 1,
+    converterParameters: { uom: '°C' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 0,
+    condition: { register: 501, bit: 0, comparator: 'eq', value: 1 },
+  }
+  const inactive: ImodbusEntity = {
+    id: 31,
+    mqttname: 'relative_humidity',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: '',
+    identified: 0,
+    converterParameters: { uom: '%' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 1,
+    condition: { register: 501, bit: 1, comparator: 'eq', value: 1 },
+  }
+  const s = {
+    filename: 'conditional',
+    manufacturer: 'Acme',
+    model: 'X1',
+    i18n: [
+      {
+        lang: 'en',
+        texts: [
+          { textId: 'name', text: 'Acme Device' },
+          { textId: 'e21', text: 'Temperature' },
+          { textId: 'e31', text: 'Relative humidity' },
+        ],
+      },
+    ],
+    entities: [active, inactive],
+  } as any as ImodbusSpecification
+  const sl = new Slave(
+    0,
+    { slaveid: 47, specificationid: 'conditional', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
+  // With values read: the active entity has a real mqttValue, the inactive one an
+  // empty string -> only the active entity must be announced to Home Assistant.
+  const payloads = disc['generateDiscoveryPayloads'](sl, s)
+  expect(payloads.length).toBe(1)
+  const topic = payloads[0].topic
+  expect(topic).toContain('/e21/config')
+  expect(topic).not.toContain('e31')
+})
+
 test('issue #228: republishDiscoveryIfChanged publishes delta after first poll', () => {
   const conn = new MqttConnector()
   const disc = new MqttDiscover(conn, msub1)
@@ -785,4 +844,148 @@ test('issue #228: republishDiscoveryIfChanged is a no-op when nothing changed', 
 
   disc.republishDiscoveryIfChanged(sl)
   expect(publishCount).toBe(0)
+})
+
+test('issue: republishDiscoveryIfChanged deletes inactive conditional discovery topics', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const published: { topic: string; payload: string }[] = []
+  conn.getMqttClient = function (cb: (c: MqttClient) => void) {
+    cb({
+      publish: (topic: string, payload: Buffer | string) => {
+        published.push({ topic, payload: payload.toString() })
+      },
+    } as any as MqttClient)
+  }
+
+  const active: ImodbusEntity = {
+    id: 21,
+    mqttname: 'temperature',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: 24,
+    identified: 1,
+    converterParameters: { uom: '°C' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 0,
+    condition: { register: 501, bit: 0, comparator: 'eq', value: 1 },
+  }
+  const inactive: ImodbusEntity = {
+    id: 31,
+    mqttname: 'relative_humidity',
+    converter: 'number',
+    modbusValue: [],
+    mqttValue: '',
+    identified: 0,
+    converterParameters: { uom: '%' },
+    registerType: ModbusRegisterType.HoldingRegister,
+    readonly: true,
+    modbusAddress: 1,
+    condition: { register: 501, bit: 1, comparator: 'eq', value: 1 },
+  }
+  const s = {
+    filename: 'conddel',
+    manufacturer: 'Acme',
+    model: 'X',
+    i18n: [
+      {
+        lang: 'en',
+        texts: [
+          { textId: 'name', text: 'Cond' },
+          { textId: 'e21', text: 'Temperature' },
+          { textId: 'e31', text: 'Relative humidity' },
+        ],
+      },
+    ],
+    entities: [active, inactive],
+  } as any as ImodbusSpecification
+  const sl = new Slave(
+    0,
+    { slaveid: 47, specificationid: 'conddel', specification: s as any } as Islave,
+    Config.getConfiguration().mqttbasetopic
+  )
+
+  // Simulate the boot announcement: the inactive entity WAS announced (pre-poll, no values known).
+  const bootPayloads = disc['generateDiscoveryPayloads'](sl, {
+    ...s,
+    entities: [active, { ...inactive, mqttValue: undefined }],
+  } as any)
+  for (const tp of bootPayloads) {
+    disc['lastDiscoveryPayloads'].set(tp.topic, tp.payload.toString())
+  }
+
+  // After the poll the inactive entity has mqttValue '' -> it must be deleted from HA.
+  disc.republishDiscoveryIfChanged(sl, s as any)
+
+  const deletions = published.filter((p) => p.payload === '')
+  expect(deletions.length).toBe(1)
+  expect(deletions[0].topic).toContain('/e31/config')
+  // the active entity is not deleted
+  expect(published.find((p) => p.topic.includes('/e21/config') && p.payload === '')).toBeUndefined()
+})
+
+
+test('language change: republishDiscoveryIfChanged re-announces translated names without restart', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const published: { topic: string; payload: string }[] = []
+  conn.getMqttClient = function (cb: (c: MqttClient) => void) {
+    cb({
+      publish: (topic: string, payload: Buffer | string) => {
+        published.push({ topic, payload: payload.toString() })
+      },
+    } as any as MqttClient)
+  }
+
+  // Spec with both en + de entity names for entity 2.
+  const s = {
+    filename: 'langtest',
+    manufacturer: 'Acme',
+    model: 'X1',
+    i18n: [
+      { lang: 'en', texts: [{ textId: 'name', text: 'Acme Device' }, { textId: 'e2', text: 'Power' }] },
+      { lang: 'de', texts: [{ textId: 'name', text: 'Acme Gerät' }, { textId: 'e2', text: 'Leistung' }] },
+    ],
+    entities: [
+      {
+        id: 2, mqttname: 'power', converter: 'number', modbusAddress: 0,
+        registerType: ModbusRegisterType.HoldingRegister, readonly: true,
+        mqttValue: 42, identified: 1, converterParameters: { uom: 'W' },
+      } as ImodbusEntity,
+    ],
+  } as any as ImodbusSpecification
+  const sl = new Slave(0, { slaveid: 6, specificationid: 'langtest', specification: s } as any as Islave, Config.getConfiguration().mqttbasetopic)
+
+  // Prime the cache as if the initial discovery ran in English.
+  const enPayloads = disc['generateDiscoveryPayloads'](sl, s)
+  for (const tp of enPayloads) disc['lastDiscoveryPayloads'].set(tp.topic, tp.payload.toString())
+  expect(JSON.parse(enPayloads[0].payload.toString()).name).toBe('Power')
+
+  // User switches the discovery language to German and saves the config
+  // (same as POST /api/configuration: writeConfiguration + setMqttdiscoverylanguage).
+  const oldLang = Config.getConfiguration().mqttdiscoverylanguage
+  new Config().writeConfiguration({ ...Config.getConfiguration(), mqttdiscoverylanguage: 'de' })
+  ConfigSpecification.setMqttdiscoverylanguage('de')
+  expect(Config.getConfiguration().mqttdiscoverylanguage).toBe('de')
+  expect(oldLang).not.toBe('de')
+
+  disc.republishDiscoveryIfChanged(sl)
+
+  expect(published.length).toBe(1)
+  const payload = JSON.parse(published[0].payload)
+  expect(payload.name).toBe('Leistung')
+})
+
+test('generateDiscoveryPayloads skips inactive multi-condition variant (SI active, Imperial inactive)', () => {
+  const conn = new MqttConnector()
+  const disc = new MqttDiscover(conn, msub1)
+  const si = { id: 2, mqttname: 'temperature', converter: 'number', modbusAddress: 0, registerType: ModbusRegisterType.HoldingRegister, readonly: true, mqttValue: 24.5, identified: 1, converterParameters: { uom: '°C' }, conditions: [{ register: 400, comparator: 'eq', value: 1 }, { register: 501, bit: 0, comparator: 'eq', value: 1 }] }
+  const imp = { id: 25, mqttname: 'temperature_imperial', converter: 'number', modbusAddress: 0, registerType: ModbusRegisterType.HoldingRegister, readonly: true, mqttValue: '', identified: 0, converterParameters: { uom: '°F' }, conditions: [{ register: 400, comparator: 'eq', value: 2 }, { register: 501, bit: 0, comparator: 'eq', value: 1 }] }
+  const s = { filename: 'mc', manufacturer: 'T', model: 'W', i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'T' }, { textId: 'e2', text: 'Temperature' }, { textId: 'e25', text: 'Temperature (Imperial)' }] }], entities: [si, imp] } as any as ImodbusSpecification
+  const sl = new Slave(0, { slaveid: 5, specificationid: 'mc', specification: s } as any as Islave, Config.getConfiguration().mqttbasetopic)
+  const payloads = disc['generateDiscoveryPayloads'](sl, s)
+  const topics = payloads.map((p) => p.topic)
+  expect(topics.some((t) => t.includes('/e25/config'))).toBe(false)
+  expect(topics.some((t) => t.includes('/e2/config'))).toBe(true)
 })

@@ -12,7 +12,7 @@ import { ConfigPersistence } from '../persistence/configPersistence.js'
 import { createAuthMiddleware } from './auth/authMiddleware.js'
 import { initOidc, registerOidcRoutes, setupSession, type OidcConfig } from './auth/oidc.js'
 import { sendResult } from './sendResult.js'
-import { AngularStatics } from './angularStatics.js'
+import { WebuiStatics } from './webuiStatics.js'
 import { corsMiddleware } from './corsMiddleware.js'
 
 interface IAddonInfo {
@@ -33,10 +33,10 @@ export class HttpServerBase {
   server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse>
   httpsServer?: https.Server
   protected oidcConfig: OidcConfig | null = null
-  private angularStatics: AngularStatics
+  private webuiStatics: WebuiStatics
   constructor(private angulardir: string = '.') {
     this.app = express()
-    this.angularStatics = new AngularStatics(angulardir)
+    this.webuiStatics = new WebuiStatics(angulardir)
   }
   /** Node-level request listener; lets tests (supertest) drive the server without framework internals */
   get requestListener(): http.RequestListener {
@@ -108,7 +108,7 @@ export class HttpServerBase {
             Config.executeHassioGetRequest<{ data: IAddonInfo }>(
               '/addons/self/info',
               (info) => {
-                this.angularStatics.setIngressUrl(info.data.ingress_entry)
+                this.webuiStatics.setIngressUrl(info.data.ingress_entry)
                 const port = Config.getConfiguration().httpport
                 log.log(LogLevelEnum.info, 'Hassio authentication prefix:' + info.data.ingress_entry + ' modbus2mqtt: ' + port)
                 this.initBase()
@@ -130,11 +130,12 @@ export class HttpServerBase {
   }
 
   processAll(req: Request, res: express.Response) {
-    this.angularStatics.sendIndexFile(req, res)
+    // SPA fallback at the root: serve the new webui index (the legacy Angular
+    // UI is served at the root).
+    this.webuiStatics.sendIndexFile(req, res)
   }
-  initBase() {
-    this.angularStatics.init()
 
+  initBase() {
     this.app.use(express.json({ limit: '50mb' }))
     this.app.use(express.urlencoded({ extended: true, limit: '50mb' }))
     this.app.use(corsMiddleware)
@@ -143,14 +144,18 @@ export class HttpServerBase {
       setupSession(this.app)
       registerOidcRoutes(this.app, this.oidcConfig)
     }
-    // angular files have full path including language e.G. /en-US/polyfill.js
-    this.app.use(createAuthMiddleware(this.oidcConfig))
-    this.app.use(this.angularStatics.middleware())
-    this.app.use(express.static(this.angulardir))
-    this.app.get('/', (req: Request, res: express.Response) => {
-      res.redirect('index.html')
-    })
+    // API routes (registered in initApp) come first so /api/* is not shadowed
+    // by the root static webui below.
     this.initApp()
+
+    // ---- New webui at the root (/) ----
+    // The HA_enoceanmqtt-style configurator uses only relative asset paths, so
+    // serving it from / works directly and behind the HA ingress proxy.
+    this.app.use(express.static(this.webuiStatics.getDir()))
+
+    // Catch-all: anything not matched (e.g. unknown /api route) falls back to
+    // the webui index at the root.
+    this.app.use(this.webuiStatics.middleware())
     this.app.all(/.*/, this.processAll.bind(this))
   }
 }

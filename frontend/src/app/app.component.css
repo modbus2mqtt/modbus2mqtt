@@ -1,3 +1,6 @@
-.topmargin {
-  height: 2em;
+.content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  width: 100%;
 }

@@ -1,5 +1,5 @@
 .announcement-container {
-  margin: 8px 16px 0 16px;
+  margin: 8px 0 0 0;
 }
 
 .announcement-card {
@@ -8,18 +8,18 @@
 }
 
 .severity-breaking {
-  border-left-color: #d32f2f;
-  background-color: #fff3f3;
+  border-left-color: var(--danger);
+  background-color: rgba(255, 77, 79, 0.06);
 }
 
 .severity-warning {
-  border-left-color: #f9a825;
-  background-color: #fff8e1;
+  border-left-color: var(--warning);
+  background-color: rgba(250, 173, 20, 0.06);
 }
 
 .severity-info {
   border-left-color: #1976d2;
-  background-color: #e3f2fd;
+  background-color: rgba(25, 118, 210, 0.08);
 }
 
 .announcement-row {
@@ -35,11 +35,11 @@
 }
 
 .breaking-icon {
-  color: #d32f2f;
+  color: var(--danger);
 }
 
 .warning-icon {
-  color: #f9a825;
+  color: var(--warning);
 }
 
 .info-icon {
@@ -52,7 +52,7 @@
 }
 
 .announcement-date {
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.85em;
   margin-left: 8px;
 }
@@ -60,6 +60,7 @@
 .announcement-message {
   margin-top: 4px;
   line-height: 1.5;
+  color: var(--text);
 }
 
 .announcement-close {

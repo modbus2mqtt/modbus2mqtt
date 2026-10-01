@@ -2,6 +2,9 @@ import { ConverterMap } from '../../src/specification/index.js'
 import { Converters, EnumNumberFormat, Ientity, Ispecification, ModbusRegisterType } from '../../src/shared/specification/index.js'
 import { ConfigSpecification } from '../../src/specification/index.js'
 import { it, expect } from '@jest/globals'
+import * as fs from 'fs'
+import { join } from 'path'
+import { TempConfigDirHelper } from '../server/testhelper.js'
 
 ConfigSpecification.setMqttdiscoverylanguage('en', undefined)
 const spec: Ispecification = {
@@ -494,4 +497,78 @@ it('text swapBytes turns the characters of a register around', () => {
   const registers = [0x4f4d, 0x4244, 0x5355]
   expect(converter.modbus2mqtt(spec, entity.id, registers)).toBe('MODBUS')
   expect(converter.mqtt2modbus(spec, entity.id, 'MODBUS')).toEqual(registers)
+})
+
+// Issue: spec templates written with the object converter form `converter: { name: 'number' }`
+// (as the fork's Thermokon WRF06 template does) reached ConverterMap.getConverter() with an
+// object key, so no converter was found -> no discovery entities and no values anywhere.
+// postProcessSpec normalizes object-form converters to the plain string when a spec is loaded.
+it('normalizes object-form converter to a plain string when a spec is loaded', async () => {
+  const helper = new TempConfigDirHelper('converter_normalize')
+  helper.setup()
+  try {
+    const localSpecDir = join(ConfigSpecification.getLocalDir(), 'specifications')
+    fs.mkdirSync(localSpecDir, { recursive: true })
+    const yaml = [
+      'filename: convobjecttest',
+      'model: Test',
+      'manufacturer: Test',
+      'version: "0.5"',
+      'nextEntityId: 2',
+      'entities:',
+      '  - id: 1',
+      '    registerType: 3',
+      '    readonly: true',
+      '    converter:',
+      '      name: number',
+      '    modbusAddress: 1',
+      '    converterParameters:',
+      '      multiplier: 1',
+      '    valid: true',
+      '    mqttname: test',
+      'i18n: []',
+      'files: []',
+      'testdata:',
+      '  holdingRegisters: []',
+      '  analogInputs: []',
+      '  coils: []',
+      '  discreteInputs: []',
+    ].join('\n')
+    fs.writeFileSync(join(localSpecDir, 'convobjecttest.yaml'), yaml, 'utf8')
+
+    new ConfigSpecification().readYaml()
+    const loaded = ConfigSpecification.getSpecificationByFilename('convobjecttest')
+    expect(loaded).toBeDefined()
+    const entity = loaded!.entities[0]
+    // Object form must have been normalized to the plain string.
+    expect(entity.converter).toBe('number')
+    expect(ConverterMap.getConverter(entity)).toBeDefined()
+  } finally {
+    helper.cleanup()
+  }
+})
+
+it('number converter removes floating point noise (262 * 0.1 -> 26.2, not 26.200000000000003)', () => {
+  const entity: Ientity = {
+    id: 1, mqttname: 'mqtt', converter: 'number',
+    converterParameters: { multiplier: 0.1, offset: 0, decimals: 1 },
+    registerType: ModbusRegisterType.HoldingRegister, readonly: false, modbusAddress: 2,
+  }
+  spec.entities = [entity]
+  const converter = ConverterMap.getConverter(spec.entities[0])
+  const v = converter?.modbus2mqtt(spec, entity.id, [262])
+  expect(v).toBe(26.2)
+})
+
+it('select converter resolves option name to key on write (SI -> 1, Imperial -> 2)', () => {
+  const entity: Ientity = {
+    id: 7, mqttname: 'unit_system', converter: 'select',
+    converterParameters: { multiplier: 1, offset: 0, options: [{ key: 1, name: 'SI' }, { key: 2, name: 'Imperial' }] },
+    registerType: ModbusRegisterType.HoldingRegister, readonly: false, modbusAddress: 400,
+  }
+  spec.entities = [entity]
+  const converter = ConverterMap.getConverter(spec.entities[0])
+  expect(converter?.mqtt2modbus(spec, entity.id, 'SI')).toEqual([1])
+  expect(converter?.mqtt2modbus(spec, entity.id, 'Imperial')).toEqual([2])
+  expect(converter?.mqtt2modbus(spec, entity.id, '1')).toEqual([1])
 })

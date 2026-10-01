@@ -1,9 +1,10 @@
 .mat-mdc-card-header {
   font-weight: bold;
-  background-color: rgb(199, 240, 186);
+  background: var(--bg-surface);
   display: flex;
   min-height: 4em;
   padding-top: 1em;
+  color: var(--text);
 }
 
 .mat-mdc-card-title {
@@ -38,4 +39,28 @@ dd {
   margin: 0 0 8px 0;
   font-size: 0.85em;
   opacity: 0.85;
+}
+
+/* Slave cards: keep normal block flow but give fields breathing room.
+   (Do NOT grid the whole card — the template nests an expansion panel
+   with fixed-width fields inside card content, and a grid mangles it.) */
+
+/* gap between direct children of the card content (spec field, panel,
+   new-slave fields, hints) */
+mat-card-content > * + * {
+  margin-top: 16px;
+}
+
+/* inside the "Slave Settings" expansion panel content, stack fields
+   with clear vertical spacing so nothing overlaps */
+.mat-expansion-panel-content mat-form-field {
+  display: block;
+  margin: 12px 0;
+}
+
+/* keep narrow-width hints from colliding */
+.width150pt,
+.width50,
+.width50pt {
+  min-width: 0;
 }

@@ -25,6 +25,7 @@ import {
   Islave,
   IidentificationSpecification,
   IModbusConnection,
+  IdebugComponentInfo,
 } from '@shared/server'
 
 @Injectable({
@@ -109,6 +110,29 @@ export class ApiService {
       catchError((err) => {
         this.errorHandler(err)
         return new Observable<Converters[]>()
+      })
+    )
+  }
+  debugComponentsCache: IdebugComponentInfo[] | undefined = undefined
+  getDebugComponents(): Observable<IdebugComponentInfo[]> {
+    if (this.debugComponentsCache != undefined) {
+      const sub = new Subject<IdebugComponentInfo[]>()
+      sub.pipe(first())
+      setTimeout(() => {
+        sub.next(this.debugComponentsCache!)
+      }, 1)
+      return sub
+    }
+
+    const url = this.getFullUri(apiUri.debugComponents)
+    return this.httpClient.get<IdebugComponentInfo[]>(url).pipe(
+      map((cnv) => {
+        this.debugComponentsCache = cnv as IdebugComponentInfo[]
+        return cnv
+      }),
+      catchError((err) => {
+        this.errorHandler(err)
+        return new Observable<IdebugComponentInfo[]>()
       })
     )
   }

@@ -1,7 +1,8 @@
 .mat-mdc-card-header {
   font-weight: bold;
-  background-color: rgb(235, 223, 250);
+  background: var(--bg-surface);
   display: flex;
+  color: var(--text);
 }
 
 .messages {
@@ -10,6 +11,6 @@
 }
 
 .message {
-  color: red;
+  color: var(--danger);
   cursor: pointer;
 }

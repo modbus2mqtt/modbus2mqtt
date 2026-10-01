@@ -8,13 +8,15 @@ services:
       - 3443:3443
     restart: always
     volumes:
-      - data:/home/volkmar/data
-      - config:/home/volkmar/config
-      - ssl:/home/volkmar/ssl
+      # ONE volume: ALL configuration (MQTT/busses/devices/specs/secrets)
+      # and the public specifications live under /data - mounting this is
+      # enough for the whole setup to survive container recreation.
+      - data:/data
+      # Optional: TLS certificates (fullchain.pem, privkey.pem, secrets.txt)
+      - ssl:/ssl
     environment:
       - TZ=Europe/Berlin
       - MODBUS2MQTT_HTTPS_PORT=3443
 volumes:
   data:
-  config:
   ssl:

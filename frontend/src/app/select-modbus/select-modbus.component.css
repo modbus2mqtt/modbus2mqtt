@@ -5,7 +5,7 @@
 mat-header-row.mat-mdc-header-row {
   border-bottom-style: solid;
   border-bottom-width: 1px;
-  border: 1px solid #e7e7e7;
+  border: 1px solid var(--border);
 }
 
 .mat-mdc-cell {
@@ -15,7 +15,7 @@ mat-header-row.mat-mdc-header-row {
 }
 
 .mat-mdc-row {
-  border: 1px solid #e7e7e7;
+  border: 1px solid var(--border);
 }
 
 .field {
@@ -36,6 +36,7 @@ mat-header-row.mat-mdc-header-row {
 
 .mat-mdc-card-header {
   font-weight: bold;
-  background-color: rgb(235, 235, 235);
+  background: var(--bg-surface);
   display: flex;
+  color: var(--text);
 }

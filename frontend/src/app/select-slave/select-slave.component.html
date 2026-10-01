@@ -4,9 +4,9 @@
       <mat-slide-toggle
         [formControl]="showAllPublicSpecs"
         class="width50"
-        matTooltip="Unhides unmatiching specification in the specification selection list"
+        [matTooltip]="t('slave.unhideSpecs')"
         (toggleChange)="showUnmatched()"
-        >Show all public specifications</mat-slide-toggle
+        >{{ t('slave.showAllPublicSpecs') }}</mat-slide-toggle
       >
     </p>
     <div class="flexrows">
@@ -14,7 +14,7 @@
         <mat-card class="width550pt card">
           <form (keydown.enter)="keyDown($event, uislave.slaveForm)" [formGroup]="uislave.slaveForm">
             <mat-card-header
-              ><mat-card-title matTooltip="Edit Specification" (click)="editSpecification(uislave.slave)" class="clickable">{{
+              ><mat-card-title [matTooltip]="t('slave.editSpec')" (click)="editSpecification(uislave.slave)" class="clickable">{{
                 uislave.label
               }}</mat-card-title>
               <div class="card-header-buttons">
@@ -22,7 +22,7 @@
                   <button
                     mat-icon-button
                     class="material-icons app-toolbar-menu save-button"
-                    matTooltip="Save Changes"
+                    [matTooltip]="t('bus.saveChanges')"
                     (click)="saveSlave(uislave)"
                     color="primary"
                     [disabled]="!needsSaving(i)"
@@ -32,7 +32,7 @@
                   <button
                     mat-icon-button
                     class="material-icons app-toolbar-menu cancel-button"
-                    matTooltip="Cancel Changes"
+                    [matTooltip]="t('bus.cancelChanges')"
                     color="warn"
                     [disabled]="!needsSaving(i)"
                     (click)="cancelSlave(uislave)"
@@ -47,11 +47,7 @@
                       mat-icon-button
                       class="material-icons app-toolbar-menu save-button"
                       matTooltipClass="tooltip-class"
-                      matTooltip="Poll this slave now
-
-                  Reads the device, publishes the MQTT state and runs the HTTP push - once, right now. Poll mode and poll interval are ignored, so a slave set to 'no poll' can be tested too.
-
-                  The result appears in Status & Errors below."
+                      [matTooltip]="t('slave.pollNow')"
                       color="primary"
                       [disabled]="isPolling(uislave)"
                       (click)="pollSlave(uislave)"
@@ -62,7 +58,7 @@
                   <button
                     mat-icon-button
                     class="material-icons app-toolbar-menu delete-button"
-                    matTooltip="Delete"
+                    [matTooltip]="t('common.delete')"
                     color="warn"
                     (click)="deleteSlave(uislave.slave)"
                   >
@@ -87,11 +83,7 @@
                       mat-icon-button
                       class="material-icons app-toolbar-menu save-button"
                       matTooltipClass="tooltip-class"
-                      matTooltip="Add a slave that takes its settings from this one
-
-                  Prepares the New Slave card below: enter the Slave Id (the device's Modbus address) and add it.
-
-                  The new slave inherits everything - specification, poll, HTTP push, discovery - and follows every change made here. Only its Slave Id, Slave Name and MQTT Root Topic are individual."
+                      [matTooltip]="t('slave.fromThisOne')"
                       color="primary"
                       (click)="addReferencingSlave(uislave)"
                     >
@@ -100,7 +92,7 @@
                     <button
                       mat-icon-button
                       class="material-icons app-toolbar-menu delete-button"
-                      matTooltip="Add New Specification"
+                      [matTooltip]="t('slave.addNewSpec')"
                       color="primary"
                       (click)="addSpecification(uislave.slave)"
                     >
@@ -110,7 +102,7 @@
                       <button
                         mat-icon-button
                         class="material-icons app-toolbar-menu delete-button"
-                        matTooltip="Edit Specification"
+                        [matTooltip]="t('slave.editSpec')"
                         color="primary"
                         (click)="editSpecification(uislave.slave)"
                       >
@@ -133,14 +125,14 @@
                   }
                 </p>
                 <mat-form-field class="width150pt">
-                  <mat-label>Slave Name</mat-label>
+                  <mat-label>{{ t('slave.slaveName') }}</mat-label>
                   <input matInput formControlName="name" [errorStateMatcher]="errorStateMatcher" />
                   @if (uislave.slaveForm.get('name')!.hasError('duplicates') != null) {
                     <mat-error> Must be unique </mat-error>
                   }
                 </mat-form-field>
                 <mat-form-field class="width150pt">
-                  <mat-label>MQTT Root Topic</mat-label>
+                  <mat-label>{{ t('slave.mqttRootTopic') }}</mat-label>
                   <input matInput formControlName="rootTopic" />
                 </mat-form-field>
               } @else {
@@ -158,7 +150,7 @@
                   </p>
                 }
                 <mat-form-field>
-                  <mat-label>Specification</mat-label>
+                  <mat-label>{{ t('slave.specification') }}</mat-label>
 
                   <mat-select
                     matInput
@@ -197,11 +189,11 @@
                 </mat-form-field>
                 <mat-expansion-panel>
                   <mat-expansion-panel-header>
-                    <mat-panel-title> Slave Settings </mat-panel-title>
+                    <mat-panel-title>{{ t('slave.slaveSettings') }}</mat-panel-title>
                   </mat-expansion-panel-header>
                   <ng-template matExpansionPanelContent>
                     <mat-form-field class="width150pt">
-                      <mat-label>Slave Name</mat-label>
+                      <mat-label>{{ t('slave.slaveName') }}</mat-label>
                       <input
                         matInput
                         matTooltipClass="tooltip-class"
@@ -222,12 +214,12 @@
                     @if ([0, 2, 4].includes(uislave.slaveForm.get('pollMode')!.value)) {
                       @if (!uislave.slaveForm.get('pollSchedule')!.value) {
                         <mat-form-field class="width150pt">
-                          <mat-label>Poll Interval [ms]</mat-label>
+                          <mat-label>{{ t('slave.pollInterval') }}</mat-label>
                           <input matInput formControlName="pollInterval" type="number" placeholder="1000" />
                         </mat-form-field>
                       }
                       <mat-form-field class="width200pt">
-                        <mat-label>Poll Schedule</mat-label>
+                        <mat-label>{{ t('slave.pollSchedule') }}</mat-label>
                         <mat-select
                           formControlName="pollSchedulePreset"
                           (selectionChange)="onPollSchedulePresetChange(uislave.slaveForm)"
@@ -240,7 +232,7 @@
                       </mat-form-field>
                       @if (uislave.slaveForm.get('pollSchedulePreset')!.value === pollScheduleCustom) {
                         <mat-form-field class="width200pt">
-                          <mat-label>Custom cron</mat-label>
+                          <mat-label>{{ t('slave.customCron') }}</mat-label>
                           <input
                             matInput
                             formControlName="pollSchedule"
@@ -257,7 +249,7 @@
                       }
                     }
                     <mat-form-field class="width150pt">
-                      <mat-label>Max Registers Per Request</mat-label>
+                      <mat-label>{{ t('slave.maxRegisters') }}</mat-label>
                       <input
                         matInput
                         formControlName="maxRegistersPerRequest"
@@ -265,19 +257,19 @@
                         min="1"
                         max="125"
                         [placeholder]="MAX_REGISTERS_PER_REQUEST_DEFAULT"
-                        matTooltip="Maximum number of Modbus registers read per request (1–125). Some devices support fewer than the Modbus spec maximum of 125."
+                        [matTooltip]="t('slave.maxRegistersHint')"
                       />
                       @if (uislave.slaveForm.get('maxRegistersPerRequest')!.hasError('maxRegistersPerRequest')) {
                         <mat-error>Must be an integer from 1 to 125</mat-error>
                       }
                     </mat-form-field>
                     <mat-form-field class="width150pt">
-                      <mat-label>Poll Mode</mat-label>
+                      <mat-label>{{ t('slave.pollMode') }}</mat-label>
                       <mat-select matInput formControlName="pollMode">
-                        <mat-option [value]="0">Interval</mat-option>
-                        <mat-option [value]="2">Interval and Triggger</mat-option>
-                        <mat-option [value]="1">Trigger only</mat-option>
-                        <mat-option [value]="3">No polling</mat-option>
+                        <mat-option [value]="0">{{ t('slave.interval') }}</mat-option>
+                        <mat-option [value]="2">{{ t('slave.intervalTrigger') }}</mat-option>
+                        <mat-option [value]="1">{{ t('slave.triggerOnly') }}</mat-option>
+                        <mat-option [value]="3">{{ t('slave.noPolling') }}</mat-option>
                         <mat-option [value]="4">HTTP Push (no MQTT)</mat-option>
                       </mat-select>
                     </mat-form-field>
@@ -289,9 +281,9 @@
                       <mat-panel-title> MQTT Topics </mat-panel-title>
                     </mat-expansion-panel-header>
                     <ng-template matExpansionPanelContent>
-                      <h2>Quality of Service</h2>
+                      <h2>{{ t('slave.qos') }}</h2>
                       <mat-form-field class="width200pt">
-                        <mat-label>Quality of Service</mat-label>
+                        <mat-label>{{ t('slave.qos') }}</mat-label>
                         <mat-select
                           matTooltipClass="tooltip-class"
                           formControlName="qos"
@@ -308,9 +300,9 @@
                           <mat-option [value]="2">2 - exactly once</mat-option>
                         </mat-select>
                       </mat-form-field>
-                      <h2>Root Topic</h2>
+                      <h2>{{ t('slave.rootTopic') }}</h2>
                       <mat-form-field class="width150pt">
-                        <mat-label>Root Topic Name</mat-label>
+                        <mat-label>{{ t('slave.rootTopic') }}</mat-label>
                         <input
                           matInput
                           matTooltipClass="tooltip-class"
@@ -326,9 +318,9 @@
                         It is in the responsibility of the user to make sure, that there are no duplicates in MQTT topic names'
                         />
                       </mat-form-field>
-                      <h2>Configuration URL</h2>
+                      <h2>{{ t('slave.configUrl') }}</h2>
                       <mat-form-field class="width150pt">
-                        <mat-label>Configuration URL</mat-label>
+                        <mat-label>{{ t('slave.configUrl') }}</mat-label>
                         <input
                           matInput
                           matTooltipClass="tooltip-class"
@@ -341,17 +333,17 @@
                         Example: http://192.168.1.100:8080 or https://device.local"
                         />
                       </mat-form-field>
-                      <h2>State Topic</h2>
+                      <h2>{{ t('slave.stateTopic') }}</h2>
 
                       @if (config.rootUrl != undefined) {
-                        <div matTooltip="Use this URL inside of Home Assistant Addons (E.g.Nodered)">
+                        <div [matTooltip]="t('slave.configUrlHint')">
                           Web Service Root: <strong>{{ config.rootUrl }}</strong>
                         </div>
                         <mat-slide-toggle
                           class="width50"
                           formControlName="showUrl"
-                          matTooltip="Use this URL inside of Home Assistant Addons (E.g.Nodered)"
-                          >Show REST API Url instead of MQTT Topics</mat-slide-toggle
+                          [matTooltip]="t('slave.configUrlHint')"
+                          >{{ t('slave.showRestUrl') }}</mat-slide-toggle
                         >
                       }
 
@@ -361,26 +353,26 @@
                           mat-icon-button
                           mat-small-icon-button
                           class="material-icons app-toolbar-menu save-button"
-                          matTooltip="Copy to Clipboard"
+                          [matTooltip]="t('slave.copyToClipboard')"
                           (click)="copy2Clipboard(getStateTopic(uislave))"
                           color="primary"
                         >
                           <mat-icon>content_copy</mat-icon>
                         </button>
                       </div>
-                      <h2>State Payload Example</h2>
+                      <h2>{{ t('slave.statePayloadExample') }}</h2>
                       <textarea id="w3review" name="w3review" rows="10" cols="20">
                         {{ getStatePayload(uislave) }}
                       </textarea>
                       @if ([1, 2].includes(uislave.slaveForm.get('pollMode')!.value)) {
-                        <h2>Trigger Poll Topic</h2>
+                        <h2>{{ t('slave.triggerPollTopic') }}</h2>
                         <div>
                           {{ getTriggerPollTopic(uislave)
                           }}<button
                             mat-icon-button
                             mat-small-icon-button
                             class="material-icons app-toolbar-menu save-button"
-                            matTooltip="Copy to Clipboard"
+                            [matTooltip]="t('slave.copyToClipboard')"
                             (click)="copy2Clipboard(getTriggerPollTopic(uislave))"
                             color="primary"
                           >
@@ -388,7 +380,7 @@
                           </button>
                         </div>
                       }
-                      <h2>Command Topics</h2>
+                      <h2>{{ t('slave.commandTopics') }}</h2>
                       <dl>
                         @for (commandEntity of uislave.commandEntities; track $index) {
                           <dt>{{ getSpecEntityName(uislave, commandEntity.entityId) }}</dt>
@@ -428,9 +420,9 @@
                         class="width550"
                         formControlName="noDiscovery"
                         (toggleChange)="disableDiscoverEntitiesList(uislave)"
-                        >{{ getNoDiscoveryText(uislave) }}<br />Click to toggle</mat-slide-toggle
+                        >{{ getNoDiscoveryText(uislave) }}<br />{{ t('slave.clickToToggle') }}</mat-slide-toggle
                       >
-                      <h2>Deselect to exclude from Discovery</h2>
+                      <h2>{{ t('slave.deselectExclude') }}</h2>
                       <mat-selection-list #noDiscovery formControlName="discoverEntitiesList">
                         @for (selected of uislave.selectedEntitites; track $index) {
                           <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
@@ -463,7 +455,7 @@
                         }
                       </mat-form-field>
                       <mat-form-field class="width550">
-                        <mat-label>Bearer PAT</mat-label>
+                        <mat-label>{{ t('slave.bearerPat') }}</mat-label>
                         <input
                           matInput
                           type="password"
@@ -472,7 +464,7 @@
                           [placeholder]="
                             hasHttpPushPat(uislave) ? '•••••••• (stored, leave empty to keep)' : 'Personal Access Token'
                           "
-                          matTooltip="Stored encrypted. Leave empty to keep the currently stored token."
+                          [matTooltip]="t('slave.storedEncrypted')"
                         />
                       </mat-form-field>
                       <mat-form-field class="width550">
@@ -481,16 +473,16 @@
                           matInput
                           formControlName="httpPushRoot"
                           placeholder="orbis"
-                          matTooltip="Send only this subtree of the payload, e.g. 'orbis' to post just the orbis array. Same path format as the entity MQTT name."
+                          [matTooltip]="t('slave.subtreeHint')"
                         />
                       </mat-form-field>
-                      <h2>Select entities to push</h2>
+                      <h2>{{ t('slave.selectEntitiesPush') }}</h2>
                       <mat-selection-list formControlName="pushEntitiesList">
                         @for (selected of uislave.selectedEntitites; track $index) {
                           <mat-list-option [value]="selected.id">{{ selected.name }}</mat-list-option>
                         }
                       </mat-selection-list>
-                      <h2>POST Body Example</h2>
+                      <h2>{{ t('slave.postBodyExample') }}</h2>
                       <textarea rows="10" cols="20" readonly>{{ uislave.httpPushBody?.() }}</textarea>
                     </ng-template>
                   </mat-expansion-panel>
@@ -498,7 +490,7 @@
               }
               <mat-expansion-panel>
                 <mat-expansion-panel-header>
-                  <mat-panel-title>Status &amp; Errors </mat-panel-title>
+                  <mat-panel-title>{{ t('slave.statusErrors') }}</mat-panel-title>
                   <mat-panel-description>{{ getPollMessage(uislave) }}</mat-panel-description>
                 </mat-expansion-panel-header>
                 <ng-template matExpansionPanelContent>
@@ -512,13 +504,13 @@
       <mat-card class="width550pt card" #newSlaveCard>
         <form (keydown.enter)="keyDown($event, slaveNewForm)" [formGroup]="slaveNewForm">
           <mat-card-header
-            ><mat-card-title class="clickable">New Slave</mat-card-title>
+            ><mat-card-title class="clickable">{{ t('slave.newSlave') }}</mat-card-title>
 
             <div class="card-header-buttons">
               <button
                 mat-icon-button
                 class="material-icons app-toolbar-menu cancel-button"
-                matTooltip="Add Modbus Slave"
+                [matTooltip]="t('slave.addSlave')"
                 color="primary"
                 type="submit"
                 (click)="addSlave(slaveNewForm)"
@@ -530,7 +522,7 @@
           </mat-card-header>
           <mat-card-content>
             <mat-form-field class="field width150pt">
-              <mat-label>Slave Id</mat-label>
+              <mat-label>{{ t('slave.slaveId') }}</mat-label>
               <input matInput name="slaveId" formControlName="slaveId" type="number" #newSlaveIdInput />
             </mat-form-field>
             @if (!slaveNewForm.get('referenceSlaveId')!.value) {
@@ -540,7 +532,7 @@
             }
             @if (referenceCandidates().length > 0) {
               <mat-form-field class="field width200pt">
-                <mat-label>Take settings from</mat-label>
+                <mat-label>{{ t('slave.takeSettingsFrom') }}</mat-label>
                 <mat-select
                   formControlName="referenceSlaveId"
                   matTooltip="Optional: take every setting from an existing slave and follow its changes. Only Slave Name, Slave Id and MQTT Root Topic stay individual, so identical devices are configured in one place."

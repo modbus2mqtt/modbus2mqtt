@@ -4,6 +4,7 @@ import {
   ImodbusEntity,
   ImodbusSpecification,
   SpecificationStatus,
+  BUS_TIMEOUT_DEFAULT,
 } from '../shared/specification/index.js'
 import { ImodbusAddress, ModbusTasks } from '../shared/server/index.js'
 import { IdentifiedStates } from '../shared/specification/index.js'
@@ -32,6 +33,19 @@ const log = new Logger('bus')
 export interface IModbusResultWithDuration {
   data: number[]
   duration?: number
+}
+
+/**
+ * Normalize a modbus request timeout to a positive value.
+ *
+ * A missing/zero timeout would be handed straight to modbus-serial's setTimeout(),
+ * which DISABLES the request timeout entirely (it skips starting the timer for a
+ * falsy duration). A device that never answers then leaves the read promise pending
+ * forever and wedges the bus worker (every following request hangs). This guarantees
+ * every read/write carries a real deadline.
+ */
+export function normalizeModbusTimeout(timeout: number | undefined): number {
+  return timeout !== undefined && timeout > 0 ? timeout : BUS_TIMEOUT_DEFAULT
 }
 export class Bus implements IModbusConfiguration {
   private static busses: Bus[] | undefined = undefined
@@ -189,7 +203,7 @@ export class Bus implements IModbusConfiguration {
   getSlaveTimeoutBySlaveId(slaveid: number): number {
     const slave = this.getSlaveBySlaveId(slaveid)
     if (slave) if (slave.modbusTimout != undefined) return slave.modbusTimout
-    return this.properties.connectionData.timeout
+    return this.getModbusTimeoutOrDefault()
   }
   getMaxRegistersPerRequestBySlaveId(slaveid: number): number {
     const slave = this.getSlaveBySlaveId(slaveid)
@@ -197,7 +211,14 @@ export class Bus implements IModbusConfiguration {
     return MAX_REGISTERS_PER_REQUEST_DEFAULT
   }
   getModbusConnection(): IModbusConnection {
-    return this.properties.connectionData
+    // See normalizeModbusTimeout: never let an unset/zero timeout reach modbus-serial,
+    // where it would disable the request deadline and hang the worker.
+    const connection = this.properties.connectionData
+    if (connection.timeout !== undefined && connection.timeout > 0) return connection
+    return { ...connection, timeout: normalizeModbusTimeout(connection.timeout) }
+  }
+  private getModbusTimeoutOrDefault(): number {
+    return this.getModbusConnection().timeout
   }
   getId(): number {
     return this.properties.busId

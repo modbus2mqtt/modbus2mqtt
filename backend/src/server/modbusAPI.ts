@@ -148,8 +148,7 @@ export class ModbusAPI implements IModbusAPI, IconsumerModbusAPI {
         return
       } else {
         this.modbusClient!.setID(slaveid)
-        let slaveTimout = this.modbusConfiguration.getSlaveTimeoutBySlaveId(slaveid)
-        if (slaveTimout == undefined) slaveTimout = (this.modbusConfiguration.getModbusConnection() as IRTUConnection).timeout
+        const slaveTimout = this.modbusConfiguration.getSlaveTimeoutBySlaveId(slaveid)
         this.modbusClient!.setTimeout(slaveTimout)
         const start = Date.now()
         debugMClient('%s call: %d %d', fctName, dataaddress, length)

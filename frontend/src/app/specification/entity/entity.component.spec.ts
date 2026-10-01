@@ -39,6 +39,7 @@ const buildSpecificationMethods = () => {
     getCurrentMessage: () => ({ type: 0, category: 0 }) as any,
     getMqttLanguageName: () => 'english',
     getUom: () => 'cm',
+    getEntityName: () => '',
     getNonVariableNumberEntities: () => [{ id: 4, name: 'ent 4' }],
     getMqttNames: () => [],
     getSaveObservable: () => new Subject<void>(),

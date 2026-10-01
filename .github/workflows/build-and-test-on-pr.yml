@@ -13,7 +13,7 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4.0.3
         id: filter
         with:
           filters: |
@@ -27,7 +27,7 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - '.nvmrc'
-              - '.github/workflows/build-and-test-on-pr.yml'
+              - '.github/workflows/**'
 
   build-and-test-on-pr:
     name: 'On pull request: Build and Test'
@@ -40,15 +40,15 @@ jobs:
 
       - name: Checkout repository
         if: needs.check-changes.outputs.code == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Setup pnpm
         if: needs.check-changes.outputs.code == 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6.1.0
       - name: Set up Node.js from .nvmrc
         if: needs.check-changes.outputs.code == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -75,6 +75,10 @@ jobs:
         if: needs.check-changes.outputs.code == 'true'
         run: |
           pushd backend && pnpm run test && popd
+      - name: Run MQTT/Modbus auto-discovery unit tests
+        if: needs.check-changes.outputs.code == 'true'
+        run: |
+          pushd backend && pnpm exec vitest run --config vitest.config.mts tests/server/MqttAutoDiscover_test.tsx tests/server/ModbusAutoDiscover_test.tsx && popd
       - name: Run specification smoke test
         if: needs.check-changes.outputs.code == 'true'
         run: |
@@ -93,7 +97,7 @@ jobs:
         run: npx playwright test
       - name: Upload Playwright test results
         if: ${{ always() && needs.check-changes.outputs.code == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: playwright-report
           path: |
@@ -102,7 +106,7 @@ jobs:
           if-no-files-found: warn
       - name: Upload server logs
         if: ${{ always() && needs.check-changes.outputs.code == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: e2e-logs
           path: |

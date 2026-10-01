@@ -6,6 +6,7 @@ import {
   ImodbusSpecification,
   IbaseSpecification,
   getSpecificationI18nName,
+  getSpecificationI18nEntityName,
   getFileNameFromName,
   IdentifiedStates,
   SpecificationStatus,
@@ -172,6 +173,14 @@ export class SpecificationComponent extends SessionStorage implements OnInit, On
       },
       getUom: (entity_id: number): string => {
         return getUom(this.currentSpecification as ImodbusSpecification, entity_id)
+      },
+      getEntityName: (entityId: number): string => {
+        if (!this.currentSpecification) return ''
+        return (
+          getSpecificationI18nEntityName(this.currentSpecification, this.getMqttDiscoveryLanguage(), entityId, true) ||
+          this.currentSpecification.entities.find((e) => e.id === entityId)?.name ||
+          ''
+        )
       },
       postModbusEntity: (changedEntity: ImodbusEntityWithName): Observable<ImodbusData> => {
         if (this.currentSpecification && this.config && this.busId != undefined && this.slaveid != undefined) {

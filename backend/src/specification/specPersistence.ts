@@ -1,9 +1,9 @@
-import { parse } from 'yaml'
+import { parse, stringify } from 'yaml'
 import * as fs from 'fs'
 import * as path from 'path'
 import { join } from 'path'
-import Debug from 'debug'
 import {
+  Converters,
   EnumNumberFormat,
   FileLocation,
   Inumber,
@@ -18,7 +18,6 @@ import { ICollectionPersistence } from '../server/persistence/persistence.js'
 import { LogLevelEnum, Logger } from './log.js'
 
 const log = new Logger('specPersistence')
-const debug = Debug('specPersistence')
 const filesUrlPrefix = 'specifications/files'
 
 function getSpecificationImageOrDocumentUrl(rootUrl: string | undefined, specName: string, url: string): string {
@@ -166,6 +165,14 @@ export class SpecPersistence implements ICollectionPersistence<IfileSpecificatio
   private postProcessSpec(o: IfileSpecification) {
     if (o.entities)
       o.entities.forEach((entity) => {
+        // Normalize the converter reference. Spec files written/edited by hand (and the newer
+        // 0.5 templates) may carry the object form `converter: { name: 'number' }` while the
+        // runtime (ConverterMap.getConverter) expects the plain string `converter: 'number'`.
+        // Older specs are normalized by the migrator (0.3->0.4), but specs already at the current
+        // version skip migration, so do it here for every loaded spec.
+        if (entity.converter != undefined && typeof entity.converter === 'object' && 'name' in entity.converter) {
+          entity.converter = (entity.converter as { name: Converters }).name
+        }
         if (entity.converter != undefined) {
           const inumber = entity.converterParameters as Inumber
           if (inumber.multiplier != undefined && inumber.numberFormat == undefined) {
@@ -181,7 +188,63 @@ export class SpecPersistence implements ICollectionPersistence<IfileSpecificatio
 
   writeItem(key: string, item: IfileSpecification): void {
     this.writeSpecAsJson(this.getLocalJsonPath(key), item)
+    this.writeFilesFromSpec(key, item)
     Migrator.cleanOldFiles(key, this.getLocalSpecDir())
+  }
+
+  /**
+   * Persists local file payloads (base64 `data`) as real binary files plus the
+   * files.yaml sidecar, so static serving (/specifications/files/...), the
+   * specification summary list and the contribution/commit path all see the
+   * uploaded image/datasheet without relying on the base64 embedded in the
+   * spec JSON alone.
+   *
+   * The webui editor submits the full form (?filedata=true): every local file
+   * carries `data` (base64) and its stable `url` (specifications/files/<name>/<base>).
+   * Files without `data` are kept as-is (remote URLs / already-on-disk refs).
+   */
+  private writeFilesFromSpec(key: string, spec: IfileSpecification): void {
+    const files = (spec.files || []).filter((f) => f.fileLocation == FileLocation.Local && f.url && f.data)
+    if (!files.length) return
+    const specDir = this.getLocalFilesPath(key.replace(/\.yaml$/, ''))
+    if (!fs.existsSync(specDir)) fs.mkdirSync(specDir, { recursive: true })
+
+    // Write each base64 payload under its final basename; the url already
+    // carries the canonical specifications/files/<name>/<base> prefix.
+    files.forEach((f) => {
+      const base = getBaseFilename(f.url)
+      if (!base) return
+      const target = join(specDir, base)
+      try {
+        const buf = Buffer.from(f.data as string, 'base64')
+        fs.writeFileSync(target, buf)
+      } catch (e) {
+        log.log(LogLevelEnum.error, 'Unable to write spec file ' + target + ': ' + (e as Error).message)
+      }
+    })
+
+    // files.yaml sidecar (legacy format read back by readFilesYaml / migrator
+    // 0.4->0.5). Only local entries are listed; the YAML keeps url/fileLocation/
+    // usage + the optional lang for documents.
+    const yamlEntries = (spec.files || []).filter((f) => f.fileLocation == FileLocation.Local)
+    if (!yamlEntries.length) return
+    const sidecar = {
+      version: '0.1',
+      files: yamlEntries.map((f) => {
+        const rc: Record<string, unknown> = {
+          url: f.url,
+          fileLocation: f.fileLocation,
+          usage: f.usage,
+        }
+        if (f.lang) rc.lang = f.lang
+        return rc
+      }),
+    }
+    try {
+      fs.writeFileSync(join(specDir, 'files.yaml'), stringify(sidecar), { encoding: 'utf8' })
+    } catch (e) {
+      log.log(LogLevelEnum.error, 'Unable to write files.yaml for ' + key + ': ' + (e as Error).message)
+    }
   }
 
   writeSpecAsJson(filepath: string, spec: IfileSpecification): void {
@@ -242,7 +305,6 @@ export class SpecPersistence implements ICollectionPersistence<IfileSpecificatio
       fs.cpSync(filespath, localFilesPath, { recursive: true })
     }
   }
-
 
   private cleanSpecForWriting(spec: IfileSpecification): void {
     spec.entities.forEach((e) => {

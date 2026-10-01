@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core'
 import { ApiService } from '../services/api-service'
+import { TranslationService } from '../services/translation.service'
 import { FormBuilder } from '@angular/forms'
 import { Router } from '@angular/router'
 import { Observable, Subject, catchError, first, forkJoin, map } from 'rxjs'
@@ -52,8 +53,11 @@ export class SpecificationsComponent implements OnInit {
     private apiService: ApiService,
     private fb: FormBuilder,
     private router: Router,
-    private cdr: ChangeDetectorRef
-  ) {}
+    private cdr: ChangeDetectorRef,
+    private translation: TranslationService
+  ) {
+  }
+  t = (key: string) => this.translation.map()[key] ?? key
   contributing: boolean = false
   fillSpecifications(specs: IspecificationSummary[]) {
     if (!this.config) return

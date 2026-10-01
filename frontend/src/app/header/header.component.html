@@ -7,44 +7,77 @@
     <button
       class="header-btn"
       type="button"
-      aria-label="Configure MQTT/Github"
+      [attr.aria-label]="t('header.configure')"
       routerLink="/configure"
       routerLinkActive="active"
       [routerLinkActiveOptions]="{ exact: true }"
-      matTooltip="Configure MQTT/Github"
+      [matTooltip]="t('header.configure')"
     >
       <mat-icon aria-hidden="true">settings</mat-icon>
     </button>
     <button
       class="header-btn"
       type="button"
-      aria-label="Contribute/Import/Export Specifications"
+      [attr.aria-label]="t('header.specifications')"
       routerLink="/specifications"
       routerLinkActive="active"
       [routerLinkActiveOptions]="{ exact: true }"
-      matTooltip="Contribute/Import/Export Specifications"
+      [matTooltip]="t('header.specifications')"
     >
       <mat-icon aria-hidden="true">description</mat-icon>
     </button>
     <button
       class="header-btn"
       type="button"
-      aria-label="Show Busses"
+      [attr.aria-label]="t('header.busses')"
       routerLink="/busses"
       routerLinkActive="active"
       [routerLinkActiveOptions]="{ exact: true }"
-      matTooltip="Show Busses"
+      [matTooltip]="t('header.busses')"
     >
       <mat-icon aria-hidden="true">device_hub</mat-icon>
     </button>
     @if (auth.isOidcEnabled && auth.isAuthenticated) {
-      <span class="auth-user" matTooltip="Logged in as {{ auth.user?.name || auth.user?.email || 'User' }}">
+      <span class="auth-user" [matTooltip]="t('header.loggedInAs') + ' ' + (auth.user?.name || auth.user?.email || 'User')">
         <mat-icon>person</mat-icon>
         <span class="auth-username">{{ auth.user?.name || auth.user?.email || 'User' }}</span>
       </span>
-      <button class="header-btn" type="button" aria-label="Logout" (click)="auth.logout()" matTooltip="Logout">
+      <button class="header-btn" type="button" [attr.aria-label]="t('header.logout')" (click)="auth.logout()" [matTooltip]="t('header.logout')">
         <mat-icon aria-hidden="true">logout</mat-icon>
       </button>
     }
+    <button
+      class="lang-select"
+      type="button"
+      (click)="langMenu?.open($event)"
+      [attr.aria-label]="t('header.language') + ': ' + currentLang.toUpperCase()"
+      [matMenuTriggerFor]="langMenu"
+      [matTooltip]="t('header.language') + ' · ' + currentLang.toUpperCase()"
+    >
+      <mat-icon aria-hidden="true">language</mat-icon>
+    </button>
+    <mat-menu #langMenu="matMenu" class="lang-menu">
+      @for (lang of languages; track lang.code) {
+        <button mat-menu-item (click)="setLanguage(lang.code)">
+          <span class="lang-opt">{{ lang.label }}</span>
+          @if (currentLang === lang.code) {
+            <mat-icon>check</mat-icon>
+          }
+        </button>
+      }
+    </mat-menu>
+    <button
+      class="theme-toggle"
+      type="button"
+      [attr.aria-label]="t('header.toggleTheme')"
+      [matTooltip]="t('header.toggleTheme')"
+      (click)="toggleTheme()"
+    >
+      @if (theme === 'dark') {
+        <mat-icon aria-hidden="true" class="theme-icon">light_mode</mat-icon>
+      } @else {
+        <mat-icon aria-hidden="true" class="theme-icon">dark_mode</mat-icon>
+      }
+    </button>
   </span>
 </header>

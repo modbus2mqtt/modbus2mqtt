@@ -73,6 +73,10 @@ export class NumberConverter extends Converter {
       if (!multiplier) multiplier = 1
       if (!offset) offset = 0
       v = v * multiplier + offset
+      // Remove floating-point noise from the multiplier division (e.g. 262 * 0.1
+      // -> 26.200000000000003). Rounding to ~10 significant decimals collapses the
+      // artifact while preserving real precision (0.01-resolution stays intact).
+      if (typeof v === 'number' && Number.isFinite(v)) v = Math.round(v * 1e10) / 1e10
       return v
     } else throw new Error('entityid not found in entities')
   }

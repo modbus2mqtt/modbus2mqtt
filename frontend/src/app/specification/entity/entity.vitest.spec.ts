@@ -26,6 +26,7 @@ function createSpecificationMethods(): ISpecificationMethods {
     getCurrentMessage: () => ({ type: 0, category: 0 }),
     getMqttLanguageName: () => 'english',
     getUom: () => 'cm',
+    getEntityName: () => '',
     getNonVariableNumberEntities: () => [{ id: 4, name: 'ent 4' }],
     getMqttNames: () => [],
     getSaveObservable: () => new Subject<void>(),
@@ -60,7 +61,7 @@ describe('Entity Component tests (vitest)', () => {
   let httpMock: HttpTestingController
   let specMethods: ISpecificationMethods
 
-  async function mount(displayHex = false): Promise<void> {
+  async function mount(displayHex = false, entity?: ImodbusEntity): Promise<void> {
     ;(window as any).configuration = { rootUrl: '/' }
     specMethods = createSpecificationMethods()
 
@@ -78,7 +79,7 @@ describe('Entity Component tests (vitest)', () => {
     fixture = TestBed.createComponent(EntityComponent)
     component = fixture.componentInstance
     component.specificationMethods = specMethods
-    component.entity = createSelectEntity()
+    component.entity = entity || createSelectEntity()
     component.disabled = false
     component.displayHex = displayHex
     fixture.detectChanges()
@@ -206,4 +207,21 @@ describe('Entity Component tests (vitest)', () => {
     component.stringPropertiesFormGroup.get('textSwapBytes')!.setValue(true)
     fixture.detectChanges()
   })
+  it('renders the localized (i18n) entity name via getEntityName', async () => {
+    await mount(false, { ...createSelectEntity(), name: 'Room occupancy' })
+    // The discovery language in the real app resolves entity translations from
+    // the spec i18n blocks; simulate a German UI here.
+    specMethods.getEntityName = (id: number) => (id === 1 ? 'Raumbelegung' : '')
+    // getVariableTypeOrEntityNameLabel() must prefer the localized name
+    expect(component.getVariableTypeOrEntityNameLabel()).toBe('Raumbelegung')
+    // ...and still expose the raw name for the edit field
+    expect(component.entity.name).toBe('Room occupancy')
+  })
+
+  it('falls back to entity.name when no localized name is provided', async () => {
+    await mount(false, { ...createSelectEntity(), name: 'Room occupancy' })
+    specMethods.getEntityName = () => ''
+    expect(component.getVariableTypeOrEntityNameLabel()).toBe('Room occupancy')
+  })
+
 })

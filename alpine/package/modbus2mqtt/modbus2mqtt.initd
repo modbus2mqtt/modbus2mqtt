@@ -3,7 +3,10 @@
 
 description="Modbus to MQTT bridge"
 command="/usr/bin/modbus2mqtt"
-command_args="-c /config -d /data -s /ssl"
+# EVERYTHING lives under /data (the single persistent share):
+#   /data/modbus2mqtt - configuration (MQTT, busses, devices, local specs)
+#   /data/public      - public specifications
+command_args="-c /data -d /data -s /ssl"
 command_user="modbus2mqtt:dialout"
 command_background=true
 pidfile="/run/$RC_SVCNAME.pid"
@@ -22,11 +25,18 @@ start_pre() {
     checkpath --directory --mode 0755 --owner modbus2mqtt:dialout /var/lib/modbus2mqtt/.config/git
     checkpath --file-truncate --mode 0644 --owner modbus2mqtt:dialout /var/log/$RC_SVCNAME.log
     checkpath --file-truncate --mode 0644 --owner modbus2mqtt:dialout /var/log/$RC_SVCNAME.err
-    checkpath --directory --mode 0755 --owner modbus2mqtt:dialout /config/modbus2mqtt
+    mkdir -p /data/modbus2mqtt
+    checkpath --directory --mode 0755 --owner modbus2mqtt:dialout /data/modbus2mqtt
     checkpath --directory --mode 0755 --owner modbus2mqtt:dialout /data/public
-    checkpath --directory --mode 0755 --owner modbus2mqtt:dialout /config/modbus2mqtt
+    # Migrate legacy /data/local layout once (idempotent)
+    if [ -d /data/local ] && [ ! -e /data/modbus2mqtt/modbus2mqtt.yaml ]; then
+        ebegin "Migrating /data/local to /data/modbus2mqtt"
+        cp -R /data/local/. /data/modbus2mqtt/
+        chown -R modbus2mqtt:dialout /data/modbus2mqtt
+        eend $?
+    fi
     checkpath --file --mode 0600 --owner modbus2mqtt:dialout /ssl/secrets.txt
-# Git is used within this service. It is confused about the permissions    
+# Git is used within this service. It is confused about the permissions
     git config --system --add safe.directory /data/public
 
 }

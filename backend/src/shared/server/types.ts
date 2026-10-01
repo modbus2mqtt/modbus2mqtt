@@ -103,7 +103,10 @@ export interface Iconfiguration {
   tcpBridgePort?: number
   displayHex?: boolean
   appVersion?: string
+  modbusAutoDiscoverBlacklist?: string[]
+  modbusAutoDiscoverNetworkScan?: boolean
 }
+
 export interface IUserAuthenticationStatus {
   hassiotoken: boolean
   oidcEnabled: boolean

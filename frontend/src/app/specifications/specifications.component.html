@@ -3,7 +3,7 @@
   <div class="flexrows">
     <mat-card class="width250pt card">
       <mat-card-header>
-        <mat-card-title>Functions</mat-card-title>
+        <mat-card-title>{{ t('spec.functions') }}</mat-card-title>
       </mat-card-header>
       <mat-card-content>
         <div class="border" dragndropDirective (fileDropped)="onJsonFileDropped($event)">
@@ -13,26 +13,26 @@
             id="jsonFiles"
             multiple
             accept=".json"
-            matTooltip="Import Specification JSON"
+            [matTooltip]="t('spec.importJson')"
             (change)="jsonBrowseHandler($event.target)"
             hidden
             class="downloadLabel"
           />
           <label class="downloadLabel" for="jsonFiles" i18n dragndropDirective (fileDropped)="onJsonFileDropped($event)"
-            >Import Specification Files</label
+            >{{ t('spec.importFiles') }}</label
           >
         </div>
 
-        <button mat-button class="width150pt downloadLink" (click)="fetchPublic()">Update Public Specifications</button>
+        <button mat-button class="width150pt downloadLink" (click)="fetchPublic()">{{ t('spec.updatePublic') }}</button>
 
-        <a [href]="generateDownloadLink('local')" download class="downloadLink">Download Local Settings</a>
+        <a [href]="generateDownloadLink('local')" download class="downloadLink">{{ t('spec.downloadLocal') }}</a>
       </mat-card-content>
     </mat-card>
     <div [ngClass]="{ waitCursor: contributing }">
       @for (spec of specifications; track $index) {
         <mat-card class="width350pt card">
           <mat-card-header>
-            <mat-card-title matTooltip="Contribute Specification" class="width200pt"
+            <mat-card-title [matTooltip]="t('spec.contribute')" class="width200pt"
               ><mat-icon [matTooltip]="getStatusText(spec.status)">{{ getStatusIcon(spec.status) }}</mat-icon
               >{{ getTranslatedSpecName(spec) }}</mat-card-title
             >
@@ -72,10 +72,10 @@
                 Contribute
               </button>
             </div>
-            <a [href]="generateDownloadLink(spec.filename)" download>Download</a>
+            <a [href]="generateDownloadLink(spec.filename)" download>{{ t('spec.download') }}</a>
             <p>
               @if (spec.pullUrl != undefined) {
-                <a [href]="spec.pullUrl" target="_blank">View Pull Request on Github</a>
+                <a [href]="spec.pullUrl" target="_blank">{{ t('spec.viewPr') }}</a>
               }
             </p>
 

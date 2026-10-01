@@ -1,8 +1,9 @@
 .mat-mdc-card-header {
   font-weight: bold;
-  background-color: rgb(235, 223, 250);
+  background: var(--bg-surface);
   display: flex;
   height: 45pt;
+  color: var(--text);
 }
 .mdc-button__label {
   text-align: left;

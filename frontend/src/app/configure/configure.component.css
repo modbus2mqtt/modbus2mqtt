@@ -1,7 +1,22 @@
 .mat-mdc-card-header {
   font-weight: bold;
-  background-color: rgb(207, 245, 248);
+  background: var(--bg-surface);
   display: flex;
   min-height: 4em;
   padding-top: 1em;
+  color: var(--text);
+}
+
+.debugComponentName {
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.debugComponentDescription {
+  display: block;
+  font-size: 0.75em;
+  color: var(--text-muted, rgba(0, 0, 0, 0.6));
+  margin-top: 0.15em;
+  white-space: normal;
 }

@@ -72,14 +72,32 @@ export class SelectConverter extends Converter {
     if (!entity) throw new Error('entity not found in entities')
 
     if (this.component === 'binary') return []
+    // The spec's own option list is authoritative: the name (e.g. "SI") maps to
+    // its key (e.g. 1) so a write from the webui works even without i18n entries.
+    const options = this.getOptions(spec, entityid)
+    const opt = options.find((o) => String(o.name) === String(name).trim())
+    if (opt) {
+      const key = Number(opt.key)
+      const buf = Buffer.alloc(2)
+      buf.writeInt16BE(key)
+      return [key]
+    }
+    // Also accept the raw key if it is a valid option (e.g. an integer value).
+    const asNum = Number(name)
+    if (!isNaN(asNum) && options.some((o) => Number(o.key) === asNum)) {
+      const buf = Buffer.alloc(2)
+      buf.writeInt16BE(asNum)
+      return [asNum]
+    }
+    // i18n (translated option names) as a last resort. Note the helper returns
+    // [0] when nothing matches, so only trust it when it actually resolves.
     const val = getSpecificationI18nEntityOptionId(spec, ConfigSpecification.mqttdiscoverylanguage!, entityid, name)
-    if (val) {
+    if (val && options.some((o) => Number(o.key) === val[0])) {
       const buf = Buffer.alloc(2)
       buf.writeInt16BE(val[0])
       return val
     }
 
-    const options = this.getOptions(spec, entityid)
     const msg = 'unknown option  entity id: ' + entity.id + '(assuming: name = 0)' + name + 'options: ' + options
     log.log(LogLevelEnum.error, msg)
     return []

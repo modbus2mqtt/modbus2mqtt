@@ -144,7 +144,21 @@ export class MqttDiscover {
       if (language)
         for (const e of spec.entities) {
           // !slave.suppressedEntities.includes(e.id)
-          if (e.id >= 0 && !e.variableConfiguration) {
+          // Config registers are not exposed to MQTT / Home Assistant - they are
+          // device configuration and must be read/written directly (config API).
+          // Diagnostic entities (sensor_identification, hw_version, fw_version) ARE
+          // announced to Home Assistant as informational sensors.
+          if (e.id >= 0 && !e.variableConfiguration && e.category !== 'config') {
+            // Conditional entities that are NOT active on the device (the matching
+            // condition register bit is not set) must not be announced to Home
+            // Assistant: the device does not have that sensor. When the spec passed
+            // here carries read values (post-poll republish), inactive entities are
+            // reported with an empty mqttValue and are skipped. Handles both the
+            // legacy single `condition` and the multi-condition `conditions` array.
+            const hasCond = e.condition != undefined || (e.conditions != undefined && e.conditions.length > 0)
+            const isInactiveConditional =
+              hasCond && (e as ImodbusEntity).mqttValue !== undefined && (e as ImodbusEntity).mqttValue === ''
+            if (isInactiveConditional) continue
             const converter = ConverterMap.getConverter(e)
             const ent: ImodbusEntity = e as ImodbusEntity
 
@@ -397,19 +411,41 @@ export class MqttDiscover {
   // Republishes discovery payloads for a slave when device-variable values
   // (serial_number, sw_version, hw_version, entityUom) have become available
   // after the first successful Modbus poll. No-op when nothing changed.
-  republishDiscoveryIfChanged(slave: Slave): void {
-    const spec = slave.getSpecification() as ImodbusSpecification | undefined
+  republishDiscoveryIfChanged(slave: Slave, valueSpec?: ImodbusSpecification | undefined): void {
+    const spec = valueSpec ?? (slave.getSpecification() as ImodbusSpecification | undefined)
     if (!spec || !spec.entities) return
     if (slave.getNoDiscovery()) return
 
     const payloads = this.generateDiscoveryPayloads(slave, spec)
+    // Entities that are no longer announced (e.g. a conditional sensor whose
+    // condition bit became unset) must be un-announced (empty payload deletes
+    // the Home Assistant entity). Generate the set of currently announced
+    // topics and emit deletion payloads for the ones missing from `payloads`.
+    const announcedTopics = new Set<string>()
+    // Discovery topics look like "<discoveryprefix>/<haType>/<busid>s<slaveid>/e<id>/config"
+    // (NOT the MQTT base topic), so match on the slave key embedded in the topic.
+    const slaveKey = slave.getBusId() + 's' + slave.getSlaveId()
+    this.lastDiscoveryPayloads.forEach((_payload, topic) => {
+      if (!topic.includes('/config')) return
+      // only touch this slave's topics
+      if (topic.split('/').includes(slaveKey)) announcedTopics.add(topic)
+    })
     const changed: ItopicAndPayloads[] = []
+    const liveTopics = new Set<string>()
     for (const tp of payloads) {
       if (slave.getNoDiscoverEntities().includes(tp.entityid)) continue
       const payloadStr = tp.payload.toString()
+      liveTopics.add(tp.topic)
       if (this.lastDiscoveryPayloads.get(tp.topic) !== payloadStr) {
         changed.push(tp)
         this.lastDiscoveryPayloads.set(tp.topic, payloadStr)
+      }
+    }
+    // Emit deletions for previously-announced topics that are no longer live.
+    for (const topic of announcedTopics) {
+      if (!liveTopics.has(topic)) {
+        changed.push({ topic: topic, payload: Buffer.alloc(0), entityid: 0 })
+        this.lastDiscoveryPayloads.delete(topic)
       }
     }
     if (changed.length === 0) return

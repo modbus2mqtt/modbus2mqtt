@@ -4,9 +4,10 @@ import { Subject } from 'rxjs'
 import { Bus } from '../../bus.js'
 import { Modbus } from '../../modbus.js'
 import { LogLevelEnum, Logger } from '../../../specification/index.js'
-import { HttpErrorsEnum, ImodbusSpecification, Ispecification } from '../../../shared/specification/index.js'
+import { HttpErrorsEnum, ImodbusSpecification, Ispecification, ModbusRegisterType } from '../../../shared/specification/index.js'
 import { ModbusTasks, apiUri } from '../../../shared/server/index.js'
 import { sendResult } from '../sendResult.js'
+import { scanProbeOk } from './slaveScan.js'
 import { ApiError, Ctx, Registrar, created, ok, requireBusSlave, stripSpecFileData } from '../routeHelpers.js'
 
 const debug = Debug('httpserver')
@@ -118,5 +119,95 @@ export function registerModbusRoutes(r: Registrar): void {
       }
     }
     throw new ApiError(HttpErrorsEnum.SrvErrInternalServerError, 'No entity found in specfication')
+  })
+
+  // ---- Config register (device configuration) read/write API ----
+  // Config registers (category==='config') are not published to MQTT/HA; they are
+  // read and written directly to configure the device:
+  //   GET /api/modbus/config?busid=&slaveid=&spec=&register=&registerType=  -> raw value
+  //   POST /api/modbus/config  body: { spec, entityid, mqttValue } -> write via the entity converter
+  r.get(apiUri.configRegister, async (ctx) => {
+    const { busid, slaveid } = requireBusSlave(ctx)
+    const bus = Bus.getBus(busid)
+    if (!bus) throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'Bus not found. Id: ' + busid)
+    const reg = Number.parseInt(String(ctx.query['register']))
+    const registerType = Number.parseInt(String(ctx.query['registerType'] ?? '3'))
+    if (isNaN(reg)) throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'register required')
+    try {
+      const addresses = new Set([{ address: reg, registerType }])
+      const values = await bus.getModbusAPI().readModbusRegister(slaveid, addresses, {
+        task: ModbusTasks.poll,
+        errorHandling: { retry: true },
+      })
+      let raw: number | undefined
+      switch (registerType) {
+        case 4: raw = values.analogInputs.get(reg)?.data?.[0]; break
+        case 3: raw = values.holdingRegisters.get(reg)?.data?.[0]; break
+        case 1: raw = values.coils.get(reg)?.data?.[0]; break
+        default: raw = values.discreteInputs.get(reg)?.data?.[0]; break
+      }
+      return ok({ register: reg, registerType, value: raw ?? null })
+    } catch (e) {
+      throw new ApiError(HttpErrorsEnum.SrvErrInternalServerError, e instanceof Error ? e.message : String(e))
+    }
+  })
+
+  r.post(apiUri.configRegister, async (ctx) => {
+    const { busid, slaveid } = requireBusSlave(ctx)
+    const bus = Bus.getBus(busid)
+    if (!bus) throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'Bus not found. Id: ' + busid)
+    const body = ctx.body as { spec?: Ispecification; entityid?: number; mqttValue?: string }
+    if (body && body.spec && body.entityid != undefined && body.mqttValue != undefined) {
+      try {
+        await Modbus.writeEntityMqtt(bus.getModbusAPI(), slaveid, body.spec, body.entityid, body.mqttValue)
+        return created('')
+      } catch (e) {
+        throw new ApiError(HttpErrorsEnum.SrvErrInternalServerError, e instanceof Error ? e.message : String(e))
+      }
+    }
+    throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'spec, entityid and mqttValue required')
+  })
+
+  // ---- Slave-ID scan ----
+  // Probes slave ids 1..32 first; if none respond, probes 33..256. A slave is
+  // considered present when a holding-register read for that unit id actually
+  // returns data. The Modbus API resolves with per-address results even when
+  // the read failed (the error is stored in the result map, not thrown), so a
+  // probe must check for data in the resolved values - otherwise every id in
+  // the range looks "present" (see issue: scan always finds slaves).
+  r.get(apiUri.scanSlaves, async (ctx) => {
+    const busid = ctx.query['busid'] ? Number.parseInt(String(ctx.query['busid'])) : undefined
+    if (busid === undefined || isNaN(busid)) throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'busid required')
+    const bus = Bus.getBus(busid)
+    if (!bus) throw new ApiError(HttpErrorsEnum.ErrBadRequest, 'Bus not found. Id: ' + busid)
+    const modbusAPI = bus.getModbusAPI()
+    const probe = async (id: number): Promise<boolean> => {
+      try {
+        const addresses = new Set([{ address: 0, registerType: ModbusRegisterType.HoldingRegister }])
+        const values = await modbusAPI.readModbusRegister(id, addresses, {
+          task: ModbusTasks.poll,
+          errorHandling: { retry: false },
+          maxRegistersPerRequest: 1,
+        } as never)
+        // A failed read is not thrown: it is recorded as {error} in the result
+        // map for the probed address. Only a data-bearing result means the
+        // slave answered (see scanProbeOk).
+        return scanProbeOk(values)
+      } catch {
+        return false
+      }
+    }
+    const found: number[] = []
+    const firstPass = Array.from({ length: 32 }, (_, i) => i + 1)
+    for (const id of firstPass) {
+      if (await probe(id)) found.push(id)
+    }
+    if (!found.length) {
+      // No slave in 1..32 - scan the remaining 33..256
+      for (let id = 33; id <= 256; id++) {
+        if (await probe(id)) found.push(id)
+      }
+    }
+    return ok({ slaveIds: found, scanned: found.length ? '1-32' : '1-256' })
   })
 }

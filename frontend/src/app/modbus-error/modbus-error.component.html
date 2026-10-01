@@ -1,11 +1,11 @@
 <div>
-  <div>Number of entries in the queue: {{ modbusErrors ? modbusErrors.queueLength : '' }}</div>
+  <div>{{ t('error.queueLength') }}: {{ modbusErrors ? modbusErrors.queueLength : '' }}</div>
   @for (task of tasksToLog; track $index) {
     <div class="icon-text">
       <mat-icon [class]="filterNewerThan(filterTask(modbusErrors.errors, task), getMinAgo(60)).length > 0 ? 'red' : 'green'"
         >circle</mat-icon
       >
-      <span>Task: {{ getTaskName(task) }} ({{ modbusErrors.requestCount[task] }} processed calls) </span>
+      <span>Task: {{ getTaskName(task) }} ({{ modbusErrors.requestCount[task] }} {{ t('error.processedCalls') }}) </span>
     </div>
     @for (state of getErrorStates(filterNewerThan(filterTask(modbusErrors.errors, task), getMinAgo(60))); track $index) {
       <div class="indent">

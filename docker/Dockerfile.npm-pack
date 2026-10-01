@@ -45,10 +45,13 @@ RUN deluser --remove-home node 2>/dev/null || true && \
     adduser -S -D -u 1000 -h /var/lib/modbus2mqtt -s /sbin/nologin \
       -G dialout -g modbus2mqtt modbus2mqtt
 
-# Create application directories
-RUN mkdir -p /config /data /ssl /var/lib/modbus2mqtt/.config/git && \
-    chown -R modbus2mqtt:dialout /var/lib/modbus2mqtt /config /data /ssl && \
-    chmod -R 755 /var/lib/modbus2mqtt /config /data /ssl
+# Create application directories.
+# /data is the single persistent share: configuration (/data/modbus2mqtt)
+# and public specifications (/data/public) both live there, so mounting
+# /data is enough for configuration to survive container recreation.
+RUN mkdir -p /data /ssl /var/lib/modbus2mqtt/.config/git && \
+    chown -R modbus2mqtt:dialout /var/lib/modbus2mqtt /data /ssl && \
+    chmod -R 755 /var/lib/modbus2mqtt /data /ssl
 
 # Home Assistant s6-overlay service compatibility script
 COPY ./docker/service /usr/bin/service

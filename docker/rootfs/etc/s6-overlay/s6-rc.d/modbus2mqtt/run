@@ -1,5 +1,7 @@
 #!/command/with-contenv sh
+# Runs as root (via s6) then drops privileges to the modbus2mqtt user.
+# Everything (config + public specs) lives under /data, the persistent share.
 cd /var/lib/modbus2mqtt || { echo "ERROR: Cannot access home directory"; exit 1; }
 export HOME=/var/lib/modbus2mqtt
-s6-setuidgid modbus2mqtt /usr/local/bin/modbus2mqtt -c /config -d /data -s /ssl 2>&1
+s6-setuidgid modbus2mqtt /usr/local/bin/modbus2mqtt -c /data -d /data -s /ssl 2>&1
 [ $? -ne 0 ] && echo "modbus2mqtt exited with error code $?" 2>&1

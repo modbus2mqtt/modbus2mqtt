@@ -2,16 +2,17 @@
   <div class="flexrows">
     <mat-card class="width350pt card">
       <mat-card-header>
-        <mat-card-title class="width200pt">Configure MQTT</mat-card-title>
+        <mat-card-title class="width200pt">{{ t('configure.mqttTitle') }}</mat-card-title>
       </mat-card-header>
-      <mat-card-content> </mat-card-content>
+      <mat-card-content>
+        <div class="mqtt-form-wrap">
       <form class="flexcolumns" [formGroup]="configureMqttFormGroup">
         <div class="saveCancel">
           <button
             mat-icon-button
             [disabled]="saveDisabled()"
             class="material-icons app-toolbar-menu save-button"
-            matTooltip="Save Changes"
+            [matTooltip]="t('bus.saveChanges')"
             (click)="save()"
             color="primary"
           >
@@ -20,7 +21,7 @@
           <button
             mat-icon-button
             class="material-icons app-toolbar-menu cancel-button"
-            matTooltip="Cancel Changes"
+            [matTooltip]="t('bus.cancelChanges')"
             color="warn"
             (click)="close()"
           >
@@ -28,9 +29,9 @@
           </button>
         </div>
 
-        <ng-template matStepLabel>Enter MQTT Connection</ng-template>
+        <ng-template matStepLabel>{{ t('configure.enterMqtt') }}</ng-template>
         <mat-form-field class="width250pt">
-          <mat-label>MQTT server URL</mat-label>
+          <mat-label>{{ t('configure.mqttUrl') }}</mat-label>
           <input matInput formControlName="mqttserverurl" (change)="onChangekMqttConfig()" placeholder="mqtt://mosquitto:1883" />
           @if (configureMqttFormGroup.hasError('invalidConnection') != null) {
             <mat-error> Invalid Connection Data </mat-error>
@@ -41,7 +42,7 @@
         </mat-form-field
         ><br />
         <mat-form-field class="width250pt">
-          <mat-label>User</mat-label>
+          <mat-label>{{ t('configure.user') }}</mat-label>
           <input matInput formControlName="mqttuser" (change)="onChangekMqttConfig()" />
           @if (configureMqttFormGroup.get('mqttuser')?.hasError('required') != null) {
             <mat-error> This field is reqired </mat-error>
@@ -49,14 +50,14 @@
         </mat-form-field
         ><br />
         <mat-form-field class="width250pt">
-          <mat-label>Password</mat-label>
+          <mat-label>{{ t('configure.password') }}</mat-label>
           <input matInput formControlName="mqttpassword" (change)="onChangekMqttConfig()" />
           @if (configureMqttFormGroup.get('mqttpassword')?.hasError('required') != null) {
             <mat-error> This field is reqired </mat-error>
           }
         </mat-form-field>
         <mat-form-field class="width250pt">
-          <mat-label>CA certificate file (located in ssl directory)</mat-label>
+          <mat-label>{{ t('configure.caFile') }}</mat-label>
           <mat-select matInput formControlName="mqttcafile" (selectionChange)="onChangekMqttConfig()">
             @for (c of sslFiles; track $index) {
               <mat-option [value]="c">{{ c }} </mat-option>
@@ -65,7 +66,7 @@
           <mat-hint>Example: {{ defaultCaFile }}</mat-hint>
         </mat-form-field>
         <mat-form-field class="width250pt">
-          <mat-label>Client certificate file (located in ssl directory)</mat-label>
+          <mat-label>{{ t('configure.certFile') }}</mat-label>
           <mat-select matInput formControlName="mqttcertfile" (selectionChange)="onChangekMqttConfig()">
             @for (c of sslFiles; track $index) {
               <mat-option [value]="c">{{ c }} </mat-option>
@@ -74,7 +75,7 @@
           <mat-hint>Example: {{ defaultCertFile }}</mat-hint>
         </mat-form-field>
         <mat-form-field class="width250pt">
-          <mat-label>Client key file (located in ssl directory)</mat-label>
+          <mat-label>{{ t('configure.keyFile') }}</mat-label>
           <mat-select matInput formControlName="mqttkeyfile" (selectionChange)="onChangekMqttConfig()">
             @for (c of sslFiles; track $index) {
               <mat-option [value]="c">{{ c }} </mat-option>
@@ -91,27 +92,41 @@
           >{{ mqttConnectMessage }}
         </div>
       </form>
+        </div>
+      </mat-card-content>
     </mat-card>
     <div class="flexcols">
       <mat-card class="width350pt card">
         <mat-card-header>
-          <mat-card-title>Configure Github</mat-card-title>
+          <mat-card-title>{{ t('configure.githubTitle') }}</mat-card-title>
         </mat-card-header>
         <mat-card-content>
           <mat-form-field class="width250pt">
-            <mat-label>Personal Access Token</mat-label>
+            <mat-label>{{ t('configure.pat') }}</mat-label>
             <input matInput [formControl]="ghPersonalAccessToken" (change)="onChangeGithubToken()" />
           </mat-form-field>
         </mat-card-content>
       </mat-card>
       <mat-card class="width350pt card">
         <mat-card-header>
-          <mat-card-title>Configure Debug</mat-card-title>
+          <mat-card-title>{{ t('configure.debugTitle') }}</mat-card-title>
         </mat-card-header>
         <mat-card-content>
           <mat-form-field class="width250pt">
-            <mat-label>Debug components</mat-label>
-            <input matInput [formControl]="debugComponentsFormControl" />
+            <mat-label>{{ t('configure.debugComponents') }}</mat-label>
+            <mat-select multiple [formControl]="debugComponentsFormControl" [compareWith]="compareDebugComponentName">
+              @for (c of knownDebugComponents; track c.name) {
+                <mat-option [value]="c.name">
+                  <div>
+                    <span class="debugComponentName">{{ c.name }}</span>
+                    <div class="debugComponentDescription">{{ c.description }}</div>
+                  </div>
+                </mat-option>
+              }
+            </mat-select>
+            <mat-hint>
+              {{ t('configure.debugComponentsHint') }}
+            </mat-hint>
           </mat-form-field>
         </mat-card-content>
       </mat-card>

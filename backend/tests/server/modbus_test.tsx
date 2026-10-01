@@ -234,6 +234,27 @@ describe('Modbus read', () => {
   //     done();
   // });
 })
+describe('isEntityActive', () => {
+  const entity = (bit: number) => ({
+    modbusAddress: 0,
+    condition: { register: 501, bit, comparator: 'eq', value: 1 },
+  })
+  it('activates the entity when the condition bit is set (WRF06 register 501 = 33)', () => {
+    // 33 = 0b00100001 -> bit0 (temp) and bit5 (co2) set
+    expect(Modbus.isEntityActive(entity(0), 33)).toBe(true)
+    expect(Modbus.isEntityActive(entity(5), 33)).toBe(true)
+  })
+  it('deactivates the entity when the condition bit is clear', () => {
+    expect(Modbus.isEntityActive(entity(1), 33)).toBe(false) // rH bit1 clear
+    expect(Modbus.isEntityActive(entity(6), 33)).toBe(false) // VOC bit6 clear
+  })
+  it('returns false when the condition register value is missing', () => {
+    expect(Modbus.isEntityActive(entity(0), undefined)).toBe(false)
+  })
+  it('treats entities without a condition as always active', () => {
+    expect(Modbus.isEntityActive({ modbusAddress: 502 }, 33)).toBe(true)
+  })
+})
 it.skip('Modbus modbusDataToSpec spec.identified = identified', () => {
   const spec: IfileSpecification = {
     version: '0.1',
@@ -337,4 +358,128 @@ it('Modbus writeEntityMqtt', async () => {
   } catch (e) {
     expect(`[FAIL] ${e}`.trim()).toBeFalsy()
   }
+})
+
+describe('conditional same-register variants (WRF06 register 400 selects mapping)', () => {
+  const mkSpec = () => {
+    const si = {
+      id: 1, mqttname: 'temp_si', converter: 'number', modbusAddress: 0,
+      registerType: ModbusRegisterType.HoldingRegister, readonly: true,
+      converterParameters: { multiplier: 0.1, numberFormat: 0, uom: '°C' },
+      condition: { register: 400, comparator: 'eq', value: 1 },
+      valid: true,
+    }
+    const imp = {
+      id: 2, mqttname: 'temp_imp', converter: 'number', modbusAddress: 0,
+      registerType: ModbusRegisterType.HoldingRegister, readonly: true,
+      converterParameters: { multiplier: 0.1, numberFormat: 0, uom: '°F' },
+      condition: { register: 400, comparator: 'eq', value: 2 },
+      valid: true,
+    }
+    return {
+      filename: 'multiaddr', model: 'WRF06', manufacturer: 'Thermokon',
+      entities: [si, imp],
+    } as unknown as IfileSpecification
+  }
+  it('reads the active variant value at the shared address (400=1 -> SI active, Imperial inactive)', async () => {
+    const spec = mkSpec()
+    const cond = new Map<number, { data: number[] }>([[400, { data: [1] }]])
+    const vals = new Map<number, { data: number[] }>([[0, { data: [240] }]])
+    const modbusAPI = {
+      getName: () => 'test',
+      readModbusRegister: async (slaveid: number, addresses: Set<ImodbusAddress>, _o: unknown) => {
+        const out = { holdingRegisters: new Map(), analogInputs: new Map(), coils: new Map(), discreteInputs: new Map() }
+        const first = addresses.values().next().value
+        if (first.address === 400) { cond.forEach((v, k) => out.holdingRegisters.set(k, v)) }
+        else { vals.forEach((v, k) => out.holdingRegisters.set(k, v)) }
+        return out
+      },
+    } as any
+    const emitted: ImodbusSpecification[] = []
+    await Modbus.getModbusSpecificationFromData(
+      ModbusTasks.specification,
+      modbusAPI,
+      5,
+      spec,
+      { next: (mspec: ImodbusSpecification) => emitted.push(mspec) } as any
+    )
+    expect(emitted.length).toBe(1)
+    const si = emitted[0].entities.find((e) => e.id === 1)
+    const imp = emitted[0].entities.find((e) => e.id === 2)
+    // SI (400=1) is active -> its value is 240*0.1 = 24; Imperial (400=2) is inactive -> mqttValue empty
+    expect(si?.mqttValue).toBe(24)
+    expect(imp?.mqttValue).toBe('')
+  })
+  it('reads the other variant when 400=2 (Imperial active, SI inactive)', async () => {
+    const spec = mkSpec()
+    const modbusAPI = {
+      getName: () => 'test',
+      readModbusRegister: async (slaveid: number, addresses: Set<ImodbusAddress>, _o: unknown) => {
+        const out = { holdingRegisters: new Map(), analogInputs: new Map(), coils: new Map(), discreteInputs: new Map() }
+        const first = addresses.values().next().value
+        if (first.address === 400) out.holdingRegisters.set(400, { data: [2] })
+        else out.holdingRegisters.set(0, { data: [240] })
+        return out
+      },
+    } as any
+    const emitted: ImodbusSpecification[] = []
+    await Modbus.getModbusSpecificationFromData(
+      ModbusTasks.specification,
+      modbusAPI,
+      5,
+      spec,
+      { next: (mspec: ImodbusSpecification) => emitted.push(mspec) } as any
+    )
+    const si = emitted[0].entities.find((e) => e.id === 1)
+    const imp = emitted[0].entities.find((e) => e.id === 2)
+    expect(si?.mqttValue).toBe('')
+    expect(imp?.mqttValue).toBe(24)
+  })
+})
+
+describe('multi-condition same-register variants (WRF06 400 AND 501)', () => {
+  const mkSpec = () => ({
+    filename: 'multicond', model: 'WRF06', manufacturer: 'Thermokon',
+    entities: [
+      { id: 2, mqttname: 'temperature', converter: 'number', modbusAddress: 0,
+        registerType: ModbusRegisterType.HoldingRegister, readonly: true,
+        converterParameters: { multiplier: 0.1, numberFormat: 0, uom: '°C' },
+        conditions: [ { register: 400, comparator: 'eq', value: 1 }, { register: 501, bit: 0, comparator: 'eq', value: 1 } ],
+        valid: true },
+      { id: 3, mqttname: 'temperature_imp', converter: 'number', modbusAddress: 0,
+        registerType: ModbusRegisterType.HoldingRegister, readonly: true,
+        converterParameters: { multiplier: 0.1, numberFormat: 0, uom: '°F' },
+        conditions: [ { register: 400, comparator: 'eq', value: 2 }, { register: 501, bit: 0, comparator: 'eq', value: 1 } ],
+        valid: true },
+    ],
+  } as unknown as IfileSpecification)
+  async function run(reg400: number, reg501: number, raw: number) {
+    const spec = mkSpec()
+    const modbusAPI = {
+      getName: () => 'test',
+      readModbusRegister: async (_s: number, addresses: Set<ImodbusAddress>, _o: unknown) => {
+        const out = { holdingRegisters: new Map(), analogInputs: new Map(), coils: new Map(), discreteInputs: new Map() }
+        const first = addresses.values().next().value
+        if (first.address === 400 || first.address === 501) {
+          out.holdingRegisters.set(400, { data: [reg400] }); out.holdingRegisters.set(501, { data: [reg501] })
+        } else out.holdingRegisters.set(0, { data: [raw] })
+        return out
+      },
+    } as any
+    const emitted: ImodbusSpecification[] = []
+    await Modbus.getModbusSpecificationFromData(ModbusTasks.specification, modbusAPI, 5, spec, { next: (m) => emitted.push(m) } as any)
+    return emitted[0].entities
+  }
+  it('SI temp active only when 400=1 AND 501 bit0 (sensor present)', async () => {
+    const ents = await run(1, 0b00100001, 240) // SI + temp present
+    const si = ents.find((e) => e.id === 2), imp = ents.find((e) => e.id === 3)
+    expect(si?.mqttValue).toBe(24)
+    expect(imp?.mqttValue).toBe('')
+  })
+  it('neither temp variant active when 400=1 but sensor 501 bit0 missing', async () => {
+    const ents = await run(1, 0b00000010, 240) // SI but NO temp sensor
+    const si = ents.find((e) => e.id === 2), imp = ents.find((e) => e.id === 3)
+    expect(si?.mqttValue).toBe('')
+    expect(imp?.mqttValue).toBe('')
+  })
 })

@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core'
 import { trigger, transition, style, animate } from '@angular/animations'
+import { TranslationService } from '../services/translation.service'
 import { AnnouncementService } from '../services/announcement.service'
 import { Announcement } from '../services/announcements'
 import { MatCard, MatCardContent } from '@angular/material/card'
@@ -25,7 +26,8 @@ import { MatTooltip } from '@angular/material/tooltip'
 export class AnnouncementBannerComponent implements OnInit {
   announcements: Announcement[] = []
 
-  constructor(private announcementService: AnnouncementService) {}
+  constructor(private announcementService: AnnouncementService, private translation: TranslationService) {}
+  t = (key: string) => this.translation.map()[key] ?? key
 
   ngOnInit(): void {
     this.announcements = this.announcementService.getActiveAnnouncements()

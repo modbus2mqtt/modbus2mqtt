@@ -1,8 +1,7 @@
 .rightAligned {
   right: 0;
   margin-left: auto;
-
-  background-color: green;
+  background: var(--success);
 }
 
 .scrollable {

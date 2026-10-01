@@ -3,12 +3,15 @@
   margin-top: 1rem;
 }
 .open-close-container {
-  border: 1px solid #dddddd;
+  border: 1px solid var(--border-strong);
   position: absolute;
   top: 5%;
   left: 66%;
   z-index: 10;
   font-weight: bold;
   font-size: 20px;
-  background-color: white;
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }

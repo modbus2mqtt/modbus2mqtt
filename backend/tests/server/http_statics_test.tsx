@@ -9,22 +9,6 @@ beforeAll(async () => {
 })
 afterAll(() => ts.cleanup())
 
-it('GET /index.html rewrites base href to the ingress path', async () => {
-  const response = await ts.request().get('/index.html').expect(200)
-  expect(response.text.indexOf('href="/test/"')).toBeGreaterThanOrEqual(0)
-})
-
-it('GET /index.html with Ingress header', async () => {
-  const response = await ts.request().get('/index.html').set({ 'X-Ingress-Path': 'test' }).expect(200)
-  expect(response.text.indexOf('base href="/test/"')).toBeGreaterThanOrEqual(0)
-})
-
-it('GET angular files serves language specific statics', async () => {
-  const response = await ts.request().get('/en-US/test.css').expect(200)
-  expect(response.text).toBe('.justContent {\n' + '  margin: 1pt;\n' + '}\n')
-  expect(response.type).toBe('text/css')
-})
-
 it('GET local specification files', async () => {
   const response = await ts.request().get('/specifications/files/waterleveltransmitter/files.yaml').expect(200)
   if (response.type === 'text/yaml' || response.type === 'application/x-yaml') {
@@ -40,7 +24,12 @@ it('GET local specification files', async () => {
   }
 })
 
-it('GET / redirects to index.html', async () => {
-  const response = await ts.request().get('/').expect(302)
-  expect(response.headers['location']).toBe('index.html')
+it('GET /old-ui falls through to the new webui (legacy removed)', async () => {
+  const response = await ts.request().get('/old-ui').expect(200)
+  expect(response.type).toBe('text/html')
+})
+
+it('GET / serves the new webui (root)', async () => {
+  const response = await ts.request().get('/').expect(200)
+  expect(response.type).toBe('text/html')
 })

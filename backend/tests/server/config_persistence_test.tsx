@@ -54,6 +54,37 @@ it('write: secrets extracted with !secret placeholders', () => {
   expect(secrets.mqttuser).toBe('writetest_user')
 })
 
+// Test 2b: Secret round-trip health — writing then re-reading repeatedly
+// must NOT corrupt the secret values (regression: read-time substitution used
+// to wrap values in literal quotes which snowballed into invalid YAML).
+it('write/read round-trips secrets without quote corruption', async () => {
+  const cfg = Config.getConfiguration()
+  cfg.mqttconnect.username = 'real_user_1'
+  cfg.mqttconnect.password = 'real_pw_1'
+  cfg.githubPersonalToken = 'real_token_1'
+  new Config().writeConfiguration(cfg)
+
+  // First re-read: values should come back clean (no embedded quotes).
+  const c1 = new Config()
+  await c1.readYamlAsync()
+  expect(Config.getConfiguration().mqttconnect.username).toBe('real_user_1')
+  expect(Config.getConfiguration().mqttconnect.password).toBe('real_pw_1')
+  expect(Config.getConfiguration().githubPersonalToken).toBe('real_token_1')
+
+  // Second write + read: previously the embedded quotes snowballed into
+  // invalid YAML here ("" 'x' "" -> parse error). Must still be clean.
+  const cfg2 = Config.getConfiguration()
+  new Config().writeConfiguration(cfg2)
+  const c2 = new Config()
+  await c2.readYamlAsync()
+  expect(Config.getConfiguration().mqttconnect.username).toBe('real_user_1')
+  expect(Config.getConfiguration().mqttconnect.password).toBe('real_pw_1')
+  expect(Config.getConfiguration().githubPersonalToken).toBe('real_token_1')
+
+  // Restore fixture state for any later tests in the file.
+  new Config().writeConfiguration(Config.getConfiguration())
+})
+
 // Test 3: Round-trip — write then read produces identical non-secret values
 it('round-trip: write then read produces identical values', async () => {
   const original = Config.getConfiguration()

@@ -13,30 +13,37 @@
 docker run -d \
   --name modbus2mqtt \
   -p 3000:3000 \
-  -v /path/to/config:/config \
+  -v /path/to/data:/data \
   --device=/dev/ttyUSB0 \
   modbus2mqtt/modbus2mqtt:latest
 ```
+
+**All** configuration — MQTT settings, busses, devices, specifications and
+secrets — is stored under `/data`, so mounting `/data` is all you need for the
+whole setup to survive container recreation. See [Volume Mounts](#volume-mounts)
+below.
 
 ### Using Docker Compose
 
 Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3.8'
-
 services:
   modbus2mqtt:
     image: modbus2mqtt/modbus2mqtt:latest
     container_name: modbus2mqtt
     ports:
       - '3000:3000'
+      - '3443:3443'
     volumes:
-      - ./config:/config
+      # ONE volume: all configuration + public specs live under /data
+      - data:/data
+      # Optional: TLS certificates (fullchain.pem, privkey.pem, secrets.txt)
+      - ssl:/ssl
     devices:
       - /dev/ttyUSB0:/dev/ttyUSB0
     environment:
-      - NODE_ENV=production
+      - TZ=Europe/Berlin
     restart: unless-stopped
 
   mosquitto:
@@ -50,6 +57,10 @@ services:
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
     restart: unless-stopped
+
+volumes:
+  data:
+  ssl:
 ```
 
 Start the services:
@@ -58,16 +69,24 @@ Start the services:
 docker-compose up -d
 ```
 
+> **Tip:** when you recreate the container you must **not** use `docker compose down -v`, because that deletes the `data` volume itself — recreate with `docker compose up -d` or `docker compose down` + `up -d` instead (keeps the volume).
+
 ## Configuration
 
 ### Volume Mounts
 
-- `/config` - Configuration files (specifications, bus configuration)
-- `/data` - Optional: SSH configuration and runtime data
+Everything the app stores lives under **`/data`** — the single persistent share:
 
-**Required**: `/config` for persistent configuration
-**Optional**: `/data` Contains public specifications.
+- **`/data/modbus2mqtt`** - configuration (MQTT settings, busses, devices, local specifications, `secrets.yaml`)
+- **`/data/public`** - git-cloned public specifications
+
+**Required**: `/data` for persistent configuration.
+
 **Optional**: `/ssl` location for TLS certificates (`fullchain.pem`, `privkey.pem`) and `secrets.txt`. The `secrets.txt` file holds a local random key used e.g. as fallback for `OIDC_SESSION_SECRET`. Losing it invalidates existing OIDC browser sessions — users simply have to log in again.
+
+**Migration from the old `/data/local` layout:** if a legacy `/data/local`
+directory exists with configuration, the container startup script automatically copies it
+to `/data/modbus2mqtt` — you don't lose anything.
 
 ### Device Access
 
@@ -135,15 +154,12 @@ The modbus2mqtt container runs with a dedicated user for security:
 
 ```bash
 # Create directories with correct ownership
-mkdir -p ./config ./data
-sudo chown -R 1000:20 ./config ./data
-chmod -R 755 ./config ./data
+mkdir -p ./data
+sudo chown -R 1000:20 ./data
+chmod -R 755 ./data
 
-# Run container (data mount optional, only needed for SSH)
-docker run -d -p 3000:3000 -v ./config:/config modbus2mqtt/modbus2mqtt:latest
-
-# With SSH support
-docker run -d -p 3000:3000 -p 2222:22 -v ./config:/config -v ./data:/data modbus2mqtt/modbus2mqtt:latest
+# Run container - all configuration + specs persist in ./data
+docker run -d -p 3000:3000 -v ./data:/data modbus2mqtt/modbus2mqtt:latest
 ```
 
 **Option 2: User mapping in Docker**
@@ -176,15 +192,15 @@ If you see `EACCES: permission denied` errors:
 1. **Check current ownership**:
 
    ```bash
-   ls -la ./config ./data
+   ls -la ./data
    # Should show: drwxr-xr-x ... 1000 dialout
    ```
 
 2. **Fix ownership**:
 
    ```bash
-   sudo chown -R 1000:20 ./config ./data
-   chmod -R 755 ./config ./data
+   sudo chown -R 1000:20 ./data
+   chmod -R 755 ./data
    ```
 
 3. **Verify container user**:
@@ -259,7 +275,6 @@ Create `/data/options.json`:
 docker run -d \
   -p 3000:3000 \
   -p 2222:22 \
-  -v ./config:/config \
   -v ./data:/data \
   modbus2mqtt/modbus2mqtt:latest
 
@@ -277,8 +292,7 @@ services:
       - '3000:3000'
       - '2222:22' # SSH access
     volumes:
-      - ./config:/config
-      - ./data:/data # Required for SSH configuration
+      - ./data:/data # persistent configuration + SSH configuration
 ```
 
 ### Multi-Architecture Support

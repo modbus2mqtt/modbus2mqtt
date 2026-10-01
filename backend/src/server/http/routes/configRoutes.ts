@@ -6,9 +6,10 @@ import { ConfigPersistence } from '../../persistence/configPersistence.js'
 import { ConfigBus } from '../../configbus.js'
 import { Bus } from '../../bus.js'
 import { MqttConnector } from '../../mqttconnector.js'
+import { MqttDiscover } from '../../mqttdiscover.js'
 import { ConverterMap, ConfigSpecification, LogLevelEnum, Logger } from '../../../specification/index.js'
 import { HttpErrorsEnum } from '../../../shared/specification/index.js'
-import { IUserAuthenticationStatus, apiUri } from '../../../shared/server/index.js'
+import { IUserAuthenticationStatus, Slave, apiUri, debugComponentCatalog } from '../../../shared/server/index.js'
 import type { AuthSession } from '../auth/oidc.js'
 import { sendResult } from '../sendResult.js'
 import { ApiError, Registrar, Result, ok } from '../routeHelpers.js'
@@ -44,6 +45,8 @@ export function registerConfigRoutes(r: Registrar): void {
 
   r.get(apiUri.converters, () => ok(ConverterMap.getConverters()))
 
+  r.get(apiUri.debugComponents, () => ok(debugComponentCatalog))
+
   r.get(apiUri.configuration, () => {
     try {
       const config = Config.getConfiguration()
@@ -56,17 +59,39 @@ export function registerConfigRoutes(r: Registrar): void {
   })
 
   r.post(apiUri.configuration, (ctx) => {
+    const languageChanged =
+      ctx.body && typeof ctx.body === 'object' &&
+      'mqttdiscoverylanguage' in ctx.body &&
+      ctx.body.mqttdiscoverylanguage !== Config.getConfiguration().mqttdiscoverylanguage
     new Config().writeConfiguration(ctx.body as Parameters<Config['writeConfiguration']>[0])
     const config = Config.getConfiguration()
     ConfigSpecification.setMqttdiscoverylanguage(config.mqttdiscoverylanguage, config.githubPersonalToken)
+    // The discovery language used to be applied on the next HTTP poll only
+    // (generateDiscoveryPayloads reads the live config), but republishDiscovery
+    // only re-announces CHANGED payloads on each poll. When the user changes
+    // the discovery language in the webui, republish every subscribed slave
+    // right away so Home Assistant gets the translated names without a restart.
+    if (languageChanged) {
+      Bus.getBusses().forEach((bus) => {
+        bus.getSlaves().forEach((islave) => {
+          if (!islave.specification) return
+          const sl = new Slave(bus.getId(), islave, config.mqttbasetopic)
+          try {
+            MqttDiscover.getInstance().republishDiscoveryIfChanged(sl)
+          } catch (e) {
+            log.log(LogLevelEnum.error, 'republish after language change failed: ' + (e instanceof Error ? e.message : String(e)))
+          }
+        })
+      })
+    }
     return { status: HttpErrorsEnum.OkNoContent, body: JSON.stringify(config) }
   })
 
   r.get(apiUri.sslFiles, () => {
-    if (ConfigPersistence.sslDir && ConfigPersistence.sslDir.length) {
-      return ok(new ConfigPersistence().listSslFiles())
-    }
-    throw new ApiError(HttpErrorsEnum.ErrNotFound, 'not found')
+    // Always answer with the file list (which falls back to the config dir when
+    // the ssl dir is empty/missing) + the path actually browsed, so the UI can
+    // show where the files come from instead of a misleading empty state.
+    return ok(new ConfigPersistence().listSslFiles())
   })
 
   r.post(apiUri.translate, () => {

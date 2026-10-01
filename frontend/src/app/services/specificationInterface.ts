@@ -15,6 +15,8 @@ export interface ISpecificationMethods {
   canEditEntity(): boolean
   getMqttLanguageName(): string
   getUom(entity_id: number): string
+  /** Localized entity (register) name in the current MQTT discovery language. */
+  getEntityName(entityId: number): string
   addEntity(addedEntity: ImodbusEntityWithName): void
   deleteEntity(entityId: number): void
   copy2Translation(entity: Ientity): void

@@ -216,3 +216,75 @@ it('dual-format: JSON takes precedence over YAML for same filename', () => {
   fs.unlinkSync(join(localSpecDir, 'dualtest.yaml'))
   fs.unlinkSync(join(localSpecDir, 'dualtest.json'))
 })
+
+// Test 9: Uploaded local files + per-language datasheets persist as binaries
+// + files.yaml sidecar, and the summary list carries the lang attribute.
+it('persistence: writes uploaded local files + files.yaml with langs', () => {
+  const localSpecDir = join(ConfigSpecification.getLocalDir(), 'specifications')
+  fs.mkdirSync(localSpecDir, { recursive: true })
+
+  const imgB64 = Buffer.from('fake-image-bytes').toString('base64')
+  const pdfDeB64 = Buffer.from('fake-pdf-de').toString('base64')
+  const pdfEnB64 = Buffer.from('fake-pdf-en').toString('base64')
+  const spec = {
+    version: SPECIFICATION_VERSION,
+    filename: 'mediapersist.yaml',
+    entities: [],
+    files: [
+      { url: 'specifications/files/mediapersist/photo.jpg', fileLocation: FileLocation.Local, usage: SpecificationFileUsage.img, data: imgB64, mimeType: 'image/jpeg' },
+      { url: 'specifications/files/mediapersist/sheet_de.pdf', fileLocation: FileLocation.Local, usage: SpecificationFileUsage.documentation, lang: 'de', data: pdfDeB64, mimeType: 'application/pdf' },
+      { url: 'specifications/files/mediapersist/sheet_en.pdf', fileLocation: FileLocation.Local, usage: SpecificationFileUsage.documentation, lang: 'en', data: pdfEnB64, mimeType: 'application/pdf' },
+      { url: 'https://vendor.example.com/sheet.pdf', fileLocation: FileLocation.Global, usage: SpecificationFileUsage.documentation, lang: 'en' },
+    ],
+    i18n: [{ lang: 'en', texts: [{ textId: 'name', text: 'Media Persist' }] }],
+    testdata: {},
+    status: SpecificationStatus.new,
+    identified: 0,
+    nextEntityId: 1,
+  }
+  // writeSpecification normalizes + persists
+  const cfgSpec = new ConfigSpecification()
+  cfgSpec.writeSpecification(spec as never, undefined, null)
+
+  const filesDir = join(ConfigSpecification.getLocalDir(), 'specifications/files/mediapersist')
+  expect(fs.existsSync(join(filesDir, 'photo.jpg'))).toBe(true)
+  expect(fs.readFileSync(join(filesDir, 'photo.jpg'), 'utf8')).toBe('fake-image-bytes')
+  expect(fs.existsSync(join(filesDir, 'sheet_de.pdf'))).toBe(true)
+  expect(fs.readFileSync(join(filesDir, 'sheet_de.pdf'), 'utf8')).toBe('fake-pdf-de')
+
+  const yaml = fs.readFileSync(join(filesDir, 'files.yaml'), 'utf8')
+  expect(yaml).toContain('usage: img')
+  expect(yaml).toContain('lang: de')
+  expect(yaml).toContain('photo.jpg')
+  // remote (Global) files must not be in the local files.yaml
+  expect(yaml).not.toContain('vendor.example.com')
+
+  // in-memory spec keeps the canonical urls + langs
+  const stored = ConfigSpecification.getSpecificationByFilename('mediapersist.yaml') ||
+    ConfigSpecification.getSpecificationByFilename('mediapersist')
+  expect(stored).toBeDefined()
+  const docs = (stored!.files || []).filter((f) => f.usage == SpecificationFileUsage.documentation)
+  expect(docs.find((f) => f.lang === 'de')).toBeDefined()
+  expect(docs.find((f) => f.lang === 'en')).toBeDefined()
+
+  // summary list contract: url + usage + lang
+  let summary: { filename: string; files: { url: string; usage: string; lang?: string }[] } | undefined
+  cfgSpec.filterAllSpecifications((s) => {
+    if (s.filename === 'mediapersist.yaml' || s.filename === 'mediapersist') {
+      summary = {
+        filename: s.filename,
+        files: s.files.map((f) => ({ url: f.url, usage: f.usage, lang: f.lang })),
+      }
+    }
+  })
+  expect(summary).toBeDefined()
+  const enDoc = summary!.files.find((f) => f.usage === 'doc' && f.lang === 'en')
+  expect(enDoc).toBeDefined()
+  expect(enDoc!.url).toContain('specifications/files/mediapersist/')
+
+  cfgSpec.deleteSpecification('mediapersist.yaml')
+  const jsonPath = join(localSpecDir, 'mediapersist.json')
+  if (fs.existsSync(jsonPath)) fs.unlinkSync(jsonPath)
+  const yaml2 = join(localSpecDir, 'mediapersist.yaml')
+  if (fs.existsSync(yaml2)) fs.unlinkSync(yaml2)
+})

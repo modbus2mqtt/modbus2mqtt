@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -78,7 +78,7 @@ jobs:
       - name: Find associated PR for pushed commit
         if: steps.check_version.outputs.changed == 'true'
         id: prcheck
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           env: |
@@ -173,7 +173,7 @@ jobs:
 
       - name: Comment on affected PRs
         if: steps.prcheck.outputs.from_fork == 'true'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           env: |

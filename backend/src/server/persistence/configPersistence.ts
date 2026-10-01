@@ -49,30 +49,50 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
     }
 
     const secretsFile = join(ConfigPersistence.getLocalDir(), 'secrets.yaml')
-    let src: string = fs.readFileSync(yamlFile, { encoding: 'utf8' })
+    const src: string = fs.readFileSync(yamlFile, { encoding: 'utf8' })
+    let parsed = parse(src)
     if (fs.existsSync(secretsFile)) {
       const secrets = parse(fs.readFileSync(secretsFile, { encoding: 'utf8' })) ?? {}
-      const srcLines = src.split('\n')
-      src = ''
-      srcLines.forEach((line) => {
-        const r1 = /"*!secret ([a-zA-Z0-9-_]*)"*/g
-        const matches = line.matchAll(r1)
-        let skipLine = false
-        for (const match of matches) {
-          const key = match[1]
-          if (secrets[key] && secrets[key].length) {
-            line = line.replace(match[0], '"' + secrets[key] + '"')
-          } else {
-            skipLine = true
-            if (!secrets[key]) debug('no entry in secrets file for ' + key + ' line will be ignored')
-            else debug('secrets file entry contains !secret for ' + key + ' line will be ignored')
+      // Substitute !secret placeholders AFTER parsing. The old approach edited
+      // the raw YAML text and wrapped values in literal quotes, which corrupted
+      // the secret on every write cycle (''!secret x'' -> '"value"' -> parse ->
+      // value with embedded quotes -> written back quoted -> next read produced
+      // invalid YAML). Post-parse substitution keeps the actual value intact.
+      const secretRe = /^!secret ([a-zA-Z0-9-_]+)$/
+      const resolveSecrets = (node: unknown): unknown => {
+        if (node == null) return node
+        if (typeof node === 'string') {
+          const m = node.match(secretRe)
+          if (!m) return node
+          const key = m[1]
+          if (secrets[key] !== undefined && secrets[key] !== null && String(secrets[key]).length > 0) {
+            return String(secrets[key])
           }
+          debug('no usable entry in secrets file for ' + key + ' field will be ignored')
+          return undefined
         }
-        if (!skipLine) src = src.concat(line, '\n')
-      })
+        if (Array.isArray(node)) {
+          const out: unknown[] = []
+          for (const item of node) {
+            const resolved = resolveSecrets(item)
+            if (resolved !== undefined) out.push(resolved)
+          }
+          return out
+        }
+        if (typeof node === 'object') {
+          const out: Record<string, unknown> = {}
+          for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+            const resolved = resolveSecrets(v)
+            if (resolved !== undefined) out[k] = resolved
+          }
+          return out
+        }
+        return node
+      }
+      parsed = resolveSecrets(parsed)
     }
 
-    return parse(src) as Iconfiguration
+    return parsed as Iconfiguration
   }
 
   write(config: Iconfiguration): void {
@@ -195,18 +215,67 @@ export class ConfigPersistence implements ISingletonPersistence<Iconfiguration> 
 
   /**
    * Recursively lists all certificate files in the ssl directory.
-   * Returns paths relative to sslDir using forward slashes (e.g. "mtls/client.pem"),
-   * so certificates stored in subdirectories can be selected in the UI.
+   * Returns paths relative to the browsed root using forward slashes
+   * (e.g. "mtls/client.pem"), so certificates stored in subdirectories can be
+   * selected in the UI.
+   *
+   * When the ssl directory is missing or empty (the addon/deployment does not
+   * mount any certificates there), the browser falls back to the config
+   * directory, which always contains files (modbus2mqtt.yaml, busses/,
+   * specifications/...). Without this fallback the picker would show a
+   * misleading "no server files available" even though the container clearly
+   * has a populated filesystem — the root returned tells the UI which
+   * directory was actually browsed.
    */
-  listSslFiles(): string[] {
-    if (!ConfigPersistence.sslDir || !ConfigPersistence.sslDir.length) return []
-    const root = ConfigPersistence.sslDir
+  listSslFiles(): { files: string[]; root: string } {
+    const candidates = [ConfigPersistence.sslDir, ConfigPersistence.getLocalDir(), ConfigPersistence.configDir]
+      .filter((d): d is string => !!d && d.length > 0)
+    for (const root of candidates) {
+      const files = this.walkFiles(root)
+      if (files.length > 0) return { files, root }
+    }
+    // Nothing browsable at all — return the sslDir (even if missing) so the UI
+    // can at least show which path is being looked at.
+    return { files: [], root: ConfigPersistence.sslDir || process.cwd() }
+  }
+
+  /** Walk `root` and collect all regular files (following symlinks safely). */
+  private walkFiles(root: string): string[] {
     const result: string[] = []
+    // Track visited real paths so symlink cycles (dir -> parent) cannot loop forever.
+    const visited = new Set<string>()
     const walk = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      let realDir: string
+      try {
+        realDir = fs.realpathSync(dir)
+      } catch {
+        return // unreadable/missing dir
+      }
+      if (visited.has(realDir)) return
+      visited.add(realDir)
+      let entries: fs.Dirent[]
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true })
+      } catch {
+        return // permission error etc — skip
+      }
+      for (const entry of entries) {
         const full = join(dir, entry.name)
-        if (entry.isDirectory()) walk(full)
-        else if (entry.isFile()) result.push(path.relative(root, full).split(path.sep).join('/'))
+        // Follow symlinks: Home Assistant's /ssl often mounts certificate
+        // stores as symlinks, and Dirent.isFile() is false for them.
+        let isDir = entry.isDirectory()
+        let isFile = entry.isFile()
+        if (entry.isSymbolicLink()) {
+          try {
+            const st = fs.statSync(full) // follows the link
+            isDir = st.isDirectory()
+            isFile = st.isFile()
+          } catch {
+            continue // dangling symlink
+          }
+        }
+        if (isDir) walk(full)
+        else if (isFile) result.push(path.relative(root, full).split(path.sep).join('/'))
       }
     }
     walk(root)
