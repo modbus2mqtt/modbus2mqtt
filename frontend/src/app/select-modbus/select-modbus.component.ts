@@ -87,7 +87,7 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
   modbusIsRtu: boolean[] = []
   busses: MatTableDataSource<IBus> = new MatTableDataSource<IBus>([])
   bussesObservable: Observable<IBus[]>
-  baudRates: Array<number> = [2400, 4800, 9600, 11200, 115700]
+  baudRates: Array<number> = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
   // Modbus RTU framing. 8N1 is what most devices ship with, but the specification asks for even
   // parity, and a device that insists on 8E1 or 8N2 could not be reached before these existed.
   dataBitsOptions: Array<number> = [7, 8]
@@ -164,6 +164,9 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
         const sd = this.getBusFormGroup(idx).get(['rtu', 'serial']) as FormControl<string>
         sd.setValue(serialport)
 
+        // A bus saved with a rate that is not offered (e.g. the mistyped 11200/115700 of older
+        // versions) must still show it, otherwise the select renders empty and hides the real value.
+        if (baudRate && !this.baudRates.includes(baudRate)) this.baudRates = [...this.baudRates, baudRate].sort((a, b) => a - b)
         const br = fg.get(['rtu', 'selectBaudRate'])
         if (br) br.setValue(baudRate)
         const to = fg.get(['rtu', 'timeout'])
