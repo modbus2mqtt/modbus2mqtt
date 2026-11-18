@@ -33,6 +33,7 @@ import { Observable, Subscription } from 'rxjs'
 import { MatTabChangeEvent, MatTabGroup, MatTab } from '@angular/material/tabs'
 import { BUS_TIMEOUT_DEFAULT } from '@shared/specification'
 import { MatOption } from '@angular/material/core'
+import { MatAutocomplete, MatAutocompleteTrigger } from '@angular/material/autocomplete'
 import { MatInput } from '@angular/material/input'
 import { MatFormField, MatLabel } from '@angular/material/form-field'
 import { MatIcon } from '@angular/material/icon'
@@ -61,6 +62,8 @@ import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/m
     MatInput,
     MatSelect,
     MatOption,
+    MatAutocomplete,
+    MatAutocompleteTrigger,
   ],
 })
 export class SelectModbusComponent implements AfterViewInit, OnDestroy {
@@ -87,7 +90,7 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
   modbusIsRtu: boolean[] = []
   busses: MatTableDataSource<IBus> = new MatTableDataSource<IBus>([])
   bussesObservable: Observable<IBus[]>
-  baudRates: Array<number> = [2400, 4800, 9600, 11200, 115700]
+  baudRates: Array<number> = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
   // Modbus RTU framing. 8N1 is what most devices ship with, but the specification asks for even
   // parity, and a device that insists on 8E1 or 8N2 could not be reached before these existed.
   dataBitsOptions: Array<number> = [7, 8]
@@ -164,6 +167,9 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
         const sd = this.getBusFormGroup(idx).get(['rtu', 'serial']) as FormControl<string>
         sd.setValue(serialport)
 
+        // A bus saved with a rate that is not offered (e.g. the mistyped 11200/115700 of older
+        // versions) must still show it, otherwise the select renders empty and hides the real value.
+        if (baudRate && !this.baudRates.includes(baudRate)) this.baudRates = [...this.baudRates, baudRate].sort((a, b) => a - b)
         const br = fg.get(['rtu', 'selectBaudRate'])
         if (br) br.setValue(baudRate)
         const to = fg.get(['rtu', 'timeout'])
@@ -301,23 +307,27 @@ export class SelectModbusComponent implements AfterViewInit, OnDestroy {
     return devices
   }
 
+  // Suggestions narrow down while typing. A value that is already one of the devices shows the
+  // whole list again, so a configured bus can still be switched to another device.
+  getSerialSuggestions(bus: IBus | null, idx: number): string[] {
+    const devices = this.getSerialDevices(bus)
+    const value = this.getSerialFormControl(idx)?.value
+    if (!value || devices.includes(value)) return devices
+    const lower = value.toLowerCase()
+    return devices.filter((d) => d.toLowerCase().includes(lower))
+  }
+
   isRTU(idx: number): boolean {
     return this.modbusIsRtu[idx]
   }
   checkConfigRTU(): boolean {
     return false //this.config !== undefined && this.config.connectionData[0].baudrate == undefined
   }
-  private serialValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
-    return this.serialDevices.length == 0 && (!control.value || control.value.length == 0) ? { 'not empty': control.value } : null
-  }
-  private serialDevicesValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
-    return this.serialDevices.length > 0 && (!control.value || control.value.length == 0) ? { 'not empty': control.value } : null
-  }
   createConnectionDataFormGroup(): FormGroup {
     const fg = this._formBuilder.group({
       selectedBusTab: this._formBuilder.control(0),
       rtu: this._formBuilder.group({
-        serial: [null, this.serialValidator],
+        serial: [null, Validators.required],
         selectBaudRate: [9600, Validators.required],
         dataBits: [DEFAULT_SERIAL_DATABITS, Validators.required],
         parity: [DEFAULT_SERIAL_PARITY, Validators.required],

@@ -76,21 +76,17 @@
               <mat-tab label="RTU" formGroupName="rtu">
                 <div class="flexcolumns">
                   <div>
-                    @if (getSerialDevices().length == 0) {
-                      <mat-form-field>
-                        <mat-label>Modbus Serial Device</mat-label>
-                        <input #serial matInput formControlName="serial" />
-                      </mat-form-field>
-                    } @else {
-                      <mat-form-field>
-                        <mat-label>Serial Port</mat-label>
-                        <mat-select matInput formControlName="serial">
-                          @for (device of getSerialDevices(bus); track $index) {
-                            <mat-option [value]="device">{{ device }}</mat-option>
-                          }
-                        </mat-select>
-                      </mat-form-field>
-                    }
+                    <!-- Free input with the detected devices as suggestions: a udev symlink or a
+                         /dev/serial/by-id path works wherever the OS provides one, without having to be listed -->
+                    <mat-form-field>
+                      <mat-label>Serial Port</mat-label>
+                      <input matInput formControlName="serial" [matAutocomplete]="serialAuto" />
+                      <mat-autocomplete #serialAuto="matAutocomplete">
+                        @for (device of getSerialSuggestions(bus, i); track device) {
+                          <mat-option [value]="device">{{ device }}</mat-option>
+                        }
+                      </mat-autocomplete>
+                    </mat-form-field>
                   </div>
                   <div>
                     <mat-form-field>
