@@ -16,6 +16,7 @@ interface HassioHardwareInfo {
     devices: Array<{
       subsystem?: string
       dev_path: string
+      by_id?: string | null
     }>
   }
 }
@@ -318,12 +319,21 @@ export class ConfigBus {
     }
   }
 
+  static serialByIdDir = '/dev/serial/by-id'
+
   private static listDevicesUdev(next: (devices: string[]) => void, reject: (error: Error) => void): void {
     SerialPort.list()
       .then((portInfo) => {
         const devices: string[] = []
         portInfo.forEach((port) => {
           devices.push(port.path)
+          // On Linux, udev names USB adapters by their serial number under /dev/serial/by-id.
+          // That path survives replugging and reordering, /dev/ttyUSBn does not.
+          // Other systems have no such directory, so offer it only where it exists.
+          if (port.pnpId) {
+            const byId = ConfigBus.serialByIdDir + '/' + port.pnpId
+            if (fs.existsSync(byId)) devices.push(byId)
+          }
         })
         next(devices)
       })
@@ -341,6 +351,8 @@ export class ConfigBus {
         try {
           fs.accessSync(device.dev_path, fs.constants.R_OK)
           rc.push(device.dev_path)
+          // The supervisor reports the stable /dev/serial/by-id path when the OS provides one
+          if (device.by_id && fs.existsSync(device.by_id)) rc.push(device.by_id)
         } catch (e) {
           log.log(LogLevelEnum.error, 'Permission denied for read serial device %s %s', device.dev_path, String(e))
         }
